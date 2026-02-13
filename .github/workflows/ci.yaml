@@ -89,7 +89,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install goose
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
       - name: Verify Migration Up
         run: goose -dir migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
       - name: Verify Migration Down
