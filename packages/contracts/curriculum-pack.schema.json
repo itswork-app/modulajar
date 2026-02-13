@@ -1,0 +1,99 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://modulajar.app/schemas/curriculum-pack.schema.json",
+    "title": "CurriculumPack",
+    "description": "Schema for a versioned curriculum pack definition",
+    "type": "object",
+    "required": [
+        "pack_id",
+        "name",
+        "version",
+        "jenjang",
+        "kelas",
+        "subjects"
+    ],
+    "properties": {
+        "pack_id": {
+            "type": "string",
+            "description": "Unique identifier for this pack (e.g. merdeka-sd4-v1)",
+            "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+            "type": "string",
+            "description": "Human-readable name of the curriculum pack"
+        },
+        "version": {
+            "type": "string",
+            "description": "Semantic version of this pack (e.g. v1, v1.1)"
+        },
+        "jenjang": {
+            "type": "string",
+            "enum": [
+                "SD",
+                "SMP",
+                "SMA",
+                "SMK"
+            ],
+            "description": "Education level"
+        },
+        "kelas": {
+            "type": "string",
+            "description": "Grade/class level (e.g. 4, 7, 10)"
+        },
+        "subjects": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "$ref": "#/definitions/Subject"
+            },
+            "description": "List of subjects in this curriculum pack"
+        }
+    },
+    "definitions": {
+        "Subject": {
+            "type": "object",
+            "required": [
+                "code",
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Subject code (e.g. BI, MTK, IPAS)"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Full subject name"
+                },
+                "time_allocation": {
+                    "type": "object",
+                    "properties": {
+                        "hours_per_week": {
+                            "type": "number"
+                        },
+                        "weeks_per_semester": {
+                            "type": "number"
+                        }
+                    },
+                    "description": "Time allocation baseline (placeholder)"
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "description": "Learning outcomes (empty for v0, populated in PR-005)"
+                }
+            }
+        }
+    },
+    "additionalProperties": false
+}

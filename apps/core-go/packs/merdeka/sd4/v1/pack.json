@@ -1,0 +1,63 @@
+{
+    "pack_id": "merdeka-sd4-v1",
+    "name": "Kurikulum Merdeka SD Kelas 4",
+    "version": "v1",
+    "jenjang": "SD",
+    "kelas": "4",
+    "subjects": [
+        {
+            "code": "BI",
+            "name": "Bahasa Indonesia",
+            "time_allocation": {
+                "hours_per_week": 7,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        },
+        {
+            "code": "MTK",
+            "name": "Matematika",
+            "time_allocation": {
+                "hours_per_week": 5,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        },
+        {
+            "code": "IPAS",
+            "name": "Ilmu Pengetahuan Alam dan Sosial",
+            "time_allocation": {
+                "hours_per_week": 5,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        },
+        {
+            "code": "PPKN",
+            "name": "Pendidikan Pancasila dan Kewarganegaraan",
+            "time_allocation": {
+                "hours_per_week": 2,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        },
+        {
+            "code": "SBK",
+            "name": "Seni Budaya dan Keterampilan",
+            "time_allocation": {
+                "hours_per_week": 2,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        },
+        {
+            "code": "PJOK",
+            "name": "Pendidikan Jasmani, Olahraga, dan Kesehatan",
+            "time_allocation": {
+                "hours_per_week": 2,
+                "weeks_per_semester": 18
+            },
+            "outcomes": []
+        }
+    ]
+}
