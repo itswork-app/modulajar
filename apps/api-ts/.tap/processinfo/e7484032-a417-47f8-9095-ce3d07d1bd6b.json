@@ -1,0 +1,202 @@
+{
+  "date": "2026-02-13T10:40:58.433Z",
+  "argv": [
+    "/home/kangza/.nvm/versions/node/v24.11.1/bin/node",
+    "/home/kangza/workspace/modulajar/apps/api-ts/dist/tests/integration.test.js"
+  ],
+  "execArgv": [
+    "--import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs",
+    "--import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs",
+    "--enable-source-maps",
+    "--import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs"
+  ],
+  "NODE_OPTIONS": "\"--import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs\"",
+  "cwd": "/home/kangza/workspace/modulajar/apps/api-ts",
+  "pid": 13761,
+  "ppid": 13702,
+  "parent": null,
+  "uuid": "e7484032-a417-47f8-9095-ce3d07d1bd6b",
+  "files": [
+    "/home/kangza/workspace/modulajar/apps/api-ts/dist/tests/integration.test.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@isaacs/ts-node-temp-fork-for-pr-2009/import.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@isaacs/ts-node-temp-fork-for-pr-2009/import-loader.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/mock-service.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/index.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/index.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/is-relative-require.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/export-line.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/munge-mocks.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/resolve-mock-entry-point.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/service-key.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/call-site-like.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/require-resolve.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-all-conditional-values.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-all-conditions.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-unique-condition-sets.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-all-exports.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-all-local-imports.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-conditional-value.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-import.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/is-windows.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/parse.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-conditional-values-list.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/errors.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-named-exports-list.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/read-pkg.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-export.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/star-glob.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/to-path.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/file-exists.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/find-dep-package.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/to-file-url.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-dependency-export.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-package-import.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/read-json.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/find-star-match.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/dist/esm/index.min.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/walk-up-path/dist/esm/index.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/loader.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/hooks.mjs",
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/mock-service-client.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/dist/src/plugins/mock_auth.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/dist/src/routes/auth.js",
+    "/home/kangza/workspace/modulajar/apps/api-ts/dist/src/routes/workspace.js"
+  ],
+  "sources": {
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/src/import.mts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/import.mts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/mock-service.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/mock-service.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/index.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/src/index.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/index.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/index.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/is-relative-require.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/is-relative-require.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/export-line.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/export-line.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/munge-mocks.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/munge-mocks.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/resolve-mock-entry-point.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/resolve-mock-entry-point.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/service-key.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/src/service-key.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/call-site-like.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/src/call-site-like.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/require-resolve.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/src/require-resolve.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-all-conditional-values.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/get-all-conditional-values.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-all-conditions.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/get-all-conditions.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-unique-condition-sets.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/get-unique-condition-sets.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-all-exports.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-all-exports.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-all-local-imports.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-all-local-imports.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-conditional-value.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-conditional-value.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-import.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-import.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/is-windows.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/is-windows.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/dist/esm/parse.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/stack/src/parse.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-conditional-values-list.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/get-conditional-values-list.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/errors.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/errors.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/get-named-exports-list.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/get-named-exports-list.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/read-pkg.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/read-pkg.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-export.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-export.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/star-glob.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/star-glob.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/to-path.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/to-path.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/file-exists.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/file-exists.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/find-dep-package.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/find-dep-package.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/to-file-url.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/to-file-url.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-dependency-export.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-dependency-export.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/resolve-package-import.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/resolve-package-import.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/read-json.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/read-json.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/dist/esm/find-star-match.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/resolve-import/src/find-star-match.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/dist/esm/index.min.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/node_modules/balanced-match/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/node_modules/brace-expansion/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/assert-valid-pattern.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/brace-expressions.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/unescape.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/ast.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/escape.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minimatch/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/glob.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/lru-cache/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/path-scurry/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/node_modules/minipass/src/index.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/pattern.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/ignore.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/processor.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/walker.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/has-magic.ts",
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/glob/src/index.ts"
+    ],
+    "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/walk-up-path/dist/esm/index.js": [
+      "/home/kangza/workspace/modulajar/apps/api-ts/node_modules/walk-up-path/src/index.ts"
+    ]
+  },
+  "root": "e7484032-a417-47f8-9095-ce3d07d1bd6b",
+  "externalID": "dist/tests/integration.test.js",
+  "code": 0,
+  "signal": null,
+  "runtime": 1709.739846
+}
