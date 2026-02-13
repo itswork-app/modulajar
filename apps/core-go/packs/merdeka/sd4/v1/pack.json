@@ -4,6 +4,7 @@
     "version": "v1",
     "jenjang": "SD",
     "kelas": "4",
+    "scope": "yearly",
     "subjects": [
         {
             "code": "BI",
@@ -12,7 +13,28 @@
                 "hours_per_week": 7,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "BI-B-01",
+                    "description": "Menyimak dan memahami informasi dari teks lisan, termasuk percakapan dan dialog"
+                },
+                {
+                    "code": "BI-B-02",
+                    "description": "Membaca dan mengidentifikasi elemen buku fiksi dan non-fiksi serta mengenali jenis teks"
+                },
+                {
+                    "code": "BI-B-03",
+                    "description": "Menulis teks narasi, deskripsi, rekon, prosedur, dan eksposisi dengan kalimat beragam dan informasi akurat"
+                },
+                {
+                    "code": "BI-B-04",
+                    "description": "Menyajikan gagasan dan pendapat secara lisan dengan struktur yang jelas"
+                },
+                {
+                    "code": "BI-B-05",
+                    "description": "Menulis tegak bersambung dengan rapi dan konsisten"
+                }
+            ]
         },
         {
             "code": "MTK",
@@ -21,7 +43,36 @@
                 "hours_per_week": 5,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "MTK-B-01",
+                    "description": "Membaca, menulis, membandingkan, dan mengurutkan bilangan cacah hingga 500.000 menggunakan sistem nilai tempat"
+                },
+                {
+                    "code": "MTK-B-02",
+                    "description": "Menentukan hasil penjumlahan, pengurangan, perkalian, dan pembagian bilangan cacah"
+                },
+                {
+                    "code": "MTK-B-03",
+                    "description": "Menyelesaikan masalah kontekstual dengan operasi hitung termasuk konteks uang dan pecahan antara 0 dan 1"
+                },
+                {
+                    "code": "MTK-B-04",
+                    "description": "Menentukan kelipatan, faktor, KPK, dan FPB menggunakan pohon faktor"
+                },
+                {
+                    "code": "MTK-B-05",
+                    "description": "Membandingkan dan mengurutkan pecahan dengan pembilang satu atau penyebut sama"
+                },
+                {
+                    "code": "MTK-B-06",
+                    "description": "Mengukur dan mengestimasi panjang, berat, dan waktu menggunakan satuan baku"
+                },
+                {
+                    "code": "MTK-B-07",
+                    "description": "Mengenal dan mengidentifikasi sifat bangun datar serta menghitung keliling dan luas persegi dan persegi panjang"
+                }
+            ]
         },
         {
             "code": "IPAS",
@@ -30,7 +81,32 @@
                 "hours_per_week": 5,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "IPAS-B-01",
+                    "description": "Menganalisis hubungan antara bentuk dan fungsi bagian tubuh manusia"
+                },
+                {
+                    "code": "IPAS-B-02",
+                    "description": "Membuat simulasi siklus hidup makhluk hidup dan mengidentifikasi masalah pelestarian sumber daya alam"
+                },
+                {
+                    "code": "IPAS-B-03",
+                    "description": "Mengidentifikasi proses perubahan wujud zat dan hubungannya dengan perpindahan kalor"
+                },
+                {
+                    "code": "IPAS-B-04",
+                    "description": "Mengidentifikasi bentuk energi dan perubahannya serta memanfaatkan gejala kemagnetan dalam kehidupan sehari-hari"
+                },
+                {
+                    "code": "IPAS-B-05",
+                    "description": "Mendeskripsikan keanekaragaman hayati, keragaman budaya, dan kearifan lokal di Indonesia"
+                },
+                {
+                    "code": "IPAS-B-06",
+                    "description": "Membedakan kebutuhan dan keinginan, mengenal nilai mata uang, dan mendemonstrasikan penggunaannya"
+                }
+            ]
         },
         {
             "code": "PPKN",
@@ -39,7 +115,28 @@
                 "hours_per_week": 2,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "PPKN-B-01",
+                    "description": "Memahami dan menerapkan nilai-nilai sila Pancasila dalam kehidupan sehari-hari"
+                },
+                {
+                    "code": "PPKN-B-02",
+                    "description": "Menjelaskan tugas, peran, dan tanggung jawab sebagai warga sekolah dan masyarakat"
+                },
+                {
+                    "code": "PPKN-B-03",
+                    "description": "Mendeskripsikan interaksi sosial di lingkungan tempat tinggal dan sekolah"
+                },
+                {
+                    "code": "PPKN-B-04",
+                    "description": "Memahami hak dan kewajiban warga negara serta mengkomunikasikan pendapat dengan tanggung jawab"
+                },
+                {
+                    "code": "PPKN-B-05",
+                    "description": "Mengenal keberagaman suku, agama, ras, dan budaya serta pentingnya persatuan"
+                }
+            ]
         },
         {
             "code": "SBK",
@@ -48,7 +145,24 @@
                 "hours_per_week": 2,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "SBK-B-01",
+                    "description": "Mengeksplorasi dan menghasilkan karya seni rupa menggunakan elemen dasar: garis, bentuk, warna, dan tekstur"
+                },
+                {
+                    "code": "SBK-B-02",
+                    "description": "Memainkan alat musik sederhana dan menyanyikan lagu dengan irama dan tempo yang tepat"
+                },
+                {
+                    "code": "SBK-B-03",
+                    "description": "Mengekspresikan cerita melalui gerak tari dan drama sederhana"
+                },
+                {
+                    "code": "SBK-B-04",
+                    "description": "Mengenal dan mengapresiasi ragam seni budaya dari berbagai daerah di Indonesia"
+                }
+            ]
         },
         {
             "code": "PJOK",
@@ -57,7 +171,24 @@
                 "hours_per_week": 2,
                 "weeks_per_semester": 18
             },
-            "outcomes": []
+            "outcomes": [
+                {
+                    "code": "PJOK-B-01",
+                    "description": "Mempraktikkan variasi gerak dasar lokomotor, non-lokomotor, dan manipulatif dalam permainan dan olahraga"
+                },
+                {
+                    "code": "PJOK-B-02",
+                    "description": "Menerapkan konsep aktivitas kebugaran jasmani untuk memelihara kesehatan tubuh"
+                },
+                {
+                    "code": "PJOK-B-03",
+                    "description": "Mempraktikkan gerak dasar aktivitas senam dan aktivitas berirama"
+                },
+                {
+                    "code": "PJOK-B-04",
+                    "description": "Memahami dan menerapkan pola hidup sehat termasuk nutrisi, kebersihan diri, dan keselamatan"
+                }
+            ]
         }
     ]
 }

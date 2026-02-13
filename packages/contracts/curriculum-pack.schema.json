@@ -40,6 +40,14 @@
             "type": "string",
             "description": "Grade/class level (e.g. 4, 7, 10)"
         },
+        "scope": {
+            "type": "string",
+            "enum": [
+                "yearly",
+                "semester"
+            ],
+            "description": "Time scope of the outcomes (yearly = per tahun, semester = per semester)"
+        },
         "subjects": {
             "type": "array",
             "minItems": 1,
