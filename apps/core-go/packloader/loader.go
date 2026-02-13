@@ -33,6 +33,7 @@ type CurriculumPack struct {
 	Version  string    `json:"version"`
 	Jenjang  string    `json:"jenjang"`
 	Kelas    string    `json:"kelas"`
+	Scope    string    `json:"scope"`
 	Subjects []Subject `json:"subjects"`
 }
 

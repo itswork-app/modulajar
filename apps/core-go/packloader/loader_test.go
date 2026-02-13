@@ -41,6 +41,24 @@ func TestLoadPack(t *testing.T) {
 			t.Errorf("subject[%d]: expected code '%s', got '%s'", i, code, pack.Subjects[i].Code)
 		}
 	}
+
+	// Verify each subject has outcomes (PR-005 requirement)
+	for i, s := range pack.Subjects {
+		if len(s.Outcomes) == 0 {
+			t.Errorf("subject[%d] '%s': expected outcomes > 0, got 0", i, s.Code)
+		}
+		t.Logf("subject '%s': %d outcomes", s.Code, len(s.Outcomes))
+
+		// Verify each outcome has required fields
+		for j, o := range s.Outcomes {
+			if o.Code == "" {
+				t.Errorf("subject[%d].outcome[%d]: missing code", i, j)
+			}
+			if o.Description == "" {
+				t.Errorf("subject[%d].outcome[%d]: missing description", i, j)
+			}
+		}
+	}
 }
 
 func TestLoadPackMissingFields(t *testing.T) {
