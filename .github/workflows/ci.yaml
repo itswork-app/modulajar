@@ -69,3 +69,32 @@ jobs:
             go-version: '1.21'
             cache-dependency-path: apps/worker-go/go.sum
       - run: go test ./...
+
+  migration-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: modulajar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install goose
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: Verify Migration Up
+        run: goose -dir migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
+      - name: Verify Migration Down
+        run: goose -dir migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" down
+      - name: Verify Idempotency (Up Again)
+        run: goose -dir migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up

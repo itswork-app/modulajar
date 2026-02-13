@@ -1,4 +1,4 @@
-.PHONY: install build test
+.PHONY: install build test migrate-up migrate-down migrate-status
 
 install:
 	cd apps/console-web && npm install
@@ -17,3 +17,12 @@ test:
 	cd apps/api-ts && npm test
 	cd apps/core-go && go test ./...
 	cd apps/worker-go && go test ./...
+
+migrate-up:
+	goose -dir migrations postgres "$(DATABASE_URL)" up
+
+migrate-down:
+	goose -dir migrations postgres "$(DATABASE_URL)" down
+
+migrate-status:
+	goose -dir migrations postgres "$(DATABASE_URL)" status
