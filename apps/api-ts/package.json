@@ -8,17 +8,25 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.js",
     "lint": "echo 'No lint yet'",
-    "test": "echo 'No test yet'"
+    "test": "tap --allow-incomplete-coverage --allow-empty-coverage --node-arg=-r --node-arg=ts-node/register tests/**/*.test.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "fastify": "^5.7.4"
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.7.4",
+    "fastify-plugin": "^5.1.0",
+    "pg": "^8.18.0",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "@types/tap": "^15.0.12",
+    "tap": "^21.5.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
