@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 
 	"modulajar/apps/core-go/docgraph"
+	"modulajar/apps/core-go/gcs"
 	"modulajar/apps/core-go/packloader"
 	"modulajar/apps/core-go/planner"
 	"modulajar/apps/core-go/render"
@@ -37,11 +39,13 @@ type StatusUpdate struct {
 
 // RenderedDocument holds the composed HTML for one document (subject).
 type RenderedDocument struct {
-	DocumentID  string `json:"document_id"`
-	DID         string `json:"did"`
-	SubjectCode string `json:"subject_code"`
-	HTML        string `json:"html"`
-	FilePath    string `json:"file_path"` // "html://{did}/v1"
+	DocumentID   string `json:"document_id"`
+	DID          string `json:"did"`
+	SubjectCode  string `json:"subject_code"`
+	HTML         string `json:"html"`
+	FilePath     string `json:"file_path"`          // "html://{did}/v1" or "gcs://bucket/path.pdf"
+	PDFPath      string `json:"pdf_path,omitempty"` // temp local PDF path (cleared after upload)
+	PDFSizeBytes int64  `json:"pdf_size_bytes,omitempty"`
 }
 
 // WorkerResult is the outcome of a worker execution.
@@ -163,7 +167,56 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		})
 	}
 
-	// 6. Update version file_paths in doc graph
+	// 6. PDF render (optional — skipped if Playwright not available)
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	pdfEnabled := render.IsPDFRenderAvailable()
+
+	if pdfEnabled {
+		for i, rd := range renderedDocs {
+			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
+			pdfResult, err := render.RenderPDF(rd.HTML, tmpPDF)
+			if err != nil {
+				// PDF render failed — log but don't fail the job
+				// The HTML artifact is still valid
+				fmt.Fprintf(os.Stderr, "WARN: PDF render skipped for %s: %v\n", rd.SubjectCode, err)
+				continue
+			}
+			renderedDocs[i].PDFPath = tmpPDF
+			renderedDocs[i].PDFSizeBytes = pdfResult.SizeBytes
+		}
+	}
+
+	// 7. GCS upload (optional — skipped if GCS_BUCKET not set)
+	if gcsBucket != "" {
+		ctx := context.Background()
+		gcsClient, err := gcs.NewClient(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARN: GCS client init failed: %v\n", err)
+		} else if gcsClient != nil {
+			defer gcsClient.Close()
+
+			for i, rd := range renderedDocs {
+				if rd.PDFPath == "" {
+					continue // No PDF to upload
+				}
+
+				objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
+				if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
+					fmt.Fprintf(os.Stderr, "WARN: GCS upload failed for %s: %v\n", rd.SubjectCode, err)
+					continue
+				}
+
+				// Finalize file_path to GCS URI
+				renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
+
+				// Clean up temp PDF
+				os.Remove(rd.PDFPath)
+				renderedDocs[i].PDFPath = ""
+			}
+		}
+	}
+
+	// 8. Update version file_paths in doc graph
 	for i, ver := range graphResult.Versions {
 		for _, rd := range renderedDocs {
 			if ver.DocumentID == rd.DocumentID {
@@ -173,7 +226,7 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		}
 	}
 
-	// 7. Success
+	// 9. Success
 	return &WorkerResult{
 		JobID:             payload.JobID,
 		PackageID:         payload.PackageID,
