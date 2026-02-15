@@ -1,4 +1,8 @@
 steps:
+  # Debug: Check files
+  - name: 'bash'
+    args: ['ls', '-R', 'apps/core-go']
+
   # 1. Build api-ts
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA', '-f', 'apps/api-ts/Dockerfile', '.']
