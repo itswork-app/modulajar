@@ -18,10 +18,13 @@ const dbPlugin = fp(async (fastify, options) => {
 
     // Test connection
     try {
+        console.log('[STARTUP] Testing database connection...');
         const client = await pool.connect();
+        console.log('[STARTUP] Database connection SUCCESS.');
         fastify.log.info('Connected to database');
         client.release();
     } catch (err) {
+        console.error('[STARTUP] Database connection FAILED:', err);
         fastify.log.error({ err }, 'Failed to connect to database');
         throw err;
     }
