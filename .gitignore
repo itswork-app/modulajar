@@ -48,3 +48,6 @@ Thumbs.db
 
 # Docker
 .dockerignore
+env-api.yaml
+env-worker.yaml
+docs/ENV_TEMPLATE.md
