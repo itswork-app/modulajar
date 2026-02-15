@@ -15,12 +15,16 @@ const fastify = Fastify({
     logger: true
 });
 
+console.log('[STARTUP] Starting Modulajar API...');
+
 // Register Plugins
+console.log('[STARTUP] Registering plugins...');
 fastify.register(dbPlugin);
 fastify.register(authPlugin);
 fastify.register(storagePlugin);
 
 // Register Routes
+console.log('[STARTUP] Registering routes...');
 fastify.register(authRoutes);
 fastify.register(workspaceRoutes);
 fastify.register(generateRoutes);
@@ -33,10 +37,17 @@ fastify.get('/healthz', async (request, reply) => {
 
 const start = async () => {
     try {
+        console.log('[STARTUP] Checking critical environment variables...');
+        if (!process.env.DATABASE_URL) console.warn('[STARTUP] WARNING: DATABASE_URL is not set');
+        if (!process.env.GCS_BUCKET) console.warn('[STARTUP] WARNING: GCS_BUCKET is not set');
+
         const port = parseInt(process.env.PORT || '8080');
+        console.log(`[STARTUP] Attempting to listen on port ${port}...`);
+
         await fastify.listen({ port, host: '0.0.0.0' });
-        console.log(`Server listening on ${port}`);
+        console.log(`[STARTUP] SUCCESS: Server listening on ${port}`);
     } catch (err) {
+        console.error('[STARTUP] FATAL ERROR during start():', err);
         fastify.log.error(err);
         process.exit(1);
     }
