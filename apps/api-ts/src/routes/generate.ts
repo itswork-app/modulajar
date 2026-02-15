@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { createHash } from 'crypto';
+import { issuePID } from '../lib/pid';
 
 const SD_FULL_SEMESTER_COST = 5;
+const PID_SECRET = process.env.PID_SECRET || 'modulajar-pid-dev-secret';
 
 /**
  * Compute idempotency key for a generate request.
@@ -13,6 +15,22 @@ function computeIdempotencyKey(
     tahunAjaran: string
 ): string {
     const payload = `${workspaceId}:${packId}:${semester}:${tahunAjaran}`;
+    return createHash('sha256').update(payload).digest('hex').substring(0, 32);
+}
+
+/**
+ * Compute a package identity key for upsert.
+ * Teacher-bound: different teacher = different package.
+ */
+function computePackageKey(
+    workspaceId: string,
+    kelas: string,
+    semester: string,
+    tahunAjaran: string,
+    teacherName: string,
+    schoolName: string
+): string {
+    const payload = `${workspaceId}:${kelas}:${semester}:${tahunAjaran}:${teacherName}:${schoolName}`;
     return createHash('sha256').update(payload).digest('hex').substring(0, 32);
 }
 
@@ -50,6 +68,9 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 pack_id: string;
                 semester: string;
                 tahun_ajaran: string;
+                kelas?: string;
+                teacher_name?: string;
+                school_name?: string;
             };
 
             if (!body.pack_id || !body.semester || !body.tahun_ajaran) {
@@ -58,19 +79,28 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
             }
 
+            const kelas = body.kelas || '4';
+            const teacherName = body.teacher_name || '-';
+            const schoolName = body.school_name || '-';
+
             const idempotencyKey = computeIdempotencyKey(
                 workspaceId, body.pack_id, body.semester, body.tahun_ajaran
             );
 
             // 1. Check for existing job (idempotent)
             const existingJob = await fastify.db.query(
-                `SELECT id, status FROM generation_jobs WHERE idempotency_key = $1`,
+                `SELECT gj.id, gj.status, gj.package_id, p.public_id AS pid
+                 FROM generation_jobs gj
+                 JOIN packages p ON p.id = gj.package_id
+                 WHERE gj.idempotency_key = $1`,
                 [idempotencyKey]
             );
 
             if (existingJob.rowCount && existingJob.rowCount > 0) {
                 return reply.code(200).send({
                     job_id: existingJob.rows[0].id,
+                    package_id: existingJob.rows[0].package_id,
+                    pid: existingJob.rows[0].pid,
                     status: existingJob.rows[0].status,
                     idempotent: true
                 });
@@ -108,16 +138,46 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            // 4. Create package row first (needed as FK for generation_jobs)
             const { ulid } = await import('ulid');
-            const packageId = ulid();
-            const publicId = `PKG-${packageId.substring(0, 8)}`;
 
-            await fastify.db.query(
-                `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [packageId, workspaceId, publicId, '4', body.semester, body.tahun_ajaran, '-', '-', 'active']
+            // 4. Resolve or create package (identity-keyed)
+            const packageKey = computePackageKey(
+                workspaceId, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName
             );
+
+            let packageId: string;
+            let pid: string;
+
+            // Look up existing package by identity key (stored in public_id prefix or via lookup)
+            const existingPkg = await fastify.db.query(
+                `SELECT id, public_id FROM packages
+                 WHERE workspace_id = $1 AND kelas = $2 AND semester = $3
+                   AND tahun_ajaran = $4 AND teacher_name = $5 AND school_name = $6
+                 LIMIT 1`,
+                [workspaceId, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName]
+            );
+
+            if (existingPkg.rowCount && existingPkg.rowCount > 0) {
+                // Reuse existing package + PID
+                packageId = existingPkg.rows[0].id;
+                pid = existingPkg.rows[0].public_id;
+            } else {
+                // Create new package with canonical PID
+                packageId = ulid();
+                pid = issuePID(PID_SECRET, {
+                    workspaceId,
+                    packageUlid: packageId,
+                    kelas,
+                    semester: body.semester,
+                    tahunAjaran: body.tahun_ajaran
+                });
+
+                await fastify.db.query(
+                    `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                    [packageId, workspaceId, pid, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName, 'draft']
+                );
+            }
 
             // 5. Create job (idempotent via UNIQUE idempotency_key)
             const jobId = ulid();
@@ -144,18 +204,20 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 );
             }
 
-            // 7. Enqueue Cloud Task (placeholder — actual Cloud Tasks integration later)
-            // In production: use @google-cloud/tasks to enqueue to worker
-            // For now, log the task payload
+            // 7. Enqueue Cloud Task (placeholder)
             fastify.log.info({
                 msg: 'Task enqueued (placeholder)',
                 job_id: jobId,
+                package_id: packageId,
+                pid,
                 pack_id: body.pack_id,
                 semester: body.semester
             });
 
             return reply.code(201).send({
                 job_id: jobId,
+                package_id: packageId,
+                pid,
                 status: 'pending',
                 cost: SD_FULL_SEMESTER_COST,
                 balance_after: balance - SD_FULL_SEMESTER_COST

@@ -12,31 +12,53 @@ import (
 
 // TaskPayload is the Cloud Task payload for a generate job.
 type TaskPayload struct {
-	JobID    string `json:"job_id"`
-	PackPath string `json:"pack_path"`
-	Semester string `json:"semester"`
+	JobID     string `json:"job_id"`
+	PackageID string `json:"package_id"`
+	PackPath  string `json:"pack_path"`
+	Semester  string `json:"semester"`
+}
+
+// StatusUpdate represents a status change to be applied by the caller.
+type StatusUpdate struct {
+	Table  string `json:"table"` // "packages" or "generation_jobs"
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
 // WorkerResult is the outcome of a worker execution.
 type WorkerResult struct {
 	JobID         string                      `json:"job_id"`
+	PackageID     string                      `json:"package_id"`
 	Status        string                      `json:"status"` // "completed" or "failed"
 	PlannerResult *planner.PlannerResult      `json:"planner_result,omitempty"`
 	ValidationOK  bool                        `json:"validation_ok"`
 	Errors        []validator.ValidationError `json:"errors,omitempty"`
 	FailureReason string                      `json:"failure_reason,omitempty"`
+	StatusUpdates []StatusUpdate              `json:"status_updates"`
 }
 
 // ExecuteJob runs the planner + validator pipeline. Pure function, no DB side-effects.
+// Returns status updates that the caller should apply.
 // Worker is safe to retry: no billing here, billing is at job creation.
 func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
+	// Start: package -> generating, job -> running
+	startUpdates := []StatusUpdate{
+		{Table: "packages", ID: payload.PackageID, Status: "generating"},
+		{Table: "generation_jobs", ID: payload.JobID, Status: "running"},
+	}
+
 	// 1. Load pack
 	pack, err := packloader.LoadPack(payload.PackPath)
 	if err != nil {
 		return &WorkerResult{
 			JobID:         payload.JobID,
+			PackageID:     payload.PackageID,
 			Status:        "failed",
 			FailureReason: fmt.Sprintf("failed to load pack: %v", err),
+			StatusUpdates: append(startUpdates,
+				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
+				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
+			),
 		}, nil
 	}
 
@@ -51,8 +73,13 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 	if err != nil {
 		return &WorkerResult{
 			JobID:         payload.JobID,
+			PackageID:     payload.PackageID,
 			Status:        "failed",
 			FailureReason: fmt.Sprintf("planner failed: %v", err),
+			StatusUpdates: append(startUpdates,
+				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
+				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
+			),
 		}, nil
 	}
 
@@ -64,27 +91,42 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 	if err != nil {
 		return &WorkerResult{
 			JobID:         payload.JobID,
+			PackageID:     payload.PackageID,
 			Status:        "failed",
 			FailureReason: fmt.Sprintf("validator error: %v", err),
+			StatusUpdates: append(startUpdates,
+				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
+				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
+			),
 		}, nil
 	}
 
 	if !report.OK {
 		return &WorkerResult{
 			JobID:         payload.JobID,
+			PackageID:     payload.PackageID,
 			Status:        "failed",
 			ValidationOK:  false,
 			Errors:        report.Errors,
 			FailureReason: fmt.Sprintf("validation failed with %d errors", len(report.Errors)),
+			StatusUpdates: append(startUpdates,
+				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
+				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
+			),
 		}, nil
 	}
 
-	// 4. Success
+	// 4. Success: package -> ready, job -> completed
 	return &WorkerResult{
 		JobID:         payload.JobID,
+		PackageID:     payload.PackageID,
 		Status:        "completed",
 		PlannerResult: planResult,
 		ValidationOK:  true,
+		StatusUpdates: append(startUpdates,
+			StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "ready"},
+			StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "completed"},
+		),
 	}, nil
 }
 
@@ -116,7 +158,7 @@ func Handler() http.HandlerFunc {
 			return
 		}
 
-		// Return result (caller is responsible for DB update)
+		// Return result (caller is responsible for applying StatusUpdates to DB)
 		w.Header().Set("Content-Type", "application/json")
 		if result.Status == "completed" {
 			w.WriteHeader(http.StatusOK)
