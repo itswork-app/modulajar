@@ -15,7 +15,7 @@ Ensure these exist:
 
 ```bash
 # Grant Cloud Build SA permissions
-PROJECT_ID=$(gcloud config get-value project)
+PROJECT_ID=modulajar-487006
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
