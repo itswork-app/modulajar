@@ -68,7 +68,15 @@ func IsPDFRenderAvailable() bool {
 		return false
 	}
 	// Check the render script exists
-	return findRenderScript() != ""
+	if findRenderScript() == "" {
+		return false
+	}
+	// Probe: can node actually import playwright?
+	cmd := exec.Command("node", "-e", "require('playwright')")
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+	return true
 }
 
 // findRenderScript locates pdf_render.js in multiple candidate paths.
