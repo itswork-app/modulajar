@@ -1,0 +1,255 @@
+/* ═══════════════════════════════════════════
+   Modulajar Template v1.0 — A4 Print CSS
+   ═══════════════════════════════════════════ */
+
+/* ── A4 Page Setup ── */
+@page {
+    size: A4;
+    margin: 20mm 18mm 25mm 18mm;
+}
+
+@media print {
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', 'Noto Sans', Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #ffffff;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 15mm;
+}
+
+/* ── Typography ── */
+h1 { font-size: 22pt; font-weight: 700; color: #0d1b2a; }
+h2 { font-size: 15pt; font-weight: 700; color: #1b263b; }
+h3 { font-size: 13pt; font-weight: 600; color: #415a77; }
+h4 { font-size: 11pt; font-weight: 600; color: #415a77; }
+p  { margin-bottom: 0.6em; }
+
+/* ── Cover Page ── */
+.cover-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 85vh;
+    text-align: center;
+    page-break-after: always;
+}
+
+.cover-logo {
+    margin-bottom: 2em;
+}
+
+.cover-logo-icon {
+    font-size: 48pt;
+}
+
+.cover-title {
+    font-size: 26pt;
+    margin-bottom: 0.3em;
+    color: #0d1b2a;
+}
+
+.cover-subtitle {
+    font-size: 13pt;
+    color: #778da9;
+    margin-bottom: 2em;
+    font-weight: 400;
+}
+
+.cover-info {
+    border-collapse: collapse;
+    text-align: left;
+    width: auto;
+    min-width: 300px;
+}
+
+.cover-info td {
+    padding: 6px 14px;
+    font-size: 11pt;
+    border: none;
+}
+
+.cover-label {
+    font-weight: 600;
+    color: #415a77;
+    width: 160px;
+}
+
+.cover-value {
+    color: #1a1a2e;
+}
+
+/* ── Section Layout ── */
+.section {
+    margin-bottom: 2em;
+}
+
+.section-title {
+    border-bottom: 2px solid #415a77;
+    padding-bottom: 0.3em;
+    margin-bottom: 0.8em;
+}
+
+.section-desc {
+    color: #555;
+    font-size: 10pt;
+    margin-bottom: 1em;
+}
+
+/* ── Page Break Utilities ── */
+.page-break-before {
+    page-break-before: always;
+}
+
+.page-break-after {
+    page-break-after: always;
+}
+
+.avoid-break {
+    page-break-inside: avoid;
+}
+
+/* ── Info Table (identity) ── */
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5em;
+}
+
+.info-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    font-size: 10.5pt;
+    vertical-align: top;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #415a77;
+    width: 180px;
+    background: #f8f9fa;
+}
+
+/* ── ATP Table ── */
+.atp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5em;
+    font-size: 10pt;
+}
+
+.atp-table th {
+    background: #1b263b;
+    color: #ffffff;
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid #1b263b;
+}
+
+.atp-table td {
+    padding: 7px 10px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+
+.atp-table tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.atp-table tr {
+    page-break-inside: avoid;
+}
+
+/* ── Activity Sections ── */
+.activity-unit {
+    margin-bottom: 1.5em;
+    page-break-inside: avoid;
+}
+
+.activity-unit-title {
+    background: #e8ecf1;
+    padding: 8px 12px;
+    border-left: 4px solid #415a77;
+    margin-bottom: 0.5em;
+}
+
+.activity-content {
+    padding: 8px 12px;
+    border: 1px solid #eee;
+    border-left: 4px solid #ddd;
+    font-size: 10.5pt;
+}
+
+/* ── Assessment ── */
+.assessment-block {
+    margin-bottom: 1em;
+    page-break-inside: avoid;
+}
+
+.assessment-type {
+    font-weight: 600;
+    color: #415a77;
+    margin-bottom: 0.3em;
+}
+
+/* ── Footer Watermark ── */
+.watermark-footer {
+    margin-top: 3em;
+    padding-top: 1em;
+    border-top: 1px solid #ddd;
+    font-size: 8pt;
+    color: #999;
+    text-align: center;
+    page-break-inside: avoid;
+}
+
+.watermark-line {
+    margin-bottom: 2px;
+}
+
+.watermark-label {
+    font-weight: 600;
+    color: #aaa;
+}
+
+.watermark-value {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+}
+
+.watermark-sep {
+    margin: 0 8px;
+    color: #ccc;
+}
+
+.watermark-link {
+    color: #778da9;
+    text-decoration: none;
+}
+
+.watermark-link:hover {
+    text-decoration: underline;
+}
+
+.watermark-powered {
+    margin-top: 4px;
+    font-style: italic;
+    color: #bbb;
+}
