@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/packloader"
 	"modulajar/apps/core-go/planner"
+	"modulajar/apps/core-go/render"
 	"modulajar/apps/core-go/validator"
 )
 
@@ -21,6 +23,9 @@ type TaskPayload struct {
 	Semester    string `json:"semester"`
 	Kelas       string `json:"kelas"`
 	TahunAjaran string `json:"tahun_ajaran"`
+	TeacherName string `json:"teacher_name"`
+	SchoolName  string `json:"school_name"`
+	PID         string `json:"pid"`
 }
 
 // StatusUpdate represents a status change to be applied by the caller.
@@ -30,20 +35,30 @@ type StatusUpdate struct {
 	Status string `json:"status"`
 }
 
-// WorkerResult is the outcome of a worker execution.
-type WorkerResult struct {
-	JobID         string                      `json:"job_id"`
-	PackageID     string                      `json:"package_id"`
-	Status        string                      `json:"status"` // "completed" or "failed"
-	PlannerResult *planner.PlannerResult      `json:"planner_result,omitempty"`
-	ValidationOK  bool                        `json:"validation_ok"`
-	Errors        []validator.ValidationError `json:"errors,omitempty"`
-	FailureReason string                      `json:"failure_reason,omitempty"`
-	StatusUpdates []StatusUpdate              `json:"status_updates"`
-	DocGraph      *docgraph.DocGraphResult    `json:"doc_graph,omitempty"`
+// RenderedDocument holds the composed HTML for one document (subject).
+type RenderedDocument struct {
+	DocumentID  string `json:"document_id"`
+	DID         string `json:"did"`
+	SubjectCode string `json:"subject_code"`
+	HTML        string `json:"html"`
+	FilePath    string `json:"file_path"` // "html://{did}/v1"
 }
 
-// ExecuteJob runs the planner + validator + doc graph pipeline.
+// WorkerResult is the outcome of a worker execution.
+type WorkerResult struct {
+	JobID             string                      `json:"job_id"`
+	PackageID         string                      `json:"package_id"`
+	Status            string                      `json:"status"` // "completed" or "failed"
+	PlannerResult     *planner.PlannerResult      `json:"planner_result,omitempty"`
+	ValidationOK      bool                        `json:"validation_ok"`
+	Errors            []validator.ValidationError `json:"errors,omitempty"`
+	FailureReason     string                      `json:"failure_reason,omitempty"`
+	StatusUpdates     []StatusUpdate              `json:"status_updates"`
+	DocGraph          *docgraph.DocGraphResult    `json:"doc_graph,omitempty"`
+	RenderedDocuments []RenderedDocument          `json:"rendered_documents,omitempty"`
+}
+
+// ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
 // Pure function, no DB side-effects. Safe to retry.
 func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 	didSecret := os.Getenv("DID_SECRET")
@@ -112,19 +127,98 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
 	}
 
-	// 5. Success
+	// 5. Compose HTML for each document
+	// Try to find template dir from multiple candidate paths
+	templateDir := resolveTemplateDir(payload.PackPath)
+
+	renderedDocs := make([]RenderedDocument, 0, len(graphResult.Documents))
+	for _, doc := range graphResult.Documents {
+		verifyURL := fmt.Sprintf("https://modulajar.com/verify/%s", doc.PublicID)
+
+		html, err := render.ComposeModulAjarHTML(render.ComposerInput{
+			TemplateDir: templateDir,
+			SubjectCode: doc.SubjectCode,
+			SubjectName: subjectName(pack, doc.SubjectCode),
+			TeacherName: payload.TeacherName,
+			SchoolName:  payload.SchoolName,
+			Kelas:       payload.Kelas,
+			Semester:    payload.Semester,
+			TahunAjaran: payload.TahunAjaran,
+			PID:         payload.PID,
+			DID:         doc.PublicID,
+			VerifyURL:   verifyURL,
+			PlanResult:  planResult,
+		})
+		if err != nil {
+			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
+		}
+
+		filePath := fmt.Sprintf("html://%s/v1", doc.PublicID)
+		renderedDocs = append(renderedDocs, RenderedDocument{
+			DocumentID:  doc.ID,
+			DID:         doc.PublicID,
+			SubjectCode: doc.SubjectCode,
+			HTML:        html,
+			FilePath:    filePath,
+		})
+	}
+
+	// 6. Update version file_paths in doc graph
+	for i, ver := range graphResult.Versions {
+		for _, rd := range renderedDocs {
+			if ver.DocumentID == rd.DocumentID {
+				graphResult.Versions[i].FilePath = rd.FilePath
+				break
+			}
+		}
+	}
+
+	// 7. Success
 	return &WorkerResult{
-		JobID:         payload.JobID,
-		PackageID:     payload.PackageID,
-		Status:        "completed",
-		PlannerResult: planResult,
-		ValidationOK:  true,
-		DocGraph:      graphResult,
+		JobID:             payload.JobID,
+		PackageID:         payload.PackageID,
+		Status:            "completed",
+		PlannerResult:     planResult,
+		ValidationOK:      true,
+		DocGraph:          graphResult,
+		RenderedDocuments: renderedDocs,
 		StatusUpdates: append(startUpdates,
 			StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "ready"},
 			StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "completed"},
 		),
 	}, nil
+}
+
+// resolveTemplateDir finds the templates/v1/ directory by checking multiple candidate paths.
+// This handles different working directories (project root, worker/, test contexts).
+func resolveTemplateDir(packPath string) string {
+	candidates := []string{
+		// Relative to pack path: packs/merdeka/sd4/v1/pack.json → ../../../../templates/v1
+		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
+		// CWD-relative
+		filepath.Join("templates", "v1"),
+		// One level up (from worker/ or render/)
+		filepath.Join("..", "templates", "v1"),
+	}
+
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "modul-ajar.html")); err == nil {
+			return c
+		}
+	}
+
+	// Default fallback
+	return filepath.Join("templates", "v1")
+}
+
+// subjectName looks up the display name for a subject code from the pack.
+func subjectName(pack *packloader.CurriculumPack, code string) string {
+	for _, s := range pack.Subjects {
+		if s.Code == code {
+			return s.Name
+		}
+	}
+	return code
 }
 
 // Handler returns an HTTP handler for POST /tasks/generate.

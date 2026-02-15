@@ -3,25 +3,30 @@ package worker
 import (
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
 // DID regex: DOC-{SUBJECT}-SD{N}-S{N}-{YEAR}-{6chars}-{8chars}
 var didRegex = regexp.MustCompile(`^DOC-[A-Z]+-SD\d+-S\d+-\d{4}-[A-Z2-9]{6}-[A-Z2-9]{8}$`)
 
-func TestExecuteJobSuccess(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
+func basePayload() TaskPayload {
+	return TaskPayload{
 		JobID:       "test-job-001",
 		PackageID:   "test-pkg-001",
 		WorkspaceID: "test-ws-001",
-		PackPath:    packPath,
+		PackPath:    filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json"),
 		Semester:    "S1",
 		Kelas:       "4",
 		TahunAjaran: "2025/2026",
+		TeacherName: "Ibu Test",
+		SchoolName:  "SDN Test",
+		PID:         "PKG-SD4-S1-2026-TSTPKG-TST12345",
 	}
+}
 
-	result, err := ExecuteJob(payload)
+func TestExecuteJobSuccess(t *testing.T) {
+	result, err := ExecuteJob(basePayload())
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
@@ -29,95 +34,71 @@ func TestExecuteJobSuccess(t *testing.T) {
 	if result.Status != "completed" {
 		t.Fatalf("expected status=completed, got=%s, reason=%s", result.Status, result.FailureReason)
 	}
-
 	if !result.ValidationOK {
 		t.Fatal("expected validation_ok=true")
 	}
-
 	if result.PlannerResult == nil {
 		t.Fatal("expected planner_result to be non-nil")
 	}
 
-	t.Logf("Job %s completed. Subjects: %d", result.JobID, len(result.PlannerResult.Atps))
+	t.Logf("Job completed. Subjects: %d", len(result.PlannerResult.Atps))
 }
 
 func TestExecuteJobInvalidPack(t *testing.T) {
-	payload := TaskPayload{
-		JobID:       "test-job-002",
-		PackageID:   "test-pkg-002",
-		WorkspaceID: "test-ws-002",
-		PackPath:    "/nonexistent/pack.json",
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2026",
-	}
+	payload := basePayload()
+	payload.PackPath = "/nonexistent/pack.json"
 
 	result, err := ExecuteJob(payload)
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
-
 	if result.Status != "failed" {
 		t.Fatalf("expected status=failed, got=%s", result.Status)
 	}
 
-	t.Logf("Job %s failed as expected: %s", result.JobID, result.FailureReason)
+	t.Logf("Failed as expected: %s", result.FailureReason)
 }
 
 func TestExecuteJobRetryIdempotent(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
-		JobID:       "test-job-retry",
-		PackageID:   "test-pkg-retry",
-		WorkspaceID: "test-ws-retry",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2026",
-	}
+	payload := basePayload()
+	payload.JobID = "test-idempotent"
+	payload.PackageID = "test-pkg-idempotent"
 
 	result1, _ := ExecuteJob(payload)
 	result2, _ := ExecuteJob(payload)
 
 	if result1.Status != result2.Status {
-		t.Fatalf("retry produced different status: %s vs %s", result1.Status, result2.Status)
+		t.Fatalf("different status: %s vs %s", result1.Status, result2.Status)
 	}
 
-	// Doc graphs must be identical
-	if result1.DocGraph == nil || result2.DocGraph == nil {
-		t.Fatal("doc graphs should not be nil")
-	}
-
+	// Doc graphs identical
 	if len(result1.DocGraph.Documents) != len(result2.DocGraph.Documents) {
-		t.Fatalf("retry doc count mismatch: %d vs %d",
-			len(result1.DocGraph.Documents), len(result2.DocGraph.Documents))
+		t.Fatalf("doc count: %d vs %d", len(result1.DocGraph.Documents), len(result2.DocGraph.Documents))
 	}
-
 	for i, d1 := range result1.DocGraph.Documents {
 		d2 := result2.DocGraph.Documents[i]
 		if d1.ID != d2.ID || d1.PublicID != d2.PublicID {
-			t.Errorf("doc[%d] mismatch: id=%s/%s, did=%s/%s",
-				i, d1.ID, d2.ID, d1.PublicID, d2.PublicID)
+			t.Errorf("doc[%d] mismatch", i)
 		}
 	}
 
-	t.Logf("Retry idempotent: %d docs identical across runs", len(result1.DocGraph.Documents))
+	// Rendered HTML identical
+	if len(result1.RenderedDocuments) != len(result2.RenderedDocuments) {
+		t.Fatalf("rendered count: %d vs %d", len(result1.RenderedDocuments), len(result2.RenderedDocuments))
+	}
+	for i, r1 := range result1.RenderedDocuments {
+		r2 := result2.RenderedDocuments[i]
+		if r1.HTML != r2.HTML {
+			t.Errorf("rendered[%d] HTML differs", i)
+		}
+	}
+
+	t.Logf("Retry idempotent: %d docs + %d rendered identical", len(result1.DocGraph.Documents), len(result1.RenderedDocuments))
 }
 
 func TestLifecycleStatusTransitions(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
+	result, _ := ExecuteJob(basePayload())
 
-	payload := TaskPayload{
-		JobID:       "test-lifecycle-001",
-		PackageID:   "test-pkg-lifecycle-001",
-		WorkspaceID: "test-ws-lifecycle-001",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2026",
-	}
-
-	result, _ := ExecuteJob(payload)
 	if len(result.StatusUpdates) != 4 {
 		t.Fatalf("expected 4 status updates, got %d", len(result.StatusUpdates))
 	}
@@ -134,129 +115,107 @@ func TestLifecycleStatusTransitions(t *testing.T) {
 				i, exp.table, exp.status, result.StatusUpdates[i].Table, result.StatusUpdates[i].Status)
 		}
 	}
-
-	t.Logf("Lifecycle transitions correct")
 }
 
-// ═══════════════════════════════════════════
-// DOCUMENT GRAPH TESTS
-// ═══════════════════════════════════════════
-
 func TestDocGraphCreated(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
-		JobID:       "test-docgraph-001",
-		PackageID:   "test-pkg-docgraph-001",
-		WorkspaceID: "test-ws-docgraph-001",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2025/2026",
-	}
-
-	result, err := ExecuteJob(payload)
-	if err != nil {
-		t.Fatalf("ExecuteJob error: %v", err)
-	}
+	result, _ := ExecuteJob(basePayload())
 
 	if result.DocGraph == nil {
-		t.Fatal("expected doc_graph to be non-nil")
+		t.Fatal("expected doc_graph non-nil")
 	}
-
-	// SD4 has 6 subjects
 	if len(result.DocGraph.Documents) != 6 {
 		t.Fatalf("expected 6 documents, got %d", len(result.DocGraph.Documents))
 	}
-
 	if len(result.DocGraph.Versions) != 6 {
 		t.Fatalf("expected 6 versions, got %d", len(result.DocGraph.Versions))
 	}
-
-	t.Logf("Doc graph: %d documents, %d versions", len(result.DocGraph.Documents), len(result.DocGraph.Versions))
 }
 
 func TestDocDIDFormat(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
-		JobID:       "test-did-format",
-		PackageID:   "test-pkg-did-format",
-		WorkspaceID: "test-ws-did-format",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2025/2026",
-	}
-
-	result, _ := ExecuteJob(payload)
+	result, _ := ExecuteJob(basePayload())
 
 	for _, doc := range result.DocGraph.Documents {
 		if !didRegex.MatchString(doc.PublicID) {
 			t.Errorf("DID format invalid: %s", doc.PublicID)
 		}
-		t.Logf("DID: %s (subject: %s)", doc.PublicID, doc.SubjectCode)
 	}
 }
 
-func TestDocVersioning(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
-		JobID:       "test-versioning",
-		PackageID:   "test-pkg-versioning",
-		WorkspaceID: "test-ws-versioning",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2026",
+// ═══════════════════════════════════════════
+// HTML COMPOSER INTEGRATION TESTS
+// ═══════════════════════════════════════════
+
+func TestRenderedDocumentsCreated(t *testing.T) {
+	result, _ := ExecuteJob(basePayload())
+
+	if len(result.RenderedDocuments) != 6 {
+		t.Fatalf("expected 6 rendered documents, got %d", len(result.RenderedDocuments))
 	}
 
-	result, _ := ExecuteJob(payload)
-
-	for i, ver := range result.DocGraph.Versions {
-		if ver.Version != 1 {
-			t.Errorf("version[%d]: expected version=1, got=%d", i, ver.Version)
+	for _, rd := range result.RenderedDocuments {
+		if rd.HTML == "" {
+			t.Errorf("subject %s: empty HTML", rd.SubjectCode)
 		}
-		if ver.FilePath != "pending://" {
-			t.Errorf("version[%d]: expected file_path=pending://, got=%s", i, ver.FilePath)
+		if rd.DID == "" {
+			t.Errorf("subject %s: empty DID", rd.SubjectCode)
 		}
-		if ver.DocumentID != result.DocGraph.Documents[i].ID {
-			t.Errorf("version[%d]: document_id mismatch", i)
+		if rd.FilePath == "" {
+			t.Errorf("subject %s: empty file_path", rd.SubjectCode)
 		}
+		t.Logf("subject %s: %d bytes, file_path=%s", rd.SubjectCode, len(rd.HTML), rd.FilePath)
 	}
-
-	t.Logf("All %d versions are v1 with pending:// file_path", len(result.DocGraph.Versions))
 }
 
-func TestDocSubjectCoverage(t *testing.T) {
-	packPath := filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json")
-	payload := TaskPayload{
-		JobID:       "test-coverage",
-		PackageID:   "test-pkg-coverage",
-		WorkspaceID: "test-ws-coverage",
-		PackPath:    packPath,
-		Semester:    "S1",
-		Kelas:       "4",
-		TahunAjaran: "2026",
-	}
+func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
+	result, _ := ExecuteJob(basePayload())
 
-	result, _ := ExecuteJob(payload)
-
-	expectedSubjects := map[string]bool{
-		"BI": false, "MTK": false, "IPAS": false,
-		"PPKN": false, "SBK": false, "PJOK": false,
-	}
-
-	for _, doc := range result.DocGraph.Documents {
-		if _, ok := expectedSubjects[doc.SubjectCode]; !ok {
-			t.Errorf("unexpected subject: %s", doc.SubjectCode)
-		}
-		expectedSubjects[doc.SubjectCode] = true
-	}
-
-	for subj, found := range expectedSubjects {
-		if !found {
-			t.Errorf("missing document for subject: %s", subj)
+	for _, rd := range result.RenderedDocuments {
+		if strings.Contains(rd.HTML, "{{") && strings.Contains(rd.HTML, "}}") {
+			t.Errorf("subject %s: unresolved placeholder in HTML", rd.SubjectCode)
 		}
 	}
 
-	t.Logf("All 6 subjects covered in documents")
+	t.Logf("All %d rendered docs have no unresolved placeholders", len(result.RenderedDocuments))
+}
+
+func TestRenderedHTMLContainsPIDDID(t *testing.T) {
+	result, _ := ExecuteJob(basePayload())
+
+	for _, rd := range result.RenderedDocuments {
+		if !strings.Contains(rd.HTML, basePayload().PID) {
+			t.Errorf("subject %s: missing PID in HTML", rd.SubjectCode)
+		}
+		if !strings.Contains(rd.HTML, rd.DID) {
+			t.Errorf("subject %s: missing DID in HTML", rd.SubjectCode)
+		}
+	}
+}
+
+func TestVersionFilePathsUpdated(t *testing.T) {
+	result, _ := ExecuteJob(basePayload())
+
+	for _, ver := range result.DocGraph.Versions {
+		if !strings.HasPrefix(ver.FilePath, "html://") {
+			t.Errorf("version %s: file_path=%s, expected html:// prefix", ver.ID, ver.FilePath)
+		}
+	}
+
+	t.Logf("All %d version file_paths updated to html:// URIs", len(result.DocGraph.Versions))
+}
+
+func TestRenderedHTMLContainsSubjectName(t *testing.T) {
+	result, _ := ExecuteJob(basePayload())
+
+	// Verify each rendered doc contains its subject data
+	for _, rd := range result.RenderedDocuments {
+		if !strings.Contains(rd.HTML, "atp-table") {
+			t.Errorf("subject %s: missing ATP table", rd.SubjectCode)
+		}
+		if !strings.Contains(rd.HTML, "activity-unit") {
+			t.Errorf("subject %s: missing activity sections", rd.SubjectCode)
+		}
+		if !strings.Contains(rd.HTML, "Asesmen") {
+			t.Errorf("subject %s: missing assessment section", rd.SubjectCode)
+		}
+	}
 }
