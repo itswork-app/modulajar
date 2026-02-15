@@ -2,10 +2,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY apps/api-ts/package*.json ./
 RUN npm install
 
-COPY . .
+COPY apps/api-ts/ .
 RUN npm run build
 
 FROM node:18-alpine

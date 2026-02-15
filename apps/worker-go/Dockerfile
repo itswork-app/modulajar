@@ -55,7 +55,7 @@ RUN npm install
 # The user's env has `packs/` directory.
 
 WORKDIR /app
-COPY packs /app/packs
+COPY apps/core-go/packs /app/packs
 COPY apps/core-go/templates /app/templates
 
 # Environment setup
