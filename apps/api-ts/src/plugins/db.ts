@@ -13,7 +13,7 @@ const dbPlugin = fp(async (fastify, options) => {
         // Optimal for Cloud Run + Neon (serverless)
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 5000,
     });
 
     // Test connection
