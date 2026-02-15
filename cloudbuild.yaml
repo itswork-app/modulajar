@@ -1,0 +1,66 @@
+steps:
+  # 1. Build api-ts
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA', '-f', 'apps/api-ts/Dockerfile', '.']
+
+  # 2. Build worker-go
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/worker-go:$COMMIT_SHA', '-f', 'apps/worker-go/Dockerfile', '.']
+
+  # 3. Push images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/worker-go:$COMMIT_SHA']
+
+  # 4. Deploy modulajar-api (Allow unauthenticated)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'modulajar-api'
+      - '--image'
+      - 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA'
+      - '--region'
+      - 'asia-southeast1'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'modulajar-api-sa@modulajar-487006.iam.gserviceaccount.com'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--allow-unauthenticated'
+
+  # 5. Deploy modulajar-worker (Authenticated only)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'modulajar-worker'
+      - '--image'
+      - 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/worker-go:$COMMIT_SHA'
+      - '--region'
+      - 'asia-southeast1'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'modulajar-worker-sa@modulajar-487006.iam.gserviceaccount.com'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '1'
+      - '--no-allow-unauthenticated'
+
+images:
+  - 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA'
+  - 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/worker-go:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
