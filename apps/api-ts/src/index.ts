@@ -4,6 +4,7 @@ import authPlugin from './plugins/auth';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspace';
 import generateRoutes from './routes/generate';
+import billingRoutes from './routes/billing';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -20,6 +21,7 @@ fastify.register(authPlugin);
 fastify.register(authRoutes);
 fastify.register(workspaceRoutes);
 fastify.register(generateRoutes);
+fastify.register(billingRoutes);
 
 fastify.get('/healthz', async (request, reply) => {
     return { status: 'ok' };
