@@ -91,54 +91,54 @@ export function DocumentTable() {
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden ring-1 ring-slate-900/5">
-            <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-[#FAFAFA]">
+        <div className="bg-white rounded-[2.5rem] shadow-xl shadow-emerald-100/50 border border-slate-100 overflow-hidden ring-1 ring-slate-900/5">
+            <table className="min-w-full divide-y divide-slate-50">
+                <thead className="bg-slate-50/50">
                     <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Mata Pelajaran</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Jenjang / Kelas</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Periode</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Aksi</th>
+                        <th className="px-8 py-6 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Mata Pelajaran</th>
+                        <th className="px-8 py-6 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Jenjang / Kelas</th>
+                        <th className="px-8 py-6 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Periode</th>
+                        <th className="px-8 py-6 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th className="px-8 py-6 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-slate-100">
+                <tbody className="bg-white divide-y divide-slate-50">
                     {documents.map((doc: Document) => {
                         const Icon = getSubjectIcon(doc.subject);
                         const colorClass = getSubjectColor(doc.subject);
 
                         return (
-                            <tr key={doc.id || doc.public_id} className="hover:bg-slate-50/80 transition-colors group">
-                                <td className="px-6 py-5 whitespace-nowrap">
+                            <tr key={doc.id || doc.public_id} className="hover:bg-emerald-50/30 transition-colors group">
+                                <td className="px-8 py-6 whitespace-nowrap">
                                     <div className="flex items-center">
-                                        <div className={cn("shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", colorClass)}>
-                                            <Icon className="h-5 w-5" />
+                                        <div className={cn("shrink-0 h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm", colorClass)}>
+                                            <Icon className="h-6 w-6" />
                                         </div>
-                                        <div className="ml-4">
+                                        <div className="ml-5">
                                             <div className="text-sm font-bold text-slate-900">{doc.subject}</div>
-                                            <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                                <Calendar className="w-3 h-3" />
+                                            <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
+                                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
                                                 {new Date(doc.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                                             </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-5 whitespace-nowrap">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                                <td className="px-8 py-6 whitespace-nowrap">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
                                         {doc.jenjang || 'SD'}
                                     </span>
-                                    <div className="text-xs text-slate-500 mt-1.5 font-medium ml-1">Kelas {doc.kelas}</div>
+                                    <div className="text-xs text-slate-500 mt-2 font-semibold ml-1">Kelas {doc.kelas}</div>
                                 </td>
-                                <td className="px-6 py-5 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-slate-900">{doc.tahun_ajaran}</div>
-                                    <div className="text-xs text-slate-500 mt-0.5">Semester {doc.semester}</div>
+                                <td className="px-8 py-6 whitespace-nowrap">
+                                    <div className="text-sm font-bold text-slate-900">{doc.tahun_ajaran}</div>
+                                    <div className="text-xs text-slate-500 mt-1 font-medium">Semester {doc.semester}</div>
                                 </td>
-                                <td className="px-6 py-5 whitespace-nowrap">
+                                <td className="px-8 py-6 whitespace-nowrap">
                                     <StatusBadge status={doc.status} />
                                 </td>
-                                <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
+                                <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
                                     {doc.status === 'ready' && (
-                                        <div className="flex justify-end gap-2 opacity-100">
+                                        <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-2 group-hover:translate-x-0">
                                             <button
                                                 onClick={async () => {
                                                     const token = await getToken();
@@ -152,16 +152,16 @@ export function DocumentTable() {
                                                         alert('Gagal download');
                                                     }
                                                 }}
-                                                className="inline-flex items-center justify-center p-2 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-200"
-                                                title="Download PDF"
+                                                className="inline-flex items-center justify-center h-9 px-4 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all border border-emerald-200 font-semibold text-xs shadow-sm hover:shadow-emerald-100"
                                             >
-                                                <Download className="w-4 h-4" />
+                                                <Download className="w-4 h-4 mr-2" />
+                                                Unduh
                                             </button>
                                             <a
                                                 href={`${VERIFY_BASE}/verify/${doc.public_id}`}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="inline-flex items-center justify-center p-2 rounded-lg text-slate-600 bg-white hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
+                                                className="inline-flex items-center justify-center h-9 w-9 rounded-xl text-slate-500 bg-white hover:bg-slate-50 transition-all border border-slate-200 hover:border-slate-300 shadow-sm"
                                                 title="Verify Document"
                                             >
                                                 <ShieldCheck className="w-4 h-4" />
@@ -182,7 +182,7 @@ function StatusBadge({ status }: { status: string }) {
     const styles = {
         queued: "bg-slate-100 text-slate-600 border-slate-200",
         running: "bg-blue-50 text-blue-600 border-blue-200 animate-pulse",
-        ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        ready: "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100",
         failed: "bg-red-50 text-red-700 border-red-200",
     };
 
@@ -195,11 +195,11 @@ function StatusBadge({ status }: { status: string }) {
 
     return (
         <span className={cn(
-            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
+            "inline-flex items-center rounded-full px-3 py-1 text-xs font-bold border",
             styles[status as keyof typeof styles] || styles.queued
         )}>
             {status === 'running' && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
-            {status === 'ready' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />}
+            {status === 'ready' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2" />}
             {labels[status as keyof typeof labels] || status}
         </span>
     );

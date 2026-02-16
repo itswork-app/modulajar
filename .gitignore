@@ -51,3 +51,5 @@ Thumbs.db
 env-api.yaml
 env-worker.yaml
 docs/ENV_TEMPLATE.md
+apps/console-web/dev.log
+apps/worker-go/worker-go
