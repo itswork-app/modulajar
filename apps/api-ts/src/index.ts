@@ -7,6 +7,7 @@ import workspaceRoutes from './routes/workspace';
 import generateRoutes from './routes/generate';
 import billingRoutes from './routes/billing';
 import documentsRoutes from './routes/documents';
+import verifyRoutes from './routes/verify';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,25 +16,37 @@ const fastify = Fastify({
     logger: true
 });
 
-console.log('[STARTUP] Starting Modulajar API...');
+const SERVICE_MODE = process.env.SERVICE_MODE || 'api';
+console.log(`[STARTUP] Starting Modulajar API in ${SERVICE_MODE} mode...`);
 
-// Register Plugins
-console.log('[STARTUP] Registering plugins...');
+// Health checks are always available
+fastify.get('/healthz', async () => ({ status: 'ok' }));
+fastify.get('/readyz', async () => ({ status: 'ok' }));
+
+// Core Plugins (Common to both modes)
 fastify.register(dbPlugin);
-fastify.register(authPlugin);
-fastify.register(storagePlugin);
 
-// Register Routes
-console.log('[STARTUP] Registering routes...');
-fastify.register(authRoutes);
-fastify.register(workspaceRoutes);
-fastify.register(generateRoutes);
-fastify.register(billingRoutes);
-fastify.register(documentsRoutes, { prefix: '/documents' });
+if (SERVICE_MODE === 'verify') {
+    // ---------------------------------------------------------
+    // VERIFY MODE: Public facing minimal endpoints
+    // ---------------------------------------------------------
+    console.log('[STARTUP] Registering VERIFY mode routes...');
+    fastify.register(verifyRoutes, { prefix: '/verify' });
 
-fastify.get('/healthz', async (request, reply) => {
-    return { status: 'ok' };
-});
+} else {
+    // ---------------------------------------------------------
+    // API MODE: Full authenticated backend
+    // ---------------------------------------------------------
+    console.log('[STARTUP] Registering API mode plugins and routes...');
+    fastify.register(authPlugin);
+    fastify.register(storagePlugin);
+
+    fastify.register(authRoutes);
+    fastify.register(workspaceRoutes);
+    fastify.register(generateRoutes);
+    fastify.register(billingRoutes);
+    fastify.register(documentsRoutes, { prefix: '/documents' });
+}
 
 const start = async () => {
     try {
