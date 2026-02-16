@@ -9,9 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.37.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.34.0",
+    "lucide-react": "^0.564.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "swr": "^2.4.0",
+    "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {
     "@types/node": "^20",
