@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import useSWR from 'swr';
-import { Download, ShieldCheck, Loader2, AlertCircle, FileText, Calendar } from 'lucide-react';
+import { Download, ShieldCheck, Loader2, FileText, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useWorkspace } from '@/hooks/use-workspace'; // New Hook
@@ -14,17 +13,23 @@ const VERIFY_BASE = process.env.NEXT_PUBLIC_VERIFY_BASE_URL;
 const fetcher = (url: string, token: string) =>
     fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((res) => res.json());
 
-// Mock data if API returns empty/error (for v0 dev)
-// Remove this in prod if API is stable
-const MOCK_DATA = [
-    //   { id: '1', public_id: 'DID_123', subject: 'Matematika', class: '10', semester: '1', status: 'ready', created_at: new Date().toISOString() },
-];
+interface Document {
+    id?: string;
+    public_id: string;
+    subject: string;
+    jenjang?: string;
+    kelas: string;
+    semester: string;
+    tahun_ajaran: string;
+    status: string;
+    created_at: string;
+}
 
 export function DocumentTable() {
     const { workspace, isLoading: isWorkspaceLoading } = useWorkspace();
     const { getToken } = useAuth();
 
-    const { data, error, isLoading } = useSWR(
+    const { data, isLoading } = useSWR(
         workspace?.id ? [`${API_BASE}/w/${workspace.id}/documents`, 'token'] : null,
         async ([url]) => {
             const token = await getToken();
@@ -36,7 +41,7 @@ export function DocumentTable() {
         }
     );
 
-    const documents = data?.documents || [];
+    const documents: Document[] = data?.documents || [];
     const loading = isLoading || isWorkspaceLoading;
 
     if (loading && !data) {
@@ -76,7 +81,7 @@ export function DocumentTable() {
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
-                    {documents.map((doc: any) => (
+                    {documents.map((doc: Document) => (
                         <tr key={doc.id || doc.public_id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">

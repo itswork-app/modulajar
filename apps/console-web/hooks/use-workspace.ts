@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;

@@ -16,7 +16,9 @@ export function GenerateForm() {
     // State
     const [workspaceId, setWorkspaceId] = useState<string | null>(null);
     const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
-    const [step, setStep] = useState(1);
+    // const [step, setStep] = useState(1); // Unused for now
+    const step = 1;
+
     const [formData, setFormData] = useState({
         jenjang: 'SD',
         kelas: '4',
@@ -109,11 +111,15 @@ export function GenerateForm() {
                 throw new Error(err.error || err.message || 'Failed to generate');
             }
 
-            const data = await res.json();
+            await res.json(); // Consuming body
             // TODO: Start polling or redirect
             router.push('/app');
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('An unknown error occurred');
+            }
             setIsSubmitting(false);
         }
     };

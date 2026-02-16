@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PlusCircle, Settings, LogOut, BookOpen, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserButton } from '@clerk/nextjs';
 
