@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 import { UserButton } from '@clerk/nextjs';
 
 const navigation = [
-    { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
-    { name: 'Buat Baru', href: '/app/generate', icon: PlusCircle },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Buat Baru', href: '/generate', icon: PlusCircle },
 ];
 
 export function Sidebar() {
