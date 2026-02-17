@@ -197,3 +197,28 @@ func UpdatePackageStatus(ctx context.Context, packageID string, status string) e
 	_, err := pool.Exec(ctx, query, status, packageID)
 	return err
 }
+
+// QueueStats holds queue depth metrics.
+type QueueStats struct {
+	Queued  int
+	Running int
+	Failed  int
+}
+
+// GetQueueStats returns the count of jobs in each status.
+func GetQueueStats(ctx context.Context) (QueueStats, error) {
+	if pool == nil {
+		return QueueStats{}, fmt.Errorf("database not initialized")
+	}
+
+	query := `
+		SELECT
+			count(*) FILTER (WHERE status = 'queued') as queued,
+			count(*) FILTER (WHERE status = 'running') as running,
+			count(*) FILTER (WHERE status = 'failed') as failed
+		FROM generation_jobs
+	`
+	var s QueueStats
+	err := pool.QueryRow(ctx, query).Scan(&s.Queued, &s.Running, &s.Failed)
+	return s, err
+}

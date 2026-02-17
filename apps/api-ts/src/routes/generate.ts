@@ -3,6 +3,8 @@ import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
 import { SD_FULL_SEMESTER_COST } from '../lib/pricing';
 import { getBalance, debit } from '../lib/wallet';
+import { logger } from '../utils/logger';
+import { generateRequestsTotal } from '../utils/metrics';
 
 const PID_SECRET = process.env.PID_SECRET || 'modulajar-pid-dev-secret';
 
@@ -161,6 +163,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 ? `packs/${parts[0]}/${parts[1]}/${parts[2]}/pack.json`
                 : `packs/${body.pack_id}/pack.json`;
 
+            const traceId = request.id; // From Fastify (UUID)
+
             const metadata = {
                 job_id: jobId,
                 package_id: packageId,
@@ -171,14 +175,20 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 tahun_ajaran: body.tahun_ajaran,
                 teacher_name: teacherName,
                 school_name: schoolName,
-                pid: pid
+                pid: pid,
+                trace_id: traceId // Persist Trace ID
             };
 
-            await fastify.db.query(
-                `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-                [jobId, workspaceId, packageId, 'queued', idempotencyKey, JSON.stringify(metadata)]
-            );
+            try {
+                await fastify.db.query(
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                    [jobId, workspaceId, packageId, 'queued', idempotencyKey, JSON.stringify(metadata)]
+                );
+            } catch (err) {
+                generateRequestsTotal.inc({ result: 'failed' });
+                throw err;
+            }
 
             // 6. Debit wallet (idempotent via ON CONFLICT)
             const debitRef = `JOB:${jobId}`;
@@ -191,18 +201,20 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 // Balance already checked above; if debit fails here it's a race condition
                 // The job is already created — we can't roll back cleanly
                 // Debit idempotency ensures no double-charge on retry
-                fastify.log.warn({ job_id: jobId }, 'Debit failed after job creation — possible race');
+                logger.warn({ trace_id: traceId, job_id: jobId }, 'Debit failed after job creation — possible race');
             }
 
             // 7. Enqueue Cloud Task (placeholder)
-            fastify.log.info({
-                msg: 'Task enqueued (placeholder)',
+            logger.info({
+                msg: 'Job enqueued',
+                trace_id: traceId,
                 job_id: jobId,
                 package_id: packageId,
                 pid,
-                pack_id: body.pack_id,
-                semester: body.semester
+                workspace_id: workspaceId
             });
+
+            generateRequestsTotal.inc({ result: 'success' });
 
             return reply.code(201).send({
                 job_id: jobId,
@@ -210,7 +222,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 pid,
                 status: 'pending',
                 cost: SD_FULL_SEMESTER_COST,
-                balance_after: balance - SD_FULL_SEMESTER_COST
+                balance_after: balance - SD_FULL_SEMESTER_COST,
+                trace_id: traceId
             });
         });
 

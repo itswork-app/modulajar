@@ -11,10 +11,51 @@ import documentsRoutes from './routes/documents';
 import verifyRoutes from './routes/verify';
 import dotenv from 'dotenv';
 
+import { v4 as uuidv4 } from 'uuid';
+import { logger } from './utils/logger';
+import { register, httpRequestsTotal, httpRequestDuration } from './utils/metrics';
+
 dotenv.config();
 
 const fastify = Fastify({
-    logger: true
+    logger: false, // Use our structured logger
+    genReqId: (req) => (req.headers['x-trace-id'] as string) || uuidv4(), // Trace ID correlation
+});
+
+// Middleware: Metrics & Logging
+fastify.addHook('onRequest', async (request, _reply) => {
+    (request as any).startTime = process.hrtime();
+});
+
+fastify.addHook('onResponse', async (request, reply) => {
+    const duration = process.hrtime((request as any).startTime);
+    const durationMs = (duration[0] * 1000 + duration[1] / 1e6);
+
+    // Normalize route (avoid high cardinality on 404s or params)
+    const route = request.routeOptions.url || (request as any).routerPath || 'unknown';
+    const method = request.method;
+    const status = reply.statusCode;
+
+    // 1. Metrics
+    httpRequestsTotal.inc({ method, route, status });
+    httpRequestDuration.observe({ method, route }, durationMs);
+
+    // 2. Structured Log
+    logger.info({
+        trace_id: request.id,
+        method,
+        url: request.url,
+        route,
+        status,
+        duration_ms: durationMs,
+        user_agent: request.headers['user-agent'],
+    }, 'http_request');
+});
+
+// Metrics Endpoint
+fastify.get('/metrics', async (_req, reply) => {
+    reply.header('Content-Type', register.contentType);
+    return register.metrics();
 });
 
 const SERVICE_MODE = process.env.SERVICE_MODE || 'api';
