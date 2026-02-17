@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
+	"modulajar/apps/core-go/metrics"
 	"modulajar/apps/core-go/packloader"
 	"modulajar/apps/core-go/planner"
 	"modulajar/apps/core-go/render"
@@ -30,6 +33,7 @@ type TaskPayload struct {
 	TeacherName string `json:"teacher_name"`
 	SchoolName  string `json:"school_name"`
 	PID         string `json:"pid"`
+	TraceID     string `json:"trace_id"`
 }
 
 // RenderedDocument holds the composed HTML for one document (subject).
@@ -57,7 +61,7 @@ type WorkerResult struct {
 }
 
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
-func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
+func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (*WorkerResult, error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
@@ -116,7 +120,6 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 
 	// IDEMPOTENCY CHECK: Check if artifacts already exist
 	gcsBucket := os.Getenv("GCS_BUCKET")
-	ctx := context.Background()
 	var gcsClient *gcs.Client
 
 	if gcsBucket != "" {
@@ -135,7 +138,7 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 			}
 			if allExist {
 				// Optimization: Skip regeneration
-				fmt.Printf("Job %s: Idempotency check passed (all artifacts exist). Skipping generation.\n", payload.JobID)
+				logger.Info("Idempotency check passed (all artifacts exist). Skipping generation.")
 				return &WorkerResult{
 					JobID:         payload.JobID,
 					PackageID:     payload.PackageID,
@@ -194,7 +197,7 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
 			pdfResult, err := render.RenderPDF(rd.HTML, tmpPDF)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "WARN: PDF render skipped for %s: %v\n", rd.SubjectCode, err)
+				logger.Warn("PDF render skipped", "subject", rd.SubjectCode, "error", err)
 				continue
 			}
 			renderedDocs[i].PDFPath = tmpPDF
@@ -210,9 +213,11 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 			}
 			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
 			if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
-				fmt.Fprintf(os.Stderr, "WARN: GCS upload failed for %s: %v\n", rd.SubjectCode, err)
+				logger.Warn("GCS upload failed", "subject", rd.SubjectCode, "error", err)
+				metrics.GCSUploadTotal.WithLabelValues("failed").Inc()
 				continue
 			}
+			metrics.GCSUploadTotal.WithLabelValues("success").Inc()
 			renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
 			os.Remove(rd.PDFPath)
 			renderedDocs[i].PDFPath = ""
@@ -242,6 +247,9 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 
 // Handler returns an HTTP handler for POST /tasks/generate.
 func Handler() http.HandlerFunc {
+	// Initialize default logger (slog uses JSON by default in Cloud Run if configured)
+	baseLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -262,7 +270,7 @@ func Handler() http.HandlerFunc {
 		// 1. Atomic Acquire
 		job, err := db.AcquireJob(ctx)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "AcquireJob failed: %v\n", err)
+			baseLogger.Error("AcquireJob failed", "error", err)
 			http.Error(w, "acquire failed", http.StatusInternalServerError)
 			return
 		}
@@ -274,24 +282,39 @@ func Handler() http.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("Acquired Job %s (Attempt %d)\n", job.ID, job.AttemptCount)
-
-		// 2. Mark package as generating
-		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
-
-		// 3. Construct payload from Metadata
+		// Construct payload from Metadata
 		payload, err := jobToPayload(job)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid metadata for job %s: %v\n", job.ID, err)
+			baseLogger.Error("Invalid metadata", "job_id", job.ID, "error", err)
 			db.MarkJobFailed(ctx, job.ID, "invalid metadata", job.AttemptCount)
+			metrics.JobFailuresTotal.Inc()
 			w.WriteHeader(http.StatusOK) // Don't retry invalid metadata
 			return
 		}
 
-		// 4. Exec
-		result, err := ExecuteJob(payload)
+		// Structured trace logger
+		logger := baseLogger.With(
+			"trace_id", payload.TraceID,
+			"job_id", job.ID,
+			"package_id", job.PackageID,
+			"workspace_id", payload.WorkspaceID,
+		)
 
-		// 5. Handle Result
+		logger.Info("Job acquired", "attempt", job.AttemptCount)
+		metrics.JobsAcquiredTotal.WithLabelValues("success").Inc()
+
+		start := time.Now()
+
+		// 2. Mark package as generating
+		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
+
+		// 3. Exec
+		result, err := ExecuteJob(ctx, payload, logger)
+
+		duration := time.Since(start)
+		durationMs := float64(duration.Milliseconds())
+
+		// 4. Handle Result
 		if err != nil || (result != nil && result.Status == "failed") {
 			reason := "unknown error"
 			if err != nil {
@@ -299,6 +322,10 @@ func Handler() http.HandlerFunc {
 			} else if result != nil {
 				reason = result.FailureReason
 			}
+
+			logger.Error("Job failed", "error", reason, "duration_ms", durationMs)
+			metrics.JobDurationMs.WithLabelValues("failed").Observe(durationMs)
+			metrics.JobRetriesTotal.Inc()
 
 			// Retry logic handled by MarkJobFailed
 			db.MarkJobFailed(ctx, job.ID, reason, job.AttemptCount)
@@ -311,6 +338,9 @@ func Handler() http.HandlerFunc {
 		}
 
 		// Success
+		logger.Info("Job completed successfully", "duration_ms", durationMs)
+		metrics.JobDurationMs.WithLabelValues("completed").Observe(durationMs)
+
 		db.MarkJobDone(ctx, job.ID)
 		db.UpdatePackageStatus(ctx, job.PackageID, "ready")
 
