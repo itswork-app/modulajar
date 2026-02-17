@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Modul Ajar {{.Meta.Mapel}}</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .identitas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .identitas-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .identitas-label {
+            font-weight: bold;
+            background-color: #f9f9f9;
+            width: 30%;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Modul Ajar {{.Meta.Mapel}}</h1>
+
+    <h2>I. Informasi Umum</h2>
+    <table class="identitas-table">
+        <tr>
+            <td class="identitas-label">Sekolah</td>
+            <td>{{.Identitas.Sekolah}}</td>
+        </tr>
+        <tr>
+            <td class="identitas-label">Guru</td>
+            <td>{{.Identitas.Guru}}</td>
+        </tr>
+        <tr>
+            <td class="identitas-label">Jenjang/Kelas</td>
+            <td>{{.Meta.Jenjang}} / {{.Meta.Kelas}}</td>
+        </tr>
+        <tr>
+            <td class="identitas-label">Semester</td>
+            <td>{{.Meta.Semester}} ({{.Meta.TahunAjaran}})</td>
+        </tr>
+        <tr>
+            <td class="identitas-label">Alokasi Waktu</td>
+            <td>{{.Identitas.AlokasiWaktu}}</td>
+        </tr>
+    </table>
+
+    <h3>Profil Pelajar Pancasila</h3>
+    <ul>
+        {{range .ProfilPancasila}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h3>Sarana & Prasarana (Media)</h3>
+    <ul>
+        {{range .Lampiran.Media}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h2>II. Komponen Inti</h2>
+
+    <h3>Tujuan Pembelajaran</h3>
+    <ul>
+        {{range .TujuanPembelajaran}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h3>Materi Inti</h3>
+    <ul>
+        {{range .MateriInti}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h3>Langkah Pembelajaran</h3>
+    <h4>Pendahuluan</h4>
+    <ul>
+        {{range .LangkahPembelajaran.Pendahuluan}}<li>{{.}}</li>{{end}}
+    </ul>
+    <h4>Inti</h4>
+    <ul>
+        {{range .LangkahPembelajaran.Inti}}<li>{{.}}</li>{{end}}
+    </ul>
+    <h4>Penutup</h4>
+    <ul>
+        {{range .LangkahPembelajaran.Penutup}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h3>Asesmen</h3>
+    <h4>Diagnostik</h4>
+    <ul>
+        {{range .Asesmen.Diagnostik}}<li>{{.}}</li>{{end}}
+    </ul>
+    <h4>Formatif</h4>
+    <ul>
+        {{range .Asesmen.Formatif}}<li>{{.}}</li>{{end}}
+    </ul>
+    <h4>Sumatif</h4>
+    <ul>
+        {{range .Asesmen.Sumatif}}<li>{{.}}</li>{{end}}
+    </ul>
+
+    <h3>Diferensiasi</h3>
+    <ul>
+        <li><strong>Konten:</strong> {{range .Diferensiasi.Konten}}{{.}}; {{end}}</li>
+        <li><strong>Proses:</strong> {{range .Diferensiasi.Proses}}{{.}}; {{end}}</li>
+        <li><strong>Produk:</strong> {{range .Diferensiasi.Produk}}{{.}}; {{end}}</li>
+    </ul>
+
+    <h2>III. Lampiran</h2>
+    <h3>Sumber Belajar</h3>
+    <ul>
+        {{range .Lampiran.SumberBelajar}}<li>{{.}}</li>{{end}}
+    </ul>
+
+</body>
+
+</html>
