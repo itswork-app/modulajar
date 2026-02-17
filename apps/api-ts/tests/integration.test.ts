@@ -2,6 +2,7 @@ import tap from 'tap';
 import Fastify from 'fastify';
 // import dbPlugin from '../src/plugins/db';
 import mockAuthPlugin from '../src/plugins/mock_auth'; // Use mock
+import workspaceGuardPlugin from '../src/plugins/workspace-guard';
 import authRoutes from '../src/routes/auth';
 import workspaceRoutes from '../src/routes/workspace';
 import dotenv from 'dotenv';
@@ -58,6 +59,7 @@ test('Workspace Auth & Guard', async (t) => {
 
     // Register MOCK Auth
     fastify.register(mockAuthPlugin);
+    fastify.register(workspaceGuardPlugin);
 
     fastify.register(authRoutes);
     fastify.register(workspaceRoutes);

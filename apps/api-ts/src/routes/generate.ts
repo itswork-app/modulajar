@@ -36,34 +36,12 @@ function computePackageKey(
 
 export default async function generateRoutes(fastify: FastifyInstance) {
 
-    // Reuse workspace guard from workspace.ts pattern
-    const workspaceGuard = async (request: any, reply: any) => {
-        await fastify.verifyClerk(request, reply);
-
-        const { workspaceId } = request.params as { workspaceId: string };
-        const { clerk_user_id } = request.auth || {};
-
-        if (!workspaceId) {
-            return reply.code(400).send({ error: 'Missing workspaceId' });
-        }
-
-        const result = await fastify.db.query(
-            `SELECT 1 FROM workspace_members
-             WHERE workspace_id = $1 AND clerk_user_id = $2`,
-            [workspaceId, clerk_user_id]
-        );
-
-        if (result.rowCount === 0) {
-            return reply.code(403).send({ error: 'Forbidden', message: 'Not a member of this workspace' });
-        }
-    };
-
     fastify.register(async (childServer) => {
 
         childServer.post('/:workspaceId/internal/generate-semester', {
-            preHandler: [workspaceGuard]
+            preHandler: [fastify.workspaceGuard]
         }, async (request, reply) => {
-            const { workspaceId } = request.params as { workspaceId: string };
+            const workspaceId = request.workspaceId;
             const body = request.body as {
                 pack_id: string;
                 semester: string;

@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import dbPlugin from './plugins/db';
 import authPlugin from './plugins/auth';
 import storagePlugin from './plugins/storage';
+import workspaceGuardPlugin from './plugins/workspace-guard';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspace';
 import generateRoutes from './routes/generate';
@@ -39,13 +40,14 @@ if (SERVICE_MODE === 'verify') {
     // ---------------------------------------------------------
     console.log('[STARTUP] Registering API mode plugins and routes...');
     fastify.register(authPlugin);
+    fastify.register(workspaceGuardPlugin);
     fastify.register(storagePlugin);
 
     fastify.register(authRoutes);
     fastify.register(workspaceRoutes);
     fastify.register(generateRoutes);
     fastify.register(billingRoutes);
-    fastify.register(documentsRoutes, { prefix: '/documents' });
+    fastify.register(documentsRoutes);
 }
 
 const start = async () => {
