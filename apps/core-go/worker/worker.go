@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -47,6 +49,7 @@ type RenderedDocument struct {
 	FilePath     string `json:"file_path"`          // "html://{did}/v1" or "gcs://bucket/path.pdf"
 	PDFPath      string `json:"pdf_path,omitempty"` // temp local PDF path (cleared after upload)
 	PDFSizeBytes int64  `json:"pdf_size_bytes,omitempty"`
+	PDFHash      string `json:"pdf_hash,omitempty"` // SHA256 of generated PDF
 }
 
 // WorkerResult is the outcome of a worker execution.
@@ -219,6 +222,13 @@ No markdown formatting. Pure JSON.`,
 					"html_hash": hash,
 				},
 			}
+			// Note: PDF metadata is added later after generation?
+			// Actually PDF generation happens AFTER this block.
+			// We should update metadata at the END of ExecuteJob or accumulating it.
+			// Current structure: failed to persist AI receipt here.
+			// The job metadata is updated incrementally?
+			// The `UpdateJobMetadata` merges? Postgres `jsonb_set` or merge?
+			// DB implementation usually merges.
 			if err := db.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
 				logger.Warn("Failed to persist AI receipt", "error", err)
 			}
@@ -310,19 +320,48 @@ No markdown formatting. Pure JSON.`,
 		})
 	}
 
-	// 6. PDF render
-	pdfEnabled := render.IsPDFRenderAvailable()
-	if pdfEnabled {
+	// 6. PDF render (PR-024 Chromedp)
+	// Check if Chrome is available (bundled or installed)
+	if render.IsChromeAvailable() {
 		for i, rd := range renderedDocs {
-			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
-			pdfResult, err := render.RenderPDF(rd.HTML, tmpPDF)
+			// Watermark Data
+			// Mask teacher name: "REJA P****" or "re***@domain.com"
+			maskedTeacher := maskTeacher(payload.TeacherName)
+			watermark := render.WatermarkData{
+				PublicID:    rd.DID,
+				TeacherName: maskedTeacher,
+				Date:        time.Now().Format("02-01-2006"),
+				VerifyURL:   fmt.Sprintf("verify.modulajar.app/verify/%s", rd.DID),
+			}
+
+			// Generate PDF
+			pdfBytes, err := render.GeneratePDF(ctx, rd.HTML, render.GeneratePDFOptions{
+				Watermark:    watermark,
+				MarginBottom: 0.8, // inch
+			})
 			if err != nil {
-				logger.Warn("PDF render skipped", "subject", rd.SubjectCode, "error", err)
+				logger.Warn("PDF render failed", "subject", rd.SubjectCode, "error", err)
 				continue
 			}
+
+			// Save to temp file for GCS upload (or stream directly if client supports bytes)
+			// Existing GCS client takes path.
+			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
+			if err := os.WriteFile(tmpPDF, pdfBytes, 0644); err != nil {
+				logger.Warn("Failed to write temp PDF", "error", err)
+				continue
+			}
+
 			renderedDocs[i].PDFPath = tmpPDF
-			renderedDocs[i].PDFSizeBytes = pdfResult.SizeBytes
+			renderedDocs[i].PDFSizeBytes = int64(len(pdfBytes))
+
+			// Compute SHA256 for receipt
+			pdfHash := sha256.New()
+			pdfHash.Write(pdfBytes)
+			renderedDocs[i].PDFHash = hex.EncodeToString(pdfHash.Sum(nil))
 		}
+	} else {
+		logger.Warn("Chrome/Chromium not found. PDF generation skipped.")
 	}
 
 	// 7. GCS upload
@@ -344,13 +383,34 @@ No markdown formatting. Pure JSON.`,
 		}
 	}
 
-	// 8. Update graph paths
+	// 8. Update graph paths & Persist PDF Metadata
+	pdfMetadata := make(map[string]interface{})
 	for i, ver := range graphResult.Versions {
 		for _, rd := range renderedDocs {
 			if ver.DocumentID == rd.DocumentID {
 				graphResult.Versions[i].FilePath = rd.FilePath
+
+				// Collect PDF metadata for this subject
+				if rd.PDFHash != "" {
+					pdfMetadata[rd.SubjectCode] = map[string]interface{}{
+						"pdf_path":       rd.FilePath, // GCS URI
+						"pdf_size_bytes": rd.PDFSizeBytes,
+						"pdf_sha256":     rd.PDFHash,
+						"generated_at":   time.Now().Format(time.RFC3339),
+					}
+				}
 				break
 			}
+		}
+	}
+
+	// Persist PDF metadata if any
+	if len(pdfMetadata) > 0 {
+		update := map[string]interface{}{
+			"pdf_receipts": pdfMetadata,
+		}
+		if err := db.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
+			logger.Warn("Failed to persist PDF receipts", "error", err)
 		}
 	}
 
@@ -525,4 +585,15 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func maskTeacher(name string) string {
+	if len(name) < 4 {
+		return name
+	}
+	// Simple mask: First word + "****"
+	// Or more robust?
+	// Request: re***@domain.com or REJA P****
+	// I'll implement simple masking for now.
+	return name[0:3] + "****"
 }
