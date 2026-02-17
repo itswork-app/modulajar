@@ -71,7 +71,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 `SELECT gj.id, gj.status, gj.package_id, p.public_id AS pid
                  FROM generation_jobs gj
                  JOIN packages p ON p.id = gj.package_id
-                 WHERE gj.idempotency_key = $1`,
+                 WHERE gj.generation_id = $1`,
                 [idempotencyKey]
             );
 
@@ -88,7 +88,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             // 2. Concurrency guard: max 1 active job per workspace
             const activeJobs = await fastify.db.query(
                 `SELECT id FROM generation_jobs
-                 WHERE workspace_id = $1 AND status IN ('pending', 'running')`,
+                 WHERE workspace_id = $1 AND status IN ('queued', 'running')`,
                 [workspaceId]
             );
 
@@ -152,13 +152,32 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 );
             }
 
-            // 5. Create job (idempotent via UNIQUE idempotency_key)
+            // 5. Create job (idempotent via UNIQUE generation_id)
             const jobId = ulid();
 
+            // Resolve pack path
+            const parts = body.pack_id.split('-');
+            const packPath = parts.length >= 3
+                ? `packs/${parts[0]}/${parts[1]}/${parts[2]}/pack.json`
+                : `packs/${body.pack_id}/pack.json`;
+
+            const metadata = {
+                job_id: jobId,
+                package_id: packageId,
+                workspace_id: workspaceId,
+                pack_path: packPath,
+                semester: body.semester,
+                kelas: kelas,
+                tahun_ajaran: body.tahun_ajaran,
+                teacher_name: teacherName,
+                school_name: schoolName,
+                pid: pid
+            };
+
             await fastify.db.query(
-                `INSERT INTO generation_jobs (id, workspace_id, package_id, status, idempotency_key)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [jobId, workspaceId, packageId, 'pending', idempotencyKey]
+                `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                [jobId, workspaceId, packageId, 'queued', idempotencyKey, JSON.stringify(metadata)]
             );
 
             // 6. Debit wallet (idempotent via ON CONFLICT)
