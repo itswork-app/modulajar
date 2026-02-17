@@ -32,13 +32,6 @@ type TaskPayload struct {
 	PID         string `json:"pid"`
 }
 
-// StatusUpdate represents a status change to be applied by the caller.
-type StatusUpdate struct {
-	Table  string `json:"table"` // "packages" or "generation_jobs"
-	ID     string `json:"id"`
-	Status string `json:"status"`
-}
-
 // RenderedDocument holds the composed HTML for one document (subject).
 type RenderedDocument struct {
 	DocumentID   string `json:"document_id"`
@@ -59,7 +52,6 @@ type WorkerResult struct {
 	ValidationOK      bool                        `json:"validation_ok"`
 	Errors            []validator.ValidationError `json:"errors,omitempty"`
 	FailureReason     string                      `json:"failure_reason,omitempty"`
-	StatusUpdates     []StatusUpdate              `json:"status_updates"`
 	DocGraph          *docgraph.DocGraphResult    `json:"doc_graph,omitempty"`
 	RenderedDocuments []RenderedDocument          `json:"rendered_documents,omitempty"`
 }

@@ -96,27 +96,6 @@ func TestExecuteJobRetryIdempotent(t *testing.T) {
 	t.Logf("Retry idempotent: %d docs + %d rendered identical", len(result1.DocGraph.Documents), len(result1.RenderedDocuments))
 }
 
-func TestLifecycleStatusTransitions(t *testing.T) {
-	result, _ := ExecuteJob(basePayload())
-
-	if len(result.StatusUpdates) != 4 {
-		t.Fatalf("expected 4 status updates, got %d", len(result.StatusUpdates))
-	}
-
-	expected := []struct{ table, status string }{
-		{"packages", "generating"},
-		{"generation_jobs", "running"},
-		{"packages", "ready"},
-		{"generation_jobs", "completed"},
-	}
-	for i, exp := range expected {
-		if result.StatusUpdates[i].Table != exp.table || result.StatusUpdates[i].Status != exp.status {
-			t.Errorf("update[%d]: expected %s.%s, got %s.%s",
-				i, exp.table, exp.status, result.StatusUpdates[i].Table, result.StatusUpdates[i].Status)
-		}
-	}
-}
-
 func TestDocGraphCreated(t *testing.T) {
 	result, _ := ExecuteJob(basePayload())
 
