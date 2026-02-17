@@ -13,7 +13,7 @@ const buildVerifyApp = () => {
             const id = params[0];
 
             // Document check
-            if (sql.includes('FROM generated_documents')) {
+            if (sql.includes('FROM documents')) {
                 if (id === 'DID_VALID') {
                     return {
                         rowCount: 1,
@@ -33,7 +33,7 @@ const buildVerifyApp = () => {
             }
 
             // Pack check
-            if (sql.includes('FROM curriculum_packs')) {
+            if (sql.includes('FROM packages')) {
                 if (id === 'PID_VALID') {
                     return {
                         rowCount: 1,

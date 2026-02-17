@@ -26,8 +26,8 @@ const buildApp = () => {
                 return { rowCount: 0, rows: [] };
             }
 
-            // Document lookup — now scoped by workspace_id AND public_id
-            if (sql.includes('FROM generated_documents')) {
+            // Document lookup — now joins documents + document_versions
+            if (sql.includes('FROM documents')) {
                 const [workspaceId, publicId] = params;
 
                 if (workspaceId === 'ws-1' && publicId === 'doc-ready') {
