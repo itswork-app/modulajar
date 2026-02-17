@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/curriculum"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
@@ -108,23 +109,101 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, a
 	// 4. Build document graph
 	// ... (doc graph code) ...
 
-	// AI INTEGRATION (PR-022)
-	// We call Gemini here to generate content.
-	// For PR-022, we generate a receipt and log it.
+	// AI INTEGRATION (PR-023)
 	if aiClient != nil {
-		// Example prompt: Generate a welcome message/preface
-		prompt := fmt.Sprintf("Buatkan kata pengantar singkat untuk Modul Ajar mata pelajaran %s Kelas %s Semester %s untuk guru %s.",
-			subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName)
+		// 1. Construct Schema-Driven Prompt
+		schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
+Subject: %s
+Class: %s
+Semester: %s
+Teacher: %s
+School: %s
 
-		req := ai.GenerateRequest{Prompt: prompt}
+STRICT RULE: Output must be valid JSON matching this schema:
+{
+  "meta": {
+    "jenjang": "SD|SMP|SMA",
+    "kelas": "string",
+    "mapel": "string",
+    "semester": "1|2",
+    "tahun_ajaran": "2025/2026"
+  },
+  "identitas": {
+    "sekolah": "string",
+    "guru": "string",
+    "alokasi_waktu": "2x35 menit"
+  },
+  "tujuan_pembelajaran": ["string"],
+  "materi_inti": ["string"],
+  "langkah_pembelajaran": {
+    "pendahuluan": ["string"],
+    "inti": ["string"],
+    "penutup": ["string"]
+  },
+  "asesmen": {
+    "diagnostik": ["string"],
+    "formatif": ["string"],
+    "sumatif": ["string"]
+  },
+  "diferensiasi": {
+    "konten": ["string"],
+    "proses": ["string"],
+    "produk": ["string"]
+  },
+  "profil_pancasila": ["string"],
+  "lampiran": {
+    "media": ["string"],
+    "sumber_belajar": ["string"]
+  }
+}
+No markdown formatting. Pure JSON.`,
+			subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
+
+		req := ai.GenerateRequest{Prompt: schemaPrompt}
 		resp, err := aiClient.Generate(ctx, req)
 		if err != nil {
 			logger.Warn("AI generation failed", "error", err)
-			// We continue without AI content (no breaking changes)
 		} else {
-			logger.Info("AI generation success", "model", resp.ModelName, "tokens_in", resp.TokenInput, "tokens_out", resp.TokenOutput)
+			logger.Info("AI generation success", "model", resp.ModelName)
 
-			// Persist receipt
+			// 2. Parse & Validate
+			var c curriculum.Curriculum
+			if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
+				logger.Error("Failed to parse AI JSON", "error", err, "content_snippet", resp.Content[:min(len(resp.Content), 100)])
+				// In PR-023, maybe fail job? For now, we log error and continue (non-blocking).
+				// User said "Invalid JSON -> job fails".
+				// I'll return error here?
+				return nil, fmt.Errorf("AI generated invalid JSON: %w", err)
+			}
+
+			if err := c.Validate(); err != nil {
+				return nil, fmt.Errorf("AI validation failed: %w", err)
+			}
+
+			// 3. Sanitize
+			c.Sanitize()
+
+			// 4. Render
+			// Try reading template from local file
+			tmplBytes, err := os.ReadFile("templates/v1/modul-ajar.html")
+			if err != nil {
+				// Fallback to simpler path or strictly fail?
+				// Try apps/core-go/templates/modul-ajar.html if running from root
+				tmplBytes, err = os.ReadFile("apps/core-go/templates/modul-ajar.html")
+				if err != nil {
+					logger.Warn("Template not found", "error", err)
+				}
+			}
+
+			var html, hash string
+			if len(tmplBytes) > 0 {
+				html, hash, err = curriculum.RenderHTML(&c, string(tmplBytes))
+				if err != nil {
+					return nil, fmt.Errorf("Render failed: %w", err)
+				}
+			}
+
+			// 5. Persist
 			receipt := map[string]interface{}{
 				"ai_receipt": map[string]interface{}{
 					"model":         resp.ModelName,
@@ -135,10 +214,15 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, a
 					"duration_ms":   resp.DurationMs,
 					"generated_at":  time.Now().Format(time.RFC3339),
 				},
+				"curriculum": map[string]interface{}{
+					"json":      c,
+					"html_hash": hash,
+				},
 			}
 			if err := db.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
 				logger.Warn("Failed to persist AI receipt", "error", err)
 			}
+			_ = html // Prevent unused error if not used
 		}
 	}
 	graphResult, err := docgraph.BuildDocGraph(docgraph.DocGraphInput{
@@ -434,4 +518,11 @@ func subjectName(pack *packloader.CurriculumPack, code string) string {
 		}
 	}
 	return code
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
