@@ -137,7 +137,11 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 
 	renderedDocs := make([]RenderedDocument, 0, len(graphResult.Documents))
 	for _, doc := range graphResult.Documents {
-		verifyURL := fmt.Sprintf("https://modulajar.com/verify/%s", doc.PublicID)
+		verifyBaseURL := os.Getenv("VERIFY_BASE_URL")
+		if verifyBaseURL == "" {
+			verifyBaseURL = "https://verify.modulajar.app"
+		}
+		verifyURL := fmt.Sprintf("%s/verify/%s", verifyBaseURL, doc.PublicID)
 
 		html, err := render.ComposeModulAjarHTML(render.ComposerInput{
 			TemplateDir: templateDir,

@@ -16,9 +16,11 @@ export default async function documentsRoutes(fastify: FastifyInstance) {
 
             // 1. Lookup document scoped to workspace — no cross-tenant leakage
             const result = await fastify.db.query(
-                `SELECT d.id, d.workspace_id, d.status, d.gcs_path
-                 FROM generated_documents d
-                 WHERE d.workspace_id = $1 AND d.public_id = $2`,
+                `SELECT d.id, d.workspace_id, d.status, dv.file_path AS gcs_path
+                 FROM documents d
+                 LEFT JOIN document_versions dv ON dv.document_id = d.id
+                 WHERE d.workspace_id = $1 AND d.public_id = $2
+                 ORDER BY dv.version DESC LIMIT 1`,
                 [workspaceId, publicId]
             );
 

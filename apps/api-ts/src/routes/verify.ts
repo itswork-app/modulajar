@@ -5,10 +5,14 @@ export default async function verifyRoutes(fastify: FastifyInstance) {
         const { publicId } = request.params as { publicId: string };
 
         // 1. Check if it's a Document (DID)
+        // Join packages for kelas/semester/tahun_ajaran (not on documents table)
         const docResult = await fastify.db.query(
-            `SELECT 'document' as type, public_id, status, kelas, semester, tahun_ajaran, subject
-             FROM generated_documents
-             WHERE public_id = $1`,
+            `SELECT 'document' as type, d.public_id, d.status,
+                    d.subject_code AS subject,
+                    p.kelas, p.semester, p.tahun_ajaran
+             FROM documents d
+             JOIN packages p ON p.id = d.package_id
+             WHERE d.public_id = $1`,
             [publicId]
         );
 
@@ -30,7 +34,7 @@ export default async function verifyRoutes(fastify: FastifyInstance) {
         // 2. Check if it's a Curriculum Pack (PID)
         const packResult = await fastify.db.query(
             `SELECT 'package' as type, public_id, status, kelas, semester, tahun_ajaran
-             FROM curriculum_packs
+             FROM packages
              WHERE public_id = $1`,
             [publicId]
         );
