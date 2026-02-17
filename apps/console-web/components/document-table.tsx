@@ -142,7 +142,7 @@ export function DocumentTable() {
                                             <button
                                                 onClick={async () => {
                                                     const token = await getToken();
-                                                    const res = await fetch(`${API_BASE}/documents/${doc.public_id}/download`, {
+                                                    const res = await fetch(`${API_BASE}/w/${workspace?.id}/documents/${doc.public_id}/download`, {
                                                         headers: { Authorization: `Bearer ${token}` }
                                                     });
                                                     if (res.ok) {

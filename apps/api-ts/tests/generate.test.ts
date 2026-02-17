@@ -1,6 +1,7 @@
 import tap from 'tap';
 import Fastify from 'fastify';
 import mockAuthPlugin from '../src/plugins/mock_auth';
+import workspaceGuardPlugin from '../src/plugins/workspace-guard';
 import generateRoutes from '../src/routes/generate';
 import { issuePID, PID_REGEX, workspaceShortCode } from '../src/lib/pid';
 import { ulid } from 'ulid';
@@ -205,6 +206,7 @@ test('Generate Semester with PID + Package', async (t) => {
         } as any);
 
         fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
         fastify.register(generateRoutes);
         return fastify;
     };

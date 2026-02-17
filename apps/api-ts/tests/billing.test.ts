@@ -1,6 +1,7 @@
 import tap from 'tap';
 import Fastify from 'fastify';
 import mockAuthPlugin from '../src/plugins/mock_auth';
+import workspaceGuardPlugin from '../src/plugins/workspace-guard';
 import billingRoutes from '../src/routes/billing';
 import { SD_FULL_SEMESTER_COST, idrToCredits, getDefaultTier } from '../src/lib/pricing';
 
@@ -117,6 +118,7 @@ test('Billing API', async (t) => {
         } as any);
 
         fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
         fastify.register(billingRoutes);
         return { fastify, receipts, ledger };
     }
