@@ -290,7 +290,7 @@ func Handler() http.HandlerFunc {
 	geminiKey := os.Getenv("GEMINI_API_KEY")
 	geminiModel := os.Getenv("GEMINI_MODEL")
 	if geminiModel == "" {
-		geminiModel = "gemini-1.5-pro"
+		geminiModel = "gemini-2.0-flash" // Default to available model
 	}
 	// Parse timeout and max tokens (ignoring errors for brevity, using defaults)
 	// simple helper or just pass 0 to rely on defaults
