@@ -9,7 +9,7 @@ Both `api-ts` and `core-go` (worker) expose Prometheus-compatible metrics at `/m
 ### Key Metrics
 
 #### API (`apps/api-ts`)
-- `http_requests_total{method, route, status}`: Counter of HTTP requests.
+- `http_requests_total{method, route, status}`: Counter of requests (route is pattern-based for low cardinality).
 - `http_request_duration_ms{method, route}`: Histogram of request latency.
 - `generate_requests_total{result}`: Counter of generation requests (`success` or `failed`).
 - `wallet_debit_total{result}`: Counter of wallet debit attempts.
@@ -20,14 +20,14 @@ Both `api-ts` and `core-go` (worker) expose Prometheus-compatible metrics at `/m
 - `job_retries_total`: Counter of job retries triggered by errors.
 - `job_failures_total`: Counter of jobs that failed after max retries.
 - `gcs_upload_total{result}`: Counter of GCS upload attempts.
-- `jobs_queued_gauge`: Current number of jobs in `queued` status.
-- `jobs_running_gauge`: Current number of jobs in `running` status.
-- `jobs_failed_gauge`: Current number of jobs in `failed` status.
+- `jobs_queued_gauge`: Current number of jobs in `queued` status (computed on scrape).
+- `jobs_running_gauge`: Current number of jobs in `running` status (computed on scrape).
+- `jobs_failed_gauge`: Current number of jobs in `failed` status (computed on scrape).
 
 ### Scraping
 - **Local**:
-  - API: `GET http://localhost:8080/metrics`
-  - Worker: `GET http://localhost:8081/metrics` (or configured `PORT`)
+  - API: `GET http://localhost:$PORT/metrics` (default 8080)
+  - Worker: `GET http://localhost:$PORT/metrics` (default 8080)
 
 ## 2. Structured Logging (JSON)
 
