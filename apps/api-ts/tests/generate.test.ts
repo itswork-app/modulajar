@@ -130,7 +130,7 @@ test('Generate Semester with PID + Package', async (t) => {
                 // Job lookup with package JOIN
                 if (sql.includes('SELECT gj.id, gj.status, gj.package_id, p.public_id')) {
                     const [key] = values;
-                    const found = Object.values(jobs).find((j: any) => j.idempotency_key === key);
+                    const found = Object.values(jobs).find((j: any) => j.generation_id === key);
                     if (found) {
                         const pkg = packages[(found as any).package_id] || {};
                         return {
@@ -142,10 +142,10 @@ test('Generate Semester with PID + Package', async (t) => {
                 }
 
                 // Active jobs
-                if (sql.includes('SELECT id FROM generation_jobs') && sql.includes('pending')) {
+                if (sql.includes('SELECT id FROM generation_jobs') && sql.includes('queued')) {
                     const [wid] = values;
                     const active = Object.values(jobs).filter(
-                        (j: any) => j.workspace_id === wid && (j.status === 'pending' || j.status === 'running')
+                        (j: any) => j.workspace_id === wid && (j.status === 'queued' || j.status === 'running')
                     );
                     return { rowCount: active.length, rows: active };
                 }
@@ -181,7 +181,7 @@ test('Generate Semester with PID + Package', async (t) => {
                 // Insert job
                 if (sql.includes('INSERT INTO generation_jobs')) {
                     const [id, wid, pid, status, key] = values;
-                    jobs[id] = { id, workspace_id: wid, package_id: pid, status, idempotency_key: key };
+                    jobs[id] = { id, workspace_id: wid, package_id: pid, status, generation_id: key };
                     return { rowCount: 1, rows: [] };
                 }
 

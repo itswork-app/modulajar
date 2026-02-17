@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
 	"modulajar/apps/core-go/packloader"
@@ -16,7 +17,8 @@ import (
 	"modulajar/apps/core-go/validator"
 )
 
-// TaskPayload is the Cloud Task payload for a generate job.
+// TaskPayload is the internal payload used by ExecuteJob.
+// Now constructed from DB data, not Cloud Tasks payload.
 type TaskPayload struct {
 	JobID       string `json:"job_id"`
 	PackageID   string `json:"package_id"`
@@ -63,17 +65,10 @@ type WorkerResult struct {
 }
 
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
-// Pure function, no DB side-effects. Safe to retry.
 func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
-	}
-
-	// Start: package -> generating, job -> running
-	startUpdates := []StatusUpdate{
-		{Table: "packages", ID: payload.PackageID, Status: "generating"},
-		{Table: "generation_jobs", ID: payload.JobID, Status: "running"},
 	}
 
 	failResult := func(reason string) *WorkerResult {
@@ -82,10 +77,6 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 			PackageID:     payload.PackageID,
 			Status:        "failed",
 			FailureReason: reason,
-			StatusUpdates: append(startUpdates,
-				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
-				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
-			),
 		}
 	}
 
@@ -131,11 +122,44 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
 	}
 
-	// 5. Compose HTML for each document
-	// Try to find template dir from multiple candidate paths
-	templateDir := resolveTemplateDir(payload.PackPath)
+	// IDEMPOTENCY CHECK: Check if artifacts already exist
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	ctx := context.Background()
+	var gcsClient *gcs.Client
 
+	if gcsBucket != "" {
+		gcsClient, err = gcs.NewClient(ctx)
+		if err == nil && gcsClient != nil {
+			defer gcsClient.Close()
+			allExist := true
+			for _, doc := range graphResult.Documents {
+				// Check version 1 (default)
+				objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, doc.PublicID, 1)
+				exists, _ := gcsClient.Exists(ctx, objectPath)
+				if !exists {
+					allExist = false
+					break
+				}
+			}
+			if allExist {
+				// Optimization: Skip regeneration
+				fmt.Printf("Job %s: Idempotency check passed (all artifacts exist). Skipping generation.\n", payload.JobID)
+				return &WorkerResult{
+					JobID:         payload.JobID,
+					PackageID:     payload.PackageID,
+					Status:        "completed",
+					PlannerResult: planResult,
+					ValidationOK:  true,
+					DocGraph:      graphResult,
+				}, nil
+			}
+		}
+	}
+
+	// 5. Compose HTML for each document
+	templateDir := resolveTemplateDir(payload.PackPath)
 	renderedDocs := make([]RenderedDocument, 0, len(graphResult.Documents))
+
 	for _, doc := range graphResult.Documents {
 		verifyBaseURL := os.Getenv("VERIFY_BASE_URL")
 		if verifyBaseURL == "" {
@@ -171,17 +195,13 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		})
 	}
 
-	// 6. PDF render (optional — skipped if Playwright not available)
-	gcsBucket := os.Getenv("GCS_BUCKET")
+	// 6. PDF render
 	pdfEnabled := render.IsPDFRenderAvailable()
-
 	if pdfEnabled {
 		for i, rd := range renderedDocs {
 			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
 			pdfResult, err := render.RenderPDF(rd.HTML, tmpPDF)
 			if err != nil {
-				// PDF render failed — log but don't fail the job
-				// The HTML artifact is still valid
 				fmt.Fprintf(os.Stderr, "WARN: PDF render skipped for %s: %v\n", rd.SubjectCode, err)
 				continue
 			}
@@ -190,37 +210,24 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		}
 	}
 
-	// 7. GCS upload (optional — skipped if GCS_BUCKET not set)
-	if gcsBucket != "" {
-		ctx := context.Background()
-		gcsClient, err := gcs.NewClient(ctx)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARN: GCS client init failed: %v\n", err)
-		} else if gcsClient != nil {
-			defer gcsClient.Close()
-
-			for i, rd := range renderedDocs {
-				if rd.PDFPath == "" {
-					continue // No PDF to upload
-				}
-
-				objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
-				if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
-					fmt.Fprintf(os.Stderr, "WARN: GCS upload failed for %s: %v\n", rd.SubjectCode, err)
-					continue
-				}
-
-				// Finalize file_path to GCS URI
-				renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
-
-				// Clean up temp PDF
-				os.Remove(rd.PDFPath)
-				renderedDocs[i].PDFPath = ""
+	// 7. GCS upload
+	if gcsClient != nil {
+		for i, rd := range renderedDocs {
+			if rd.PDFPath == "" {
+				continue
 			}
+			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
+			if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
+				fmt.Fprintf(os.Stderr, "WARN: GCS upload failed for %s: %v\n", rd.SubjectCode, err)
+				continue
+			}
+			renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
+			os.Remove(rd.PDFPath)
+			renderedDocs[i].PDFPath = ""
 		}
 	}
 
-	// 8. Update version file_paths in doc graph
+	// 8. Update graph paths
 	for i, ver := range graphResult.Versions {
 		for _, rd := range renderedDocs {
 			if ver.DocumentID == rd.DocumentID {
@@ -230,7 +237,6 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		}
 	}
 
-	// 9. Success
 	return &WorkerResult{
 		JobID:             payload.JobID,
 		PackageID:         payload.PackageID,
@@ -239,43 +245,7 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		ValidationOK:      true,
 		DocGraph:          graphResult,
 		RenderedDocuments: renderedDocs,
-		StatusUpdates: append(startUpdates,
-			StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "ready"},
-			StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "completed"},
-		),
 	}, nil
-}
-
-// resolveTemplateDir finds the templates/v1/ directory by checking multiple candidate paths.
-// This handles different working directories (project root, worker/, test contexts).
-func resolveTemplateDir(packPath string) string {
-	candidates := []string{
-		// Relative to pack path: packs/merdeka/sd4/v1/pack.json → ../../../../templates/v1
-		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
-		// CWD-relative
-		filepath.Join("templates", "v1"),
-		// One level up (from worker/ or render/)
-		filepath.Join("..", "templates", "v1"),
-	}
-
-	for _, c := range candidates {
-		if _, err := os.Stat(filepath.Join(c, "modul-ajar.html")); err == nil {
-			return c
-		}
-	}
-
-	// Default fallback
-	return filepath.Join("templates", "v1")
-}
-
-// subjectName looks up the display name for a subject code from the pack.
-func subjectName(pack *packloader.CurriculumPack, code string) string {
-	for _, s := range pack.Subjects {
-		if s.Code == code {
-			return s.Name
-		}
-	}
-	return code
 }
 
 // Handler returns an HTTP handler for POST /tasks/generate.
@@ -286,30 +256,114 @@ func Handler() http.HandlerFunc {
 			return
 		}
 
-		var payload TaskPayload
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			http.Error(w, fmt.Sprintf("invalid payload: %v", err), http.StatusBadRequest)
-			return
+		// Parse payload strictly to get JobID for logging (optional)
+		// Or just ignore it as we use AcquireJob.
+		// We'll decode just to verify it's a valid request.
+		var triggerPayload struct {
+			JobID string `json:"job_id"`
 		}
-		defer r.Body.Close()
+		json.NewDecoder(r.Body).Decode(&triggerPayload)
+		r.Body.Close()
 
-		if payload.JobID == "" || payload.PackPath == "" {
-			http.Error(w, "missing job_id or pack_path", http.StatusBadRequest)
-			return
-		}
+		ctx := r.Context()
 
-		result, err := ExecuteJob(payload)
+		// 1. Atomic Acquire
+		job, err := db.AcquireJob(ctx)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("execution error: %v", err), http.StatusInternalServerError)
+			fmt.Fprintf(os.Stderr, "AcquireJob failed: %v\n", err)
+			http.Error(w, "acquire failed", http.StatusInternalServerError)
 			return
 		}
+
+		if job == nil {
+			// No work available
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"idle"}`))
+			return
+		}
+
+		fmt.Printf("Acquired Job %s (Attempt %d)\n", job.ID, job.AttemptCount)
+
+		// 2. Mark package as generating
+		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
+
+		// 3. Construct payload from Metadata
+		payload, err := jobToPayload(job)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid metadata for job %s: %v\n", job.ID, err)
+			db.MarkJobFailed(ctx, job.ID, "invalid metadata", job.AttemptCount)
+			w.WriteHeader(http.StatusOK) // Don't retry invalid metadata
+			return
+		}
+
+		// 4. Exec
+		result, err := ExecuteJob(payload)
+
+		// 5. Handle Result
+		if err != nil || (result != nil && result.Status == "failed") {
+			reason := "unknown error"
+			if err != nil {
+				reason = err.Error()
+			} else if result != nil {
+				reason = result.FailureReason
+			}
+
+			// Retry logic handled by MarkJobFailed
+			db.MarkJobFailed(ctx, job.ID, reason, job.AttemptCount)
+
+			// Also update package
+			db.UpdatePackageStatus(ctx, job.PackageID, "failed")
+
+			w.WriteHeader(http.StatusOK) // We handled the failure, Cloud Tasks should consider it done (we manage retries via DB)
+			return
+		}
+
+		// Success
+		db.MarkJobDone(ctx, job.ID)
+		db.UpdatePackageStatus(ctx, job.PackageID, "ready")
 
 		w.Header().Set("Content-Type", "application/json")
-		if result.Status == "completed" {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-		}
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(result)
 	}
+}
+
+func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
+	b, err := json.Marshal(job.Metadata)
+	if err != nil {
+		return TaskPayload{}, err
+	}
+	var p TaskPayload
+	if err := json.Unmarshal(b, &p); err != nil {
+		return TaskPayload{}, err
+	}
+	// Ensure IDs match (override metadata just in case)
+	p.JobID = job.ID
+	p.PackageID = job.PackageID
+	p.WorkspaceID = job.WorkspaceID
+	return p, nil
+}
+
+// Helpers...
+func resolveTemplateDir(packPath string) string {
+	candidates := []string{
+		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
+		filepath.Join("templates", "v1"),
+		filepath.Join("..", "templates", "v1"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "modul-ajar.html")); err == nil {
+			return c
+		}
+	}
+	return filepath.Join("templates", "v1")
+}
+
+func subjectName(pack *packloader.CurriculumPack, code string) string {
+	for _, s := range pack.Subjects {
+		if s.Code == code {
+			return s.Name
+		}
+	}
+	return code
 }
