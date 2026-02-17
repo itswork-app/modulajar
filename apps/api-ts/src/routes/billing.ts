@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { createHash, randomBytes } from 'crypto';
 import { SD_FULL_SEMESTER_COST, idrToCredits, getDefaultTier } from '../lib/pricing';
+import { getBalance, credit } from '../lib/wallet';
 
 /**
  * Generate a unique external reference for a receipt.
@@ -74,13 +75,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
 
-            // Derived balance
-            const balanceResult = await fastify.db.query(
-                `SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) AS balance
-                 FROM wallet_ledger WHERE workspace_id = $1`,
-                [workspaceId]
-            );
-            const balance = parseInt(balanceResult.rows[0]?.balance || '0', 10);
+            // Derived balance (via wallet service)
+            const balance = await getBalance(fastify.db, workspaceId);
 
             // Recent receipts
             const receiptsResult = await fastify.db.query(
@@ -156,25 +152,10 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 [body.status, receipt.id]
             );
 
-            // 5. If confirmed, post wallet credit (idempotent via reference)
+            // 5. If confirmed, post wallet credit (idempotent via ON CONFLICT)
             if (body.status === 'confirmed') {
                 const creditRef = `RCPT:${receipt.id}`;
-
-                const existingCredit = await fastify.db.query(
-                    `SELECT id FROM wallet_ledger WHERE reference = $1`,
-                    [creditRef]
-                );
-
-                if (!existingCredit.rowCount || existingCredit.rowCount === 0) {
-                    const { ulid } = await import('ulid');
-                    const ledgerId = ulid();
-
-                    await fastify.db.query(
-                        `INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference)
-                         VALUES ($1, $2, $3, $4, $5)`,
-                        [ledgerId, receipt.workspace_id, 'credit', receipt.amount, creditRef]
-                    );
-                }
+                await credit(fastify.db, receipt.workspace_id as string, receipt.amount as number, creditRef);
 
                 return reply.code(200).send({
                     receipt_id: receipt.id,

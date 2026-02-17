@@ -185,17 +185,34 @@ test('Generate Semester with PID + Package', async (t) => {
                     return { rowCount: 1, rows: [] };
                 }
 
-                // Debit check
-                if (sql.includes('SELECT id FROM wallet_ledger WHERE reference')) {
-                    const [ref] = values;
-                    const found = ledger.find(l => l.reference === ref);
-                    return { rowCount: found ? 1 : 0, rows: found ? [found] : [] };
+                // Wallet service: CTE debit (balance_check + INSERT)
+                if (sql.includes('balance_check') && sql.includes('INSERT INTO wallet_ledger')) {
+                    const [wid, id, amount, ref] = values;
+                    const dup = ledger.find(l => l.workspace_id === wid && l.reference_id === ref && l.type === 'debit');
+                    if (dup) return { rowCount: 0, rows: [] };
+                    let balance = 0;
+                    for (const e of ledger.filter(l => l.workspace_id === wid)) {
+                        balance += e.type === 'credit' ? e.amount : -e.amount;
+                    }
+                    if (balance < (amount as number)) return { rowCount: 0, rows: [] };
+                    ledger.push({ id, workspace_id: wid, type: 'debit', amount, reference_id: ref });
+                    return { rowCount: 1, rows: [] };
                 }
 
-                // Insert ledger
-                if (sql.includes('INSERT INTO wallet_ledger')) {
-                    const [id, wid, type, amount, ref] = values;
-                    ledger.push({ id, workspace_id: wid, type, amount, reference: ref });
+                // Wallet service: idempotency check for debit
+                if (sql.includes('SELECT id FROM wallet_ledger') && sql.includes('reference_id')) {
+                    const [wid, ref] = values;
+                    const found = ledger.filter(l => l.workspace_id === wid && l.reference_id === ref && l.type === 'debit');
+                    return { rowCount: found.length, rows: found };
+                }
+
+                // Wallet service: credit with ON CONFLICT
+                if (sql.includes('INSERT INTO wallet_ledger') && sql.includes('ON CONFLICT')) {
+                    const [id, wid, amount, ref] = values;
+                    const type = sql.includes("'credit'") ? 'credit' : 'debit';
+                    const dup = ledger.find(l => l.workspace_id === wid && l.reference_id === ref && l.type === type);
+                    if (dup) return { rowCount: 0, rows: [] };
+                    ledger.push({ id, workspace_id: wid, type, amount, reference_id: ref });
                     return { rowCount: 1, rows: [] };
                 }
 

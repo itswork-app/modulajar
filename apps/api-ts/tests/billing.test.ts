@@ -81,17 +81,20 @@ test('Billing API', async (t) => {
                     return { rowCount: 1, rows: [] };
                 }
 
-                // Check existing credit in ledger
-                if (sql.includes('SELECT id FROM wallet_ledger WHERE reference')) {
-                    const [ref] = values;
-                    const found = ledger.find(l => l.reference === ref);
+                // Check existing credit in ledger (wallet service idempotency check)
+                if (sql.includes('SELECT id FROM wallet_ledger') && sql.includes('reference_id')) {
+                    const [wid, ref] = values;
+                    const found = ledger.find(l => l.reference_id === ref && l.workspace_id === wid);
                     return { rowCount: found ? 1 : 0, rows: found ? [found] : [] };
                 }
 
-                // Insert ledger
-                if (sql.includes('INSERT INTO wallet_ledger')) {
-                    const [id, wid, type, amount, ref] = values;
-                    ledger.push({ id, workspace_id: wid, type, amount, reference: ref });
+                // Insert ledger (wallet service — ON CONFLICT DO NOTHING)
+                if (sql.includes('INSERT INTO wallet_ledger') && sql.includes('ON CONFLICT')) {
+                    const [id, wid, amount, ref] = values;
+                    const type = sql.includes("'credit'") ? 'credit' : 'debit';
+                    const dup = ledger.find(l => l.workspace_id === wid && l.reference_id === ref && l.type === type);
+                    if (dup) return { rowCount: 0, rows: [] };
+                    ledger.push({ id, workspace_id: wid, type, amount, reference_id: ref });
                     return { rowCount: 1, rows: [] };
                 }
 
@@ -173,7 +176,7 @@ test('Billing API', async (t) => {
         t.equal(confirmBody.credits_posted, 20);
 
         // Verify ledger has exactly 1 credit entry
-        const creditEntries = ledger.filter(l => l.reference === `RCPT:${intent.receipt_id}`);
+        const creditEntries = ledger.filter(l => l.reference_id === `RCPT:${intent.receipt_id}`);
         t.equal(creditEntries.length, 1, 'Should have exactly 1 credit entry');
 
         await fastify.close();
@@ -200,7 +203,7 @@ test('Billing API', async (t) => {
             payload: { external_ref: intent.external_ref, status: 'confirmed' }
         });
 
-        const creditsBefore = ledger.filter(l => l.reference === `RCPT:${intent.receipt_id}`).length;
+        const creditsBefore = ledger.filter(l => l.reference_id === `RCPT:${intent.receipt_id}`).length;
 
         // Confirm retry
         const retryRes = await fastify.inject({
@@ -212,7 +215,7 @@ test('Billing API', async (t) => {
         t.equal(retryRes.statusCode, 200);
         t.equal(retryRes.json().idempotent, true);
 
-        const creditsAfter = ledger.filter(l => l.reference === `RCPT:${intent.receipt_id}`).length;
+        const creditsAfter = ledger.filter(l => l.reference_id === `RCPT:${intent.receipt_id}`).length;
         t.equal(creditsBefore, creditsAfter, 'No double credit on retry');
 
         await fastify.close();
@@ -244,7 +247,7 @@ test('Billing API', async (t) => {
         t.equal(rejectRes.json().credits_posted, 0);
 
         // Verify no credit entry
-        const creditEntries = ledger.filter(l => l.reference === `RCPT:${intent.receipt_id}`);
+        const creditEntries = ledger.filter(l => l.reference_id === `RCPT:${intent.receipt_id}`);
         t.equal(creditEntries.length, 0, 'No credit for rejected receipt');
 
         await fastify.close();

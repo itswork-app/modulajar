@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
+import { SD_FULL_SEMESTER_COST } from '../lib/pricing';
+import { getBalance, debit } from '../lib/wallet';
 
-const SD_FULL_SEMESTER_COST = 5;
 const PID_SECRET = process.env.PID_SECRET || 'modulajar-pid-dev-secret';
 
 /**
@@ -98,14 +99,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            // 3. Check wallet balance
-            const balanceResult = await fastify.db.query(
-                `SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) AS balance
-                 FROM wallet_ledger WHERE workspace_id = $1`,
-                [workspaceId]
-            );
-
-            const balance = parseInt(balanceResult.rows[0]?.balance || '0', 10);
+            // 3. Check wallet balance (via wallet service)
+            const balance = await getBalance(fastify.db, workspaceId);
 
             if (balance < SD_FULL_SEMESTER_COST) {
                 return reply.code(402).send({
@@ -166,20 +161,18 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 [jobId, workspaceId, packageId, 'pending', idempotencyKey]
             );
 
-            // 6. Debit wallet (idempotent — check reference doesn't exist)
+            // 6. Debit wallet (idempotent via ON CONFLICT)
             const debitRef = `JOB:${jobId}`;
-            const existingDebit = await fastify.db.query(
-                `SELECT id FROM wallet_ledger WHERE reference = $1`,
-                [debitRef]
-            );
-
-            if (!existingDebit.rowCount || existingDebit.rowCount === 0) {
-                const ledgerId = ulid();
-                await fastify.db.query(
-                    `INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [ledgerId, workspaceId, 'debit', SD_FULL_SEMESTER_COST, debitRef]
-                );
+            try {
+                await debit(fastify.db, workspaceId, SD_FULL_SEMESTER_COST, debitRef, {
+                    job_id: jobId,
+                    package_id: packageId
+                });
+            } catch {
+                // Balance already checked above; if debit fails here it's a race condition
+                // The job is already created — we can't roll back cleanly
+                // Debit idempotency ensures no double-charge on retry
+                fastify.log.warn({ job_id: jobId }, 'Debit failed after job creation — possible race');
             }
 
             // 7. Enqueue Cloud Task (placeholder)
