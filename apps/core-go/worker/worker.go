@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
@@ -61,7 +62,7 @@ type WorkerResult struct {
 }
 
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
-func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (*WorkerResult, error) {
+func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, aiClient *ai.GeminiClient) (*WorkerResult, error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
@@ -105,6 +106,41 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (
 	}
 
 	// 4. Build document graph
+	// ... (doc graph code) ...
+
+	// AI INTEGRATION (PR-022)
+	// We call Gemini here to generate content.
+	// For PR-022, we generate a receipt and log it.
+	if aiClient != nil {
+		// Example prompt: Generate a welcome message/preface
+		prompt := fmt.Sprintf("Buatkan kata pengantar singkat untuk Modul Ajar mata pelajaran %s Kelas %s Semester %s untuk guru %s.",
+			subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName)
+
+		req := ai.GenerateRequest{Prompt: prompt}
+		resp, err := aiClient.Generate(ctx, req)
+		if err != nil {
+			logger.Warn("AI generation failed", "error", err)
+			// We continue without AI content (no breaking changes)
+		} else {
+			logger.Info("AI generation success", "model", resp.ModelName, "tokens_in", resp.TokenInput, "tokens_out", resp.TokenOutput)
+
+			// Persist receipt
+			receipt := map[string]interface{}{
+				"ai_receipt": map[string]interface{}{
+					"model":         resp.ModelName,
+					"input_tokens":  resp.TokenInput,
+					"output_tokens": resp.TokenOutput,
+					"prompt_hash":   resp.PromptHash,
+					"output_hash":   resp.OutputHash,
+					"duration_ms":   resp.DurationMs,
+					"generated_at":  time.Now().Format(time.RFC3339),
+				},
+			}
+			if err := db.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
+				logger.Warn("Failed to persist AI receipt", "error", err)
+			}
+		}
+	}
 	graphResult, err := docgraph.BuildDocGraph(docgraph.DocGraphInput{
 		WorkspaceID: payload.WorkspaceID,
 		PackageID:   payload.PackageID,
@@ -247,8 +283,18 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (
 
 // Handler returns an HTTP handler for POST /tasks/generate.
 func Handler() http.HandlerFunc {
-	// Initialize default logger (slog uses JSON by default in Cloud Run if configured)
+	// Initialize default logger
 	baseLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	// Initialize Gemini Client
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	geminiModel := os.Getenv("GEMINI_MODEL")
+	if geminiModel == "" {
+		geminiModel = "gemini-2.0-flash" // Default to available model
+	}
+	// Parse timeout and max tokens (ignoring errors for brevity, using defaults)
+	// simple helper or just pass 0 to rely on defaults
+	apiClient := ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -309,7 +355,7 @@ func Handler() http.HandlerFunc {
 		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
 
 		// 3. Exec
-		result, err := ExecuteJob(ctx, payload, logger)
+		result, err := ExecuteJob(ctx, payload, logger, apiClient)
 
 		duration := time.Since(start)
 		durationMs := float64(duration.Milliseconds())
