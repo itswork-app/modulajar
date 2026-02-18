@@ -16,6 +16,12 @@ func TestGeneratePDF(t *testing.T) {
 		t.Skip("Skipping PDF generation test: Chrome not found")
 	}
 
+	// Verify Chrome is actually runnable
+	ctx := context.Background()
+	if err := CheckChromeReadiness(ctx); err != nil {
+		t.Skipf("Skipping PDF generation test: Chrome binary found but not ready/runnable: %v", err)
+	}
+
 	html := "<html><body><h1>Hello PDF</h1><p>Test Content</p></body></html>"
 	opts := GeneratePDFOptions{
 		Watermark: WatermarkData{
