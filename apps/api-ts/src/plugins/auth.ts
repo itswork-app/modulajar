@@ -50,6 +50,7 @@ declare module 'fastify' {
             clerk_user_id: string;
             org_id?: string;
         } | null;
+        rawBody?: Buffer; // Added for webhook signature verification
     }
     interface FastifyInstance {
         verifyClerk: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;

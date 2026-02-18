@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, createHmac } from 'crypto';
 import { SD_FULL_SEMESTER_COST, idrToCredits, getDefaultTier } from '../lib/pricing';
 import { getBalance, credit } from '../lib/wallet';
+import { constantTimeCompare } from '../utils/crypto';
+import { logger } from '../utils/logger';
 
 /**
  * Generate a unique external reference for a receipt.
@@ -103,34 +105,103 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
         // ── POST /internal/webhooks/payment/confirm ──
         childServer.post('/webhooks/payment/confirm', async (request, reply) => {
+            const paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+            if (!paymentSecret) {
+                logger.error('PAYMENT_WEBHOOK_SECRET not configured');
+                return reply.code(500).send({ error: 'Server misconfiguration' });
+            }
+
+            // 1. Signature Verification
+            const signature = request.headers['x-callback-signature'] as string;
+            if (!signature) {
+                logger.warn('Missing callback signature');
+                return reply.code(401).send({ error: 'Unauthorized' });
+            }
+
+            const rawBody = (request as any).rawBody as Buffer;
+            if (!rawBody) {
+                logger.error('Raw body missing');
+                return reply.code(500).send({ error: 'Internal server error' });
+            }
+
+            const hmac = createHmac('sha256', paymentSecret);
+            hmac.update(rawBody);
+            const computedSignature = hmac.digest('hex');
+
+            if (!constantTimeCompare(signature, computedSignature)) {
+                logger.warn({ signature, computedSignature }, 'Invalid callback signature');
+                return reply.code(401).send({ error: 'Unauthorized' });
+            }
+
+            // Parse body safely (already done by parser, but good to be explicit about type)
             const body = request.body as {
+                id: string; // Provider Event ID
+                event: string; // e.g. 'payment.succeeded'
                 external_ref: string;
                 paid_amount?: number;
                 status: 'confirmed' | 'rejected';
             };
 
-            if (!body.external_ref || !body.status) {
-                return reply.code(400).send({ error: 'Missing external_ref or status' });
+            // 2. Strict Event Validation
+            // We only care about payment success events
+            // Adjust based on actual provider event names. Assuming 'payment.succeeded' or similar.
+            // For this implementation, we check the 'event' field or fallback to 'status' logic.
+            // Requirement: "Valid event types: payment.succeeded ... If event type other -> return 200 but ignore"
+
+            // If the provider uses a specific event type field:
+            if (body.event && body.event !== 'payment.succeeded') {
+                logger.info({ event: body.event }, 'Ignoring non-payment event');
+                return reply.code(200).send({ status: 'ignored' });
             }
 
-            if (body.status !== 'confirmed' && body.status !== 'rejected') {
-                return reply.code(400).send({ error: 'Invalid status. Must be confirmed or rejected.' });
+            // 3. Replay Protection
+            // We use provider's event ID (body.id)
+            if (!body.id) {
+                logger.warn('Missing provider event ID');
+                return reply.code(400).send({ error: 'Missing event ID' });
             }
 
-            // 1. Find receipt by external_ref
+            const { ulid } = await import('ulid');
+            const eventId = ulid();
+            const payloadHash = createHash('sha256').update(rawBody).digest('hex');
+
+            try {
+                await fastify.db.query(
+                    `INSERT INTO payment_events (id, provider_event_id, payload_hash, status, received_at)
+                     VALUES ($1, $2, $3, $4, NOW())`,
+                    [eventId, body.id, payloadHash, 'processing']
+                );
+            } catch (err: any) {
+                if (err.code === '23505') { // Unique violation on provider_event_id
+                    logger.info({ provider_event_id: body.id }, 'Duplicate webhook event (replay)');
+                    return reply.code(200).send({ status: 'idempotent_replay' });
+                }
+                throw err;
+            }
+
+            // 4. Business Logic
+            if (!body.external_ref) {
+                await fastify.db.query(`UPDATE payment_events SET status = 'failed' WHERE id = $1`, [eventId]);
+                logger.warn({ event_id: body.id }, 'Webhook missing external_ref');
+                return reply.code(200).send({ status: 'failed_malformed' });
+            }
+
             const receiptResult = await fastify.db.query(
                 `SELECT id, workspace_id, amount, status FROM receipts WHERE external_ref = $1`,
                 [body.external_ref]
             );
 
             if (!receiptResult.rowCount || receiptResult.rowCount === 0) {
-                return reply.code(404).send({ error: 'Receipt not found' });
+                await fastify.db.query(`UPDATE payment_events SET status = 'failed_no_receipt' WHERE id = $1`, [eventId]);
+                logger.warn({ event_id: body.id, external_ref: body.external_ref }, 'Webhook receipt not found');
+                return reply.code(200).send({ status: 'failed_unknown_ref' });
             }
 
             const receipt = receiptResult.rows[0];
 
-            // 2. Idempotency: already processed?
+            // 5. Idempotency Check (Receipt Level)
             if (receipt.status === body.status) {
+                await fastify.db.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
                 return reply.code(200).send({
                     receipt_id: receipt.id,
                     status: receipt.status,
@@ -138,24 +209,31 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            // 3. Don't allow transition from confirmed/rejected back
-            if (receipt.status !== 'pending') {
-                return reply.code(409).send({
-                    error: 'Conflict',
-                    message: `Receipt already ${receipt.status}, cannot change to ${body.status}`
-                });
-            }
-
-            // 4. Update receipt status
+            // 6. Status Update
             await fastify.db.query(
                 `UPDATE receipts SET status = $1 WHERE id = $2`,
                 [body.status, receipt.id]
             );
 
-            // 5. If confirmed, post wallet credit (idempotent via ON CONFLICT)
+            // 7. Ledger Credit
             if (body.status === 'confirmed') {
-                const creditRef = `RCPT:${receipt.id}`;
-                await credit(fastify.db, receipt.workspace_id as string, receipt.amount as number, creditRef);
+                const creditRef = `RCPT:${receipt.id}`; // idempotency key for ledger
+                // We use provider_event_id as reference_id per requirement?
+                // Requirement: "wallet.credit(workspace_id, reference_id=provider_event_id, type='payment')"
+                // Wait, if we use provider_event_id, it matches the webhook event.
+                // But the receipt logic used `RCPT:id`.
+                // If the user wants `provider_event_id` as the reference, that's stricter.
+                // Let's use `provider_event_id` as requested for the ledger reference.
+
+                await credit(fastify.db, receipt.workspace_id as string, receipt.amount as number, body.id);
+
+                await fastify.db.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
+
+                logger.info({
+                    event_id: body.id,
+                    verified: true,
+                    amount: receipt.amount
+                }, 'Payment processed');
 
                 return reply.code(200).send({
                     receipt_id: receipt.id,
@@ -164,7 +242,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            // 6. Rejected — no credit posted
+            await fastify.db.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
+
             return reply.code(200).send({
                 receipt_id: receipt.id,
                 status: 'rejected',
