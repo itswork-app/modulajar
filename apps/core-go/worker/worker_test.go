@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"log/slog"
+	"modulajar/apps/core-go/render"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,8 +30,11 @@ func basePayload() TaskPayload {
 }
 
 func TestExecuteJobSuccess(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
@@ -53,7 +57,7 @@ func TestExecuteJobInvalidPack(t *testing.T) {
 	payload.PackPath = "/nonexistent/pack.json"
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), payload, logger, nil)
+	result, err := ExecuteJob(context.Background(), payload, logger, nil, nil)
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
@@ -65,13 +69,16 @@ func TestExecuteJobInvalidPack(t *testing.T) {
 }
 
 func TestExecuteJobRetryIdempotent(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	payload := basePayload()
 	payload.JobID = "test-idempotent"
 	payload.PackageID = "test-pkg-idempotent"
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result1, _ := ExecuteJob(context.Background(), payload, logger, nil)
-	result2, _ := ExecuteJob(context.Background(), payload, logger, nil)
+	result1, _ := ExecuteJob(context.Background(), payload, logger, nil, nil)
+	result2, _ := ExecuteJob(context.Background(), payload, logger, nil, nil)
 
 	if result1.Status != result2.Status {
 		t.Fatalf("different status: %s vs %s", result1.Status, result2.Status)
@@ -103,8 +110,11 @@ func TestExecuteJobRetryIdempotent(t *testing.T) {
 }
 
 func TestDocGraphCreated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	if result.DocGraph == nil {
 		t.Fatal("expected doc_graph non-nil")
@@ -118,8 +128,11 @@ func TestDocGraphCreated(t *testing.T) {
 }
 
 func TestDocDIDFormat(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	for _, doc := range result.DocGraph.Documents {
 		if !didRegex.MatchString(doc.PublicID) {
@@ -133,8 +146,11 @@ func TestDocDIDFormat(t *testing.T) {
 // ═══════════════════════════════════════════
 
 func TestRenderedDocumentsCreated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	if len(result.RenderedDocuments) != 6 {
 		t.Fatalf("expected 6 rendered documents, got %d", len(result.RenderedDocuments))
@@ -155,8 +171,11 @@ func TestRenderedDocumentsCreated(t *testing.T) {
 }
 
 func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	for _, rd := range result.RenderedDocuments {
 		if strings.Contains(rd.HTML, "{{") && strings.Contains(rd.HTML, "}}") {
@@ -168,8 +187,11 @@ func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
 }
 
 func TestRenderedHTMLContainsPIDDID(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	for _, rd := range result.RenderedDocuments {
 		if !strings.Contains(rd.HTML, basePayload().PID) {
@@ -182,8 +204,11 @@ func TestRenderedHTMLContainsPIDDID(t *testing.T) {
 }
 
 func TestVersionFilePathsUpdated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	for _, ver := range result.DocGraph.Versions {
 		if !strings.HasPrefix(ver.FilePath, "html://") {
@@ -195,8 +220,11 @@ func TestVersionFilePathsUpdated(t *testing.T) {
 }
 
 func TestRenderedHTMLContainsSubjectName(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
 	// Verify each rendered doc contains its subject data
 	for _, rd := range result.RenderedDocuments {
