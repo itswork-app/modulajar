@@ -44,6 +44,20 @@ jobs:
 
   core-go:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: modulajar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: ./apps/core-go
@@ -54,7 +68,21 @@ jobs:
         with:
             go-version: '1.21'
             cache-dependency-path: apps/core-go/go.sum
-      - run: go test ./...
+      
+      - name: Install goose
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Migrate DB
+        run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
+
+      - name: Run Tests
+        env:
+          DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
+          DID_SECRET: "test-did-secret"
+          PID_SECRET: "test-pid-secret"
+        run: go test ./...
 
   worker-go:
     runs-on: ubuntu-latest
