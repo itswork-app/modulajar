@@ -182,7 +182,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
             // 4. Business Logic
             if (!body.external_ref) {
                 await fastify.db.query(`UPDATE payment_events SET status = 'failed' WHERE id = $1`, [eventId]);
-                return reply.code(400).send({ error: 'Missing external_ref' });
+                logger.warn({ event_id: body.id }, 'Webhook missing external_ref');
+                return reply.code(200).send({ status: 'failed_malformed' });
             }
 
             const receiptResult = await fastify.db.query(
@@ -192,7 +193,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
             if (!receiptResult.rowCount || receiptResult.rowCount === 0) {
                 await fastify.db.query(`UPDATE payment_events SET status = 'failed_no_receipt' WHERE id = $1`, [eventId]);
-                return reply.code(404).send({ error: 'Receipt not found' });
+                logger.warn({ event_id: body.id, external_ref: body.external_ref }, 'Webhook receipt not found');
+                return reply.code(200).send({ status: 'failed_unknown_ref' });
             }
 
             const receipt = receiptResult.rows[0];

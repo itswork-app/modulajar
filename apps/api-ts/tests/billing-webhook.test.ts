@@ -240,4 +240,52 @@ test('Billing Webhook Hardening', async (t) => {
 
         await fastify.close();
     });
+
+    // Test 5: Missing external_ref -> 200 failed_malformed
+    await t.test('Missing external_ref -> 200 failed_malformed', async (t) => {
+        const { fastify } = buildApp();
+
+        const payload = {
+            id: 'evt_no_ref',
+            event: 'payment.succeeded',
+            // external_ref missing
+            status: 'confirmed'
+        };
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: '/internal/webhooks/payment/confirm',
+            headers: { 'x-callback-signature': sign(payload) },
+            payload
+        });
+
+        t.equal(res.statusCode, 200);
+        t.equal(JSON.parse(res.body).status, 'failed_malformed');
+
+        await fastify.close();
+    });
+
+    // Test 6: Unknown Receipt -> 200 failed_unknown_ref
+    await t.test('Unknown Receipt -> 200 failed_unknown_ref', async (t) => {
+        const { fastify } = buildApp();
+
+        const payload = {
+            id: 'evt_bad_ref',
+            event: 'payment.succeeded',
+            external_ref: 'RCPT-UNKNOWN-999',
+            status: 'confirmed'
+        };
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: '/internal/webhooks/payment/confirm',
+            headers: { 'x-callback-signature': sign(payload) },
+            payload
+        });
+
+        t.equal(res.statusCode, 200);
+        t.equal(JSON.parse(res.body).status, 'failed_unknown_ref');
+
+        await fastify.close();
+    });
 });
