@@ -23,49 +23,30 @@ WORKDIR /app/apps/worker-go
 RUN go mod download
 RUN go build -o /worker-bin .
 
-# Runtime stage: Use official Playwright image (has Node + Browsers)
-FROM mcr.microsoft.com/playwright:v1.45.0-jammy
+# Runtime stage: Debian with Chromium (for Chromedp)
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install basic utils if needed (Playwright image is Ubuntu based)
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install Chromium and dependencies
+# Chromium in Debian Bookworm is available as a package.
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    chromium \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set CHROME_BIN just in case, though chromedp looks for 'chromium'
+ENV CHROME_BIN=/usr/bin/chromium
 
 # Copy compiled binary
 COPY --from=builder /worker-bin /app/worker-go
 
-# Copy core-go render scripts (pdf_render.js and node_modules)
-# We need to install node deps for the script to work
-COPY apps/core-go/render /app/apps/core-go/render
-COPY apps/core-go/package.json apps/core-go/package-lock.json* /app/apps/core-go/
-
-# Install Node dependencies (playwright wrapper)
-WORKDIR /app/apps/core-go
-RUN npm install
-
-# Copy templates (needed for HTML composition if relative path logic uses them)
-# logic searches: templates/v1, ../templates/v1 etc.
-# Code creates temp HTML then renders it. Code resolves templates from pack path usually.
-# But pack path in cloud might be GCS? Or local?
-# The worker payload has `PackPath`.
-# If packs are in the image, we need to copy them! Ref task payload: "PackPath": "..."
-# Assuming packs are mounted or baked in. 
-# PR requirement: "HTML composed... from inputs".
-# If packs are needed, we should copy them.
-# The user's env has `packs/` directory.
-
-WORKDIR /app
+# Copy template resources
+# Assuming they are needed for HTML generation
 COPY apps/core-go/packs /app/packs
 COPY apps/core-go/templates /app/templates
 
-# Environment setup
 ENV PORT=8080
-# Point to where we installed playwright deps (PWD is /app/apps/core-go)
-# Actually pdf.go executes `node .../pdf_render.js`.
-# It finds it via relative path.
-# Worker is at /app/worker-go.
-# It looks for `render/pdf_render.js`, `../render/pdf_render.js`, etc.
-# If PWD is /app, `apps/core-go/render/pdf_render.js` matches one candidate?
-# `filepath.Join("apps", "core-go", "render", "pdf_render.js")` was added as candidate 4.
 
 CMD ["/app/worker-go"]
