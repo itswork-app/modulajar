@@ -17,9 +17,24 @@ import { register, httpRequestsTotal, httpRequestDuration } from './utils/metric
 
 dotenv.config();
 
+import cors from '@fastify/cors';
+
 const fastify = Fastify({
     logger: false, // Use our structured logger
     genReqId: (req) => (req.headers['x-trace-id'] as string) || uuidv4(), // Trace ID correlation
+});
+
+// PR-027: Strict CORS Hardening
+fastify.register(cors, {
+    origin: [
+        'https://modulajar.app',
+        'https://app.modulajar.app',
+        'http://localhost:3000'
+    ],
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: false, // Strict: No credentials unless required
+    strictPreflight: true // Enforce strict preflight checks
 });
 
 // Helper to capture raw body for webhook verification
