@@ -113,6 +113,8 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, a
 	// ... (doc graph code) ...
 
 	// AI INTEGRATION (PR-023)
+	var aiReceipt map[string]interface{}
+
 	if aiClient != nil {
 		// 1. Construct Schema-Driven Prompt
 		schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
@@ -207,16 +209,21 @@ No markdown formatting. Pure JSON.`,
 			}
 
 			// 5. Persist
+			innerAIReceipt := map[string]interface{}{
+				"model":         resp.ModelName,
+				"input_tokens":  resp.TokenInput,
+				"output_tokens": resp.TokenOutput,
+				"prompt_hash":   resp.PromptHash,
+				"output_hash":   resp.OutputHash,
+				"duration_ms":   resp.DurationMs,
+				"generated_at":  time.Now().Format(time.RFC3339),
+			}
+
+			// Capture for outer scope usage
+			aiReceipt = innerAIReceipt
+
 			receipt := map[string]interface{}{
-				"ai_receipt": map[string]interface{}{
-					"model":         resp.ModelName,
-					"input_tokens":  resp.TokenInput,
-					"output_tokens": resp.TokenOutput,
-					"prompt_hash":   resp.PromptHash,
-					"output_hash":   resp.OutputHash,
-					"duration_ms":   resp.DurationMs,
-					"generated_at":  time.Now().Format(time.RFC3339),
-				},
+				"ai_receipt": innerAIReceipt,
 				"curriculum": map[string]interface{}{
 					"json":      c,
 					"html_hash": hash,
@@ -248,6 +255,41 @@ No markdown formatting. Pure JSON.`,
 		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
 	}
 
+	// 4.5. Persist Documents to DB (PR-025)
+	// We do this BEFORE PDF generation to ensure they exist in DB with 'generating' or 'ready' status
+	// We also attach AI receipt if available
+	for _, doc := range graphResult.Documents {
+		// Prepare metadata
+		meta := make(map[string]interface{})
+
+		// If AI receipt exists (from step AI INTEGRATION)
+		// We can't easily access the locally scoped 'receipt' variable from inside the if block above.
+		// However, we can check if we have one.
+		// Actually, let's define 'aiReceipt' var outside the if block.
+		if aiReceipt != nil {
+			meta["ai_config"] = aiReceipt
+			// Top level model field for easy access
+			if m, ok := aiReceipt["model"].(string); ok {
+				meta["model"] = m
+			}
+		}
+
+		dbDoc := db.Document{
+			ID:          doc.ID,
+			WorkspaceID: doc.WorkspaceID,
+			PackageID:   doc.PackageID,
+			PublicID:    doc.PublicID,
+			SubjectCode: doc.SubjectCode,
+			Version:     doc.Version,
+			Status:      "generating", // Initially generating
+			Metadata:    meta,
+		}
+		if err := db.SaveDocument(ctx, dbDoc); err != nil {
+			logger.Warn("Failed to save document to DB", "did", doc.PublicID, "error", err)
+			continue
+		}
+	}
+
 	// IDEMPOTENCY CHECK: Check if artifacts already exist
 	gcsBucket := os.Getenv("GCS_BUCKET")
 	var gcsClient *gcs.Client
@@ -269,6 +311,12 @@ No markdown formatting. Pure JSON.`,
 			if allExist {
 				// Optimization: Skip regeneration
 				logger.Info("Idempotency check passed (all artifacts exist). Skipping generation.")
+
+				// Update status to ready for all docs
+				for _, doc := range graphResult.Documents {
+					db.UpdateDocumentStatus(ctx, doc.PublicID, "ready")
+				}
+
 				return &WorkerResult{
 					JobID:         payload.JobID,
 					PackageID:     payload.PackageID,
@@ -310,6 +358,15 @@ No markdown formatting. Pure JSON.`,
 			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
 		}
 
+		// Compute HTML hash
+		htmlHash := sha256.Sum256([]byte(html))
+		htmlHashStr := hex.EncodeToString(htmlHash[:])
+
+		// Update DB with HTML hash
+		db.UpdateDocumentMetadata(ctx, doc.PublicID, map[string]interface{}{
+			"html_sha256": htmlHashStr,
+		})
+
 		filePath := fmt.Sprintf("html://%s/v1", doc.PublicID)
 		renderedDocs = append(renderedDocs, RenderedDocument{
 			DocumentID:  doc.ID,
@@ -333,6 +390,14 @@ No markdown formatting. Pure JSON.`,
 				Date:        time.Now().Format("02-01-2006"),
 				VerifyURL:   fmt.Sprintf("verify.modulajar.app/verify/%s", rd.DID),
 			}
+
+			// Save watermark info to DB for verification
+			db.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+				"watermark_summary": map[string]string{
+					"teacher_masked": maskedTeacher,
+					"school_name":    payload.SchoolName,
+				},
+			})
 
 			// Generate PDF
 			pdfBytes, err := render.GeneratePDF(ctx, rd.HTML, render.GeneratePDFOptions{
@@ -398,6 +463,16 @@ No markdown formatting. Pure JSON.`,
 						"pdf_sha256":     rd.PDFHash,
 						"generated_at":   time.Now().Format(time.RFC3339),
 					}
+
+					// Update individual document metadata for Verify Service
+					db.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+						"pdf_sha256":   rd.PDFHash,
+						"pdf_path":     rd.FilePath,
+						"generated_at": time.Now().Format(time.RFC3339),
+					})
+
+					// Mark as done
+					db.UpdateDocumentStatus(ctx, rd.DID, "done")
 				}
 				break
 			}
@@ -413,7 +488,6 @@ No markdown formatting. Pure JSON.`,
 			logger.Warn("Failed to persist PDF receipts", "error", err)
 		}
 	}
-
 	return &WorkerResult{
 		JobID:             payload.JobID,
 		PackageID:         payload.PackageID,

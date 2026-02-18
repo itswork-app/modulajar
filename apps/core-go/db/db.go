@@ -62,6 +62,18 @@ type GenerationJob struct {
 	Metadata     map[string]interface{}
 }
 
+// Document represents a document row.
+type Document struct {
+	ID          string
+	WorkspaceID string
+	PackageID   string
+	PublicID    string
+	SubjectCode string
+	Version     int
+	Status      string
+	Metadata    map[string]interface{}
+}
+
 // AcquireJob atomically acquires the next available queued job.
 // It uses FOR UPDATE SKIP LOCKED to ensure only one worker processes a job.
 func AcquireJob(ctx context.Context) (*GenerationJob, error) {

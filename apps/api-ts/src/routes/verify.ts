@@ -1,62 +1,70 @@
 import { FastifyInstance } from 'fastify';
+import { RateLimiter } from '../utils/rate-limit';
+import { logger } from '../utils/logger';
 
 export default async function verifyRoutes(fastify: FastifyInstance) {
+    const limiter = new RateLimiter(60000, 60); // 60 req/min, per instance (per pod/process)
+
     fastify.get('/:publicId', async (request, reply) => {
         const { publicId } = request.params as { publicId: string };
+        const ip = request.ip;
 
-        // 1. Check if it's a Document (DID)
-        // Join packages for kelas/semester/tahun_ajaran (not on documents table)
-        const docResult = await fastify.db.query(
-            `SELECT 'document' as type, d.public_id, d.status,
-                    d.subject_code AS subject,
-                    p.kelas, p.semester, p.tahun_ajaran
-             FROM documents d
-             JOIN packages p ON p.id = d.package_id
-             WHERE d.public_id = $1`,
+        // 1. Rate Limiting
+        if (!limiter.check(ip)) {
+            logger.warn({ public_id: publicId, ip, rate_limit_hit: true }, 'Rate limit exceeded');
+            return reply.code(429).send({ error: 'Too many requests' });
+        }
+
+        // 2. Anti-Enumeration & Validation
+        // Public ID format: DOC-XXXX... (at least 10 chars)
+        if (!publicId || publicId.length < 10 || !/^[A-Za-z0-9-]+$/.test(publicId)) {
+            // Generic 404, don't say "Invalid format"
+            return reply.code(404).send({ error: 'Not found' });
+        }
+
+        // 3. Strict Query (Status = 'done' and type = 'document')
+        // We only check documents table now.
+        const start = Date.now();
+        const result = await fastify.db.query(
+            `SELECT public_id, generated_at, metadata
+             FROM documents
+             WHERE public_id = $1 AND status = 'done'`,
             [publicId]
         );
 
-        if (docResult.rowCount && docResult.rowCount > 0) {
-            const doc = docResult.rows[0];
-            reply.header('Cache-Control', 'public, max-age=60');
-            return {
-                type: doc.type,
-                public_id: doc.public_id,
-                valid: true,
-                status: doc.status,
-                kelas: doc.kelas,
-                semester: doc.semester,
-                tahun_ajaran: doc.tahun_ajaran,
-                subject: doc.subject
-            };
+        if (result.rowCount === 0) {
+            // Log as 'not_found' but don't leak details
+            logger.info({ public_id: publicId, status: 'not_found' }, 'Verify lookup failed');
+            return reply.code(404).send({ error: 'Not found' });
         }
 
-        // 2. Check if it's a Curriculum Pack (PID)
-        const packResult = await fastify.db.query(
-            `SELECT 'package' as type, public_id, status, kelas, semester, tahun_ajaran
-             FROM packages
-             WHERE public_id = $1`,
-            [publicId]
-        );
+        const doc = result.rows[0];
+        const metadata = doc.metadata || {};
+        const aiConfig = metadata.ai_config || {};
+        const watermark = metadata.watermark_summary || {};
 
-        if (packResult.rowCount && packResult.rowCount > 0) {
-            const pack = packResult.rows[0];
-            reply.header('Cache-Control', 'public, max-age=60');
-            return {
-                type: pack.type,
-                public_id: pack.public_id,
-                valid: true,
-                status: pack.status,
-                kelas: pack.kelas,
-                semester: pack.semester,
-                tahun_ajaran: pack.tahun_ajaran
-            };
-        }
+        // 4. Minimal Response
+        // Extract fields safely
+        const response = {
+            public_id: doc.public_id,
+            generated_at: metadata.generated_at || doc.generated_at, // timestamp
+            pdf_sha256: metadata.pdf_sha256,
+            html_sha256: metadata.html_sha256,
+            model: metadata.model || aiConfig.model,
+            watermark_summary: {
+                teacher_masked: watermark.teacher_masked,
+                school_name: watermark.school_name
+            }
+        };
 
-        // 3. Not found
-        return reply.code(404).send({
-            valid: false,
-            error: 'Not found'
-        });
+        // 5. Logging Discipline
+        logger.info({
+            public_id: publicId,
+            status: 'found',
+            duration_ms: Date.now() - start
+        }, 'Verify lookup success');
+
+        reply.header('Cache-Control', 'public, max-age=60');
+        return response;
     });
 }
