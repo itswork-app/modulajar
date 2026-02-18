@@ -22,6 +22,18 @@ const fastify = Fastify({
     genReqId: (req) => (req.headers['x-trace-id'] as string) || uuidv4(), // Trace ID correlation
 });
 
+// Helper to capture raw body for webhook verification
+fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+    (req as any).rawBody = body; // Attach raw body to request
+    try {
+        const json = JSON.parse(body.toString());
+        done(null, json);
+    } catch (err) {
+        (err as any).statusCode = 400;
+        done(err as Error, undefined);
+    }
+});
+
 // Middleware: Metrics & Logging
 fastify.addHook('onRequest', async (request, _reply) => {
     (request as any).startTime = process.hrtime();
