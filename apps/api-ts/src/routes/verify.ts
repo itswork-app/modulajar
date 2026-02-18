@@ -2,9 +2,9 @@ import { FastifyInstance } from 'fastify';
 import { RateLimiter } from '../utils/rate-limit';
 import { logger } from '../utils/logger';
 
-const limiter = new RateLimiter(60000, 60); // 60 req/min
-
 export default async function verifyRoutes(fastify: FastifyInstance) {
+    const limiter = new RateLimiter(60000, 60); // 60 req/min, per instance (per pod/process)
+
     fastify.get('/:publicId', async (request, reply) => {
         const { publicId } = request.params as { publicId: string };
         const ip = request.ip;

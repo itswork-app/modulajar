@@ -9,7 +9,8 @@ export class RateLimiter {
         this.limit = limit;
 
         // Cleanup every minute to prevent memory leak
-        setInterval(() => this.cleanup(), 60000);
+        // unref() allows the process to exit even if interval is running
+        setInterval(() => this.cleanup(), 60000).unref();
     }
 
     check(key: string): boolean {
