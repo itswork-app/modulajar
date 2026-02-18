@@ -51,6 +51,14 @@ func Close() {
 	}
 }
 
+// Ping checks the database connection.
+func Ping(ctx context.Context) error {
+	if pool == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return pool.Ping(ctx)
+}
+
 // GenerationJob represents a job row.
 type GenerationJob struct {
 	ID           string
