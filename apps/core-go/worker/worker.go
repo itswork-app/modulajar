@@ -614,6 +614,35 @@ func Handler() http.HandlerFunc {
 	}
 }
 
+// CheckFunc is a function that checks a component's health.
+type CheckFunc func(context.Context) error
+
+// ReadinessHandler returns an HTTP handler for GET /readyz.
+// It accepts check functions for DB and Chrome to allow testing.
+func ReadinessHandler(dbCheck CheckFunc, chromeCheck CheckFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		// 1. Check DB
+		if err := dbCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: DB unpingable", "error", err)
+			http.Error(w, "Service Unavailable: DB", http.StatusServiceUnavailable)
+			return
+		}
+
+		// 2. Check Chrome (Critical for PDF generation)
+		if err := chromeCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: Chrome unavailable", "error", err)
+			http.Error(w, "Service Unavailable: Chrome", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
+}
+
 func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 	b, err := json.Marshal(job.Metadata)
 	if err != nil {

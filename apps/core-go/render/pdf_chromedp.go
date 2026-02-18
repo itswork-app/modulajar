@@ -119,3 +119,43 @@ func IsChromeAvailable() bool {
 	}
 	return os.Getenv("CHROME_BIN") != ""
 }
+
+// CheckChromeReadiness verifies if Chrome is available and functional.
+// It runs a trivial command to ensure the browser can be launched.
+func CheckChromeReadiness(ctx context.Context) error {
+	if !IsChromeAvailable() {
+		return fmt.Errorf("chrome/chromium binary not found in PATH or CHROME_BIN")
+	}
+
+	optsAllocator := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Headless,
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+	)
+
+	// Set Chrome/Chromium path if available in environment
+	if cp := os.Getenv("CHROME_BIN"); cp != "" {
+		optsAllocator = append(optsAllocator, chromedp.ExecPath(cp))
+	}
+
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, optsAllocator...)
+	defer cancelAlloc()
+
+	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
+	defer cancelTask()
+
+	// Short timeout for readiness check
+	timeoutCtx, cancelTimeout := context.WithTimeout(taskCtx, 5*time.Second)
+	defer cancelTimeout()
+
+	// Run trivial action
+	var title string
+	if err := chromedp.Run(timeoutCtx,
+		chromedp.Navigate("about:blank"),
+		chromedp.Title(&title),
+	); err != nil {
+		return fmt.Errorf("chromedp run failed: %w", err)
+	}
+
+	return nil
+}
