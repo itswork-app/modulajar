@@ -29,6 +29,13 @@ func TestExecuteJob_PDFFailure_HardFail(t *testing.T) {
 	defer os.Setenv("PATH", oldPath)
 	os.Setenv("PATH", "") // Wipe path so 'google-chrome' or 'chromium' is not found
 
+	// Also wipe CHROME_BIN if set
+	oldChromeBin := os.Getenv("CHROME_BIN")
+	if oldChromeBin != "" {
+		defer os.Setenv("CHROME_BIN", oldChromeBin)
+		os.Setenv("CHROME_BIN", "")
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 
