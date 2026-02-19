@@ -1,18 +1,20 @@
-name: Deploy Worker Go
+name: Deploy Worker Go to Cloud Run
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'apps/worker-go/**'
       - 'apps/core-go/**'
+      - 'apps/worker-go/**'
       - '.github/workflows/deploy-worker-go.yaml'
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: worker-go
   REGION: asia-southeast2
+  SERVICE_NAME: modulajar-worker
+  REPOSITORY: modulajar-repo # Adjust if needed
+  IMAGE_NAME: worker-go
 
 jobs:
   deploy:
@@ -22,49 +24,43 @@ jobs:
       id-token: 'write'
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Google Auth
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker
+        run: gcloud auth configure-docker $REGION-docker.pkg.dev
+
       - name: Build and Push Container
-        run: |-
-          gcloud builds submit \
-            --quiet \
-            --tag "gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA" \
-            --project "$PROJECT_ID" \
-            . \
-            --preserve-context \
-            --config cloudbuild.yaml 
-        # Alternatively use docker build + push if no cloudbuild.yaml.
-        # But we don't have cloudbuild.yaml for worker-go specifically yet?
-        # Let's use simple docker build and push.
-      
-      # Correction: Use docker build and push without Cloud Build if acceptable, 
-      # or generate a cloudbuild.yaml on the fly.
-      # Cloud Run expects an image.
-      
-      - name: Build and Push (Docker)
-        run: |-
-          gcloud auth configure-docker gcr.io --quiet
-          docker build -f apps/worker-go/Dockerfile -t gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA .
-          docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA
+        run: |
+          # Use hash for tag
+          TAG=${GITHUB_SHA}
+          IMAGE_PATH="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:$TAG"
+          
+          # Build from root context
+          docker build -f apps/worker-go/Dockerfile -t $IMAGE_PATH .
+          docker push $IMAGE_PATH
+          echo "IMAGE_PATH=$IMAGE_PATH" >> $GITHUB_ENV
 
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
-          image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.GITHUB_SHA }}
+          image: ${{ env.IMAGE_PATH }}
           env_vars: |
-            GCS_BUCKET=${{ secrets.GCS_BUCKET }}
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-            DID_SECRET=${{ secrets.DID_SECRET }}
-            PID_SECRET=${{ secrets.PID_SECRET }}
+             GCS_BUCKET=${{ secrets.GCS_BUCKET }}
+             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+             DID_SECRET=${{ secrets.DID_SECRET }}
+             PID_SECRET=${{ secrets.PID_SECRET }}
+             DATABASE_URL=${{ secrets.DATABASE_URL }}
+             VERIFY_BASE_URL=${{ secrets.VERIFY_BASE_URL }}
+             GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}

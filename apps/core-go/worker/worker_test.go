@@ -3,15 +3,79 @@ package worker
 import (
 	"context"
 	"log/slog"
+	"modulajar/apps/core-go/db"
+	"modulajar/apps/core-go/render"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DID regex: DOC-{SUBJECT}-SD{N}-S{N}-{YEAR}-{6chars}-{8chars}
 var didRegex = regexp.MustCompile(`^DOC-[A-Z]+-SD\d+-S\d+-\d{4}-[A-Z2-9]{6}-[A-Z2-9]{8}$`)
+
+func TestMain(m *testing.M) {
+	// 1. Setup DB if DATABASE_URL is set
+	if os.Getenv("DATABASE_URL") != "" {
+		ctx := context.Background()
+		if err := db.Init(ctx); err != nil {
+			slog.Error("Failed to init DB", "error", err)
+			os.Exit(1)
+		}
+		defer db.Close()
+
+		// 2. Seed Data
+		// Need: Workspace, Package
+		seedSQL := `
+			TRUNCATE workspaces, packages, documents CASCADE;
+
+			INSERT INTO workspaces (id, clerk_org_id, name)
+			VALUES ('test-ws-001', 'test-org-001', 'Test Workspace')
+			ON CONFLICT (id) DO NOTHING;
+
+			INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
+			VALUES ('test-pkg-001', 'test-ws-001', 'PKG-SD4-S1-2026-TSTPKG-TST12345', '4', 'S1', '2025/2026', 'Ibu Test', 'SDN Test', 'generating')
+			ON CONFLICT (id) DO NOTHING;
+			
+			INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
+			VALUES ('test-pkg-idempotent', 'test-ws-001', 'PKG-SD4-S1-2026-TSTPKG-IDEMPO', '4', 'S1', '2025/2026', 'Ibu Test', 'SDN Test', 'generating')
+			ON CONFLICT (id) DO NOTHING;
+		`
+		// Use raw pool to exec seed
+		// But pool is private in db package.
+		// db package exposes Ping, but not raw Exec unless we add specific func.
+		// However, db methods like UpdatePackageStatus use pool.Exec.
+		// We can't access pool variable directly here (it's unexported 'pool').
+		// We must add a helper in db package OR expose pool?
+		// Or use pgx.Connect separately?
+		// Using pgx.Connect separately is safer/easier than modifying db package.
+		conn, err := db.AcquireJob(ctx) // This returns a job, not a connection.
+		_ = conn
+
+		// We need to execute SQL.
+		// Since we can't access db.pool, we create a temporary connection for seeding.
+		connConfig, _ := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+		tempPool, err := pgxpool.NewWithConfig(ctx, connConfig)
+		if err != nil {
+			slog.Error("Failed to create temp pool for seeding", "error", err)
+			os.Exit(1)
+		}
+		_, err = tempPool.Exec(ctx, seedSQL)
+		if err != nil {
+			slog.Error("Failed to seed DB", "error", err)
+			os.Exit(1)
+		}
+		tempPool.Close()
+	}
+
+	// 3. Run Tests
+	code := m.Run()
+
+	os.Exit(code)
+}
 
 func basePayload() TaskPayload {
 	return TaskPayload{
@@ -29,8 +93,11 @@ func basePayload() TaskPayload {
 }
 
 func TestExecuteJobSuccess(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
@@ -53,7 +120,7 @@ func TestExecuteJobInvalidPack(t *testing.T) {
 	payload.PackPath = "/nonexistent/pack.json"
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), payload, logger, nil)
+	result, err := ExecuteJob(context.Background(), payload, logger, nil, nil)
 	if err != nil {
 		t.Fatalf("ExecuteJob error: %v", err)
 	}
@@ -65,13 +132,22 @@ func TestExecuteJobInvalidPack(t *testing.T) {
 }
 
 func TestExecuteJobRetryIdempotent(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	payload := basePayload()
 	payload.JobID = "test-idempotent"
 	payload.PackageID = "test-pkg-idempotent"
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result1, _ := ExecuteJob(context.Background(), payload, logger, nil)
-	result2, _ := ExecuteJob(context.Background(), payload, logger, nil)
+	result1, err1 := ExecuteJob(context.Background(), payload, logger, nil, nil)
+	if err1 != nil {
+		t.Fatalf("ExecuteJob 1 failed: %v", err1)
+	}
+	result2, err2 := ExecuteJob(context.Background(), payload, logger, nil, nil)
+	if err2 != nil {
+		t.Fatalf("ExecuteJob 2 failed: %v", err2)
+	}
 
 	if result1.Status != result2.Status {
 		t.Fatalf("different status: %s vs %s", result1.Status, result2.Status)
@@ -103,8 +179,14 @@ func TestExecuteJobRetryIdempotent(t *testing.T) {
 }
 
 func TestDocGraphCreated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	if result.DocGraph == nil {
 		t.Fatal("expected doc_graph non-nil")
@@ -118,8 +200,14 @@ func TestDocGraphCreated(t *testing.T) {
 }
 
 func TestDocDIDFormat(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	for _, doc := range result.DocGraph.Documents {
 		if !didRegex.MatchString(doc.PublicID) {
@@ -133,8 +221,14 @@ func TestDocDIDFormat(t *testing.T) {
 // ═══════════════════════════════════════════
 
 func TestRenderedDocumentsCreated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	if len(result.RenderedDocuments) != 6 {
 		t.Fatalf("expected 6 rendered documents, got %d", len(result.RenderedDocuments))
@@ -155,8 +249,14 @@ func TestRenderedDocumentsCreated(t *testing.T) {
 }
 
 func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	for _, rd := range result.RenderedDocuments {
 		if strings.Contains(rd.HTML, "{{") && strings.Contains(rd.HTML, "}}") {
@@ -168,8 +268,14 @@ func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
 }
 
 func TestRenderedHTMLContainsPIDDID(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	for _, rd := range result.RenderedDocuments {
 		if !strings.Contains(rd.HTML, basePayload().PID) {
@@ -182,8 +288,14 @@ func TestRenderedHTMLContainsPIDDID(t *testing.T) {
 }
 
 func TestVersionFilePathsUpdated(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	for _, ver := range result.DocGraph.Versions {
 		if !strings.HasPrefix(ver.FilePath, "html://") {
@@ -195,8 +307,14 @@ func TestVersionFilePathsUpdated(t *testing.T) {
 }
 
 func TestRenderedHTMLContainsSubjectName(t *testing.T) {
+	if !render.IsChromeAvailable() {
+		t.Skip("Chrome/Chromium not found, skipping integration test")
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, _ := ExecuteJob(context.Background(), basePayload(), logger, nil)
+	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
 
 	// Verify each rendered doc contains its subject data
 	for _, rd := range result.RenderedDocuments {

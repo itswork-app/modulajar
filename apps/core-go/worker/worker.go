@@ -65,8 +65,24 @@ type WorkerResult struct {
 	RenderedDocuments []RenderedDocument          `json:"rendered_documents,omitempty"`
 }
 
+// MetadataUpdater abstracts db.UpdateJobMetadata for testing
+type MetadataUpdater interface {
+	UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error
+}
+
+// RealMetadataUpdater implements MetadataUpdater using db package
+type RealMetadataUpdater struct{}
+
+func (r *RealMetadataUpdater) UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error {
+	return db.UpdateJobMetadata(ctx, jobID, metadata)
+}
+
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
-func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, aiClient *ai.GeminiClient) (*WorkerResult, error) {
+func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, aiClient *ai.GeminiClient, metaUpdater MetadataUpdater) (*WorkerResult, error) {
+	// Default to real updater if nil (backward compatibility/ease of use)
+	if metaUpdater == nil {
+		metaUpdater = &RealMetadataUpdater{}
+	}
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
@@ -236,7 +252,7 @@ No markdown formatting. Pure JSON.`,
 			// The job metadata is updated incrementally?
 			// The `UpdateJobMetadata` merges? Postgres `jsonb_set` or merge?
 			// DB implementation usually merges.
-			if err := db.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
+			if err := metaUpdater.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
 				logger.Warn("Failed to persist AI receipt", "error", err)
 			}
 			_ = html // Prevent unused error if not used
@@ -405,16 +421,15 @@ No markdown formatting. Pure JSON.`,
 				MarginBottom: 0.8, // inch
 			})
 			if err != nil {
-				logger.Warn("PDF render failed", "subject", rd.SubjectCode, "error", err)
-				continue
+				// PR-029: Hard failure on PDF generation error
+				return nil, fmt.Errorf("PDF render failed for %s: %w", rd.SubjectCode, err)
 			}
 
 			// Save to temp file for GCS upload (or stream directly if client supports bytes)
 			// Existing GCS client takes path.
 			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
 			if err := os.WriteFile(tmpPDF, pdfBytes, 0644); err != nil {
-				logger.Warn("Failed to write temp PDF", "error", err)
-				continue
+				return nil, fmt.Errorf("failed to write temp PDF: %w", err)
 			}
 
 			renderedDocs[i].PDFPath = tmpPDF
@@ -426,7 +441,8 @@ No markdown formatting. Pure JSON.`,
 			renderedDocs[i].PDFHash = hex.EncodeToString(pdfHash.Sum(nil))
 		}
 	} else {
-		logger.Warn("Chrome/Chromium not found. PDF generation skipped.")
+		// PR-029: Hard failure if Chrome is missing
+		return nil, fmt.Errorf("Chrome/Chromium not found; cannot generate PDF")
 	}
 
 	// 7. GCS upload
@@ -437,9 +453,8 @@ No markdown formatting. Pure JSON.`,
 			}
 			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
 			if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
-				logger.Warn("GCS upload failed", "subject", rd.SubjectCode, "error", err)
 				metrics.GCSUploadTotal.WithLabelValues("failed").Inc()
-				continue
+				return nil, fmt.Errorf("GCS upload failed for %s: %w", rd.SubjectCode, err)
 			}
 			metrics.GCSUploadTotal.WithLabelValues("success").Inc()
 			renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
@@ -484,8 +499,8 @@ No markdown formatting. Pure JSON.`,
 		update := map[string]interface{}{
 			"pdf_receipts": pdfMetadata,
 		}
-		if err := db.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
-			logger.Warn("Failed to persist PDF receipts", "error", err)
+		if err := metaUpdater.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
+			return nil, fmt.Errorf("failed to persist PDF receipts: %w", err)
 		}
 	}
 	return &WorkerResult{
@@ -573,7 +588,7 @@ func Handler() http.HandlerFunc {
 		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
 
 		// 3. Exec
-		result, err := ExecuteJob(ctx, payload, logger, apiClient)
+		result, err := ExecuteJob(ctx, payload, logger, apiClient, nil)
 
 		duration := time.Since(start)
 		durationMs := float64(duration.Milliseconds())

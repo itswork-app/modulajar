@@ -19,7 +19,11 @@ test:
 	cd apps/web && npm run build
 	cd apps/api-ts && npm test
 	cd apps/core-go && go test ./...
+	cd apps/core-go && go test ./...
 	cd apps/worker-go && go test ./...
+
+test-integration:
+	./scripts/test-integration.sh
 
 migrate-up:
 	goose -dir migrations postgres "$(DATABASE_URL)" up

@@ -40,6 +40,10 @@ func GeneratePDF(ctx context.Context, htmlContent string, opts GeneratePDFOption
 		chromedp.NoSandbox, // Required for Docker/Cloud Run
 	)
 
+	if cp := os.Getenv("CHROME_BIN"); cp != "" {
+		optsAllocator = append(optsAllocator, chromedp.ExecPath(cp))
+	}
+
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, optsAllocator...)
 	defer cancelAlloc()
 
