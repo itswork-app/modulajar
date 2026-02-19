@@ -57,7 +57,7 @@ func TestRenderHTML(t *testing.T) {
 	}
 	tmpl := "<h1>{{.Meta.Mapel}}</h1><ul>{{range .TujuanPembelajaran}}<li>{{.}}</li>{{end}}</ul>"
 
-	html, hash, err := RenderHTML(c, tmpl)
+	html, hash, err := RenderHTML(c, tmpl, nil)
 	if err != nil {
 		t.Fatalf("RenderHTML failed: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestRenderHTML(t *testing.T) {
 	}
 
 	// Determinism
-	_, hash2, _ := RenderHTML(c, tmpl)
+	_, hash2, _ := RenderHTML(c, tmpl, nil)
 	if hash != hash2 {
 		t.Error("Hash mismatch for identical input")
 	}

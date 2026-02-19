@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/option"
 )
 
 // Client wraps the GCS storage client.
@@ -17,15 +18,15 @@ type Client struct {
 	bucketName string
 }
 
-// NewClient creates a new GCS client. Uses Application Default Credentials.
+// NewClient creates a new GCS client. Uses Application Default Credentials by default.
 // If GCS_BUCKET env var is empty, returns nil (upload disabled).
-func NewClient(ctx context.Context) (*Client, error) {
+func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
 	bucket := os.Getenv("GCS_BUCKET")
 	if bucket == "" {
 		return nil, nil // GCS disabled
 	}
 
-	client, err := storage.NewClient(ctx)
+	client, err := storage.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCS client: %w", err)
 	}

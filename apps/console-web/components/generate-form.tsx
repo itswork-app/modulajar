@@ -8,6 +8,13 @@ import { cn } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+const GRADES = {
+    SD: ['4', '5', '6'],
+    SMP: ['7', '8', '9'],
+    SMA: ['11', '12', '13'],
+    SMK: ['11', '12', '13'],
+};
+
 export function GenerateForm() {
     const router = useRouter();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
@@ -125,7 +132,17 @@ export function GenerateForm() {
     };
 
     const handleChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => {
+            const updates = { ...prev, [field]: value };
+            if (field === 'jenjang') {
+                // Reset kelas to first valid option for new jenjang
+                const validGrades = GRADES[value as keyof typeof GRADES];
+                if (validGrades && validGrades.length > 0) {
+                    updates.kelas = validGrades[0];
+                }
+            }
+            return updates;
+        });
     };
 
     if (isLoadingWorkspace) {
@@ -179,18 +196,9 @@ export function GenerateForm() {
                             value={formData.kelas}
                             onChange={(e) => handleChange('kelas', e.target.value)}
                         >
-                            <option value="1">Kelas 1</option>
-                            <option value="2">Kelas 2</option>
-                            <option value="3">Kelas 3</option>
-                            <option value="4">Kelas 4</option>
-                            <option value="5">Kelas 5</option>
-                            <option value="6">Kelas 6</option>
-                            <option value="7">Kelas 7</option>
-                            <option value="8">Kelas 8</option>
-                            <option value="9">Kelas 9</option>
-                            <option value="10">Kelas 10</option>
-                            <option value="11">Kelas 11</option>
-                            <option value="12">Kelas 12</option>
+                            {GRADES[formData.jenjang as keyof typeof GRADES]?.map((k) => (
+                                <option key={k} value={k}>Kelas {k}</option>
+                            ))}
                         </select>
                     </div>
 

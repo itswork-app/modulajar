@@ -1,0 +1,45 @@
+=== RUN   TestHandler_Success
+    worker_handler_test.go:18: DATABASE_URL not set
+--- SKIP: TestHandler_Success (0.00s)
+=== RUN   TestHandler_NoJob
+    worker_handler_test.go:172: DATABASE_URL not set
+--- SKIP: TestHandler_NoJob (0.00s)
+=== RUN   TestHandler_InvalidMetadata
+    worker_handler_test.go:191: DATABASE_URL not set
+--- SKIP: TestHandler_InvalidMetadata (0.00s)
+=== RUN   TestExecuteJob_TableDriven
+=== RUN   TestExecuteJob_TableDriven/Success_Path
+time=2026-02-19T16:00:39.888+07:00 level=INFO msg="AI generation success" model=""
+    worker_test.go:332: Expected completed, got failed. Reason: Render failed: failed to parse template: template: modul-ajar:6: function "SUBJECT_NAME" not defined
+=== RUN   TestExecuteJob_TableDriven/AI_Generation_Error
+time=2026-02-19T16:00:39.889+07:00 level=WARN msg="AI generation failed" error="AI quota exceeded"
+=== RUN   TestExecuteJob_TableDriven/AI_Invalid_JSON
+time=2026-02-19T16:00:39.889+07:00 level=INFO msg="AI generation success" model=""
+time=2026-02-19T16:00:39.889+07:00 level=ERROR msg="Failed to parse AI JSON" error="invalid character 'I' looking for beginning of value"
+=== RUN   TestExecuteJob_TableDriven/PDF_Generation_Error
+time=2026-02-19T16:00:39.890+07:00 level=INFO msg="AI generation success" model=""
+=== RUN   TestExecuteJob_TableDriven/Storage_Upload_Error
+time=2026-02-19T16:00:39.890+07:00 level=INFO msg="AI generation success" model=""
+=== RUN   TestExecuteJob_TableDriven/Metadata_Persist_Error
+time=2026-02-19T16:00:39.890+07:00 level=INFO msg="AI generation success" model=""
+--- FAIL: TestExecuteJob_TableDriven (0.00s)
+    --- FAIL: TestExecuteJob_TableDriven/Success_Path (0.00s)
+    --- PASS: TestExecuteJob_TableDriven/AI_Generation_Error (0.00s)
+    --- PASS: TestExecuteJob_TableDriven/AI_Invalid_JSON (0.00s)
+    --- PASS: TestExecuteJob_TableDriven/PDF_Generation_Error (0.00s)
+    --- PASS: TestExecuteJob_TableDriven/Storage_Upload_Error (0.00s)
+    --- PASS: TestExecuteJob_TableDriven/Metadata_Persist_Error (0.00s)
+=== RUN   TestReadinessHandler
+=== RUN   TestReadinessHandler/All_Systems_Go
+=== RUN   TestReadinessHandler/DB_Failure
+2026/02/19 16:00:39 ERROR Readiness probe failed: DB unpingable error="db connection lost"
+=== RUN   TestReadinessHandler/Chrome_Failure
+2026/02/19 16:00:39 ERROR Readiness probe failed: Chrome unavailable error="chrome not found"
+--- PASS: TestReadinessHandler (0.00s)
+    --- PASS: TestReadinessHandler/All_Systems_Go (0.00s)
+    --- PASS: TestReadinessHandler/DB_Failure (0.00s)
+    --- PASS: TestReadinessHandler/Chrome_Failure (0.00s)
+FAIL
+coverage: 22.8% of statements
+FAIL	modulajar/apps/core-go/worker	0.030s
+FAIL
