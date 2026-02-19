@@ -11,8 +11,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 const GRADES = {
     SD: ['4', '5', '6'],
     SMP: ['7', '8', '9'],
-    SMA: ['11', '12', '13'],
-    SMK: ['11', '12', '13'],
+    SMA: ['10', '11', '12'],
+    SMK: ['10', '11', '12'],
 };
 
 export function GenerateForm() {
