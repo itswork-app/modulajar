@@ -41,7 +41,7 @@ export PID_SECRET="test-pid-secret"
 
 # We only run core-go tests for now, specifically worker
 cd apps/core-go
-go test -v ./worker/...
+go test -v ./...
 
 # 4. Cleanup (optional, comment out to debug)
 # echo "Cleaning up..."
