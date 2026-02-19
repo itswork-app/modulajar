@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/render"
@@ -11,17 +13,40 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	http.HandleFunc("/tasks/generate", worker.Handler())
+	// Initialize DB
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.Init(ctx); err != nil {
+		log.Fatalf("Failed to initialize DB: %v", err)
+	}
+	defer db.Close()
+
+	// Initialize Worker with Real Dependencies
+	setupCtx, setupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer setupCancel()
+
+	realWorker, err := worker.NewRealWorker(setupCtx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize worker dependencies: %v", err)
+	}
+	if realWorker == nil {
+		log.Fatal("Failed to create worker instance")
+	}
+
+	// Register Handlers
+	http.Handle("/tasks/generate", worker.NewHandler(realWorker))
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
-	// PR-028 Readiness Probe
 	http.HandleFunc("/readyz", worker.ReadinessHandler(db.Ping, render.CheckChromeReadiness))
 
 	log.Printf("Worker service listening on port %s", port)

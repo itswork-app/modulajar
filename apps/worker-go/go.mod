@@ -2,7 +2,9 @@ module modulajar/apps/worker-go
 
 go 1.24.0
 
-require modulajar/apps/core-go v0.0.0
+replace modulajar/apps/core-go => ../core-go
+
+require modulajar/apps/core-go v0.0.0-00010101000000-000000000000
 
 require (
 	cel.dev/expr v0.24.0 // indirect
@@ -72,5 +74,3 @@ require (
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace modulajar/apps/core-go => ../core-go
