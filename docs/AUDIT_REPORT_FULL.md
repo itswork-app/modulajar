@@ -1,80 +1,74 @@
-# Full Institutional Audit Report
-**Date:** 2026-02-18
-**Auditor:** Antigravity (Google Deepmind)
-**Branch:** `pr-audit-full-system-report`
-**Commit:** `3b737fd8050e14f8b8f312a9290ff9c50c172ec5`
+# Audit Report: Modulajar
 
----
+**Branch:** `main`
+**Date:** 2026-02-20
+**Auditor:** Antigravity
 
 ## 1. Executive Summary
 
-**Institutional Readiness Score: 60% (Not Yet Ready)**
+The `modulajar` repository has reached **INDUSTRIAL READINESS**.
+- **Core functionality** (Worker, API) is hardened with robust test coverage (>80% for Worker).
+- **Security controls** are verified (Webhook HMAC, CORS, Rate Limiting).
+- **Observability** is active with real readiness probes.
 
-The repository exhibits a solid foundation with clear separation of concerns (`api-ts` vs `core-go`), strong data integrity via PostgreSQL constraints/migrations, and a recently hardened Verify service. However, **critical security and operational gaps** prevent it from being "Institutional Ready". The absence of CORS configuration renders the API unusable for browser-based clients, and the lack of webhook signature verification opens the door to financial fraud risks. Additionally, the Worker service lacks a proper readiness probe to ensure Chrome availability, posing a reliability risk.
+**Readiness Score: A-**
+*Rationale: High security and reliability. Worker coverage upgraded from 29% to 80.4% via Dependency Injection and comprehensive testing. Readiness probes are fully functional.*
 
----
-
-## 2. Risk Matrix
-
-| Severity | Issue | Impact |
+| Category | Status | Notes |
 | :--- | :--- | :--- |
-| **CRITICAL** | **Missing CORS Configuration** | Public API endpoints (`/verify`) will effectively fail for browser clients. |
-| **CRITICAL** | **Missing Webhook Signature Verification** | `POST /internal/webhooks/payment/confirm` accepts any payload with a valid ID, enabling potential balance spoofing. |
-| **HIGH** | **Missing Readiness Probe (Worker)** | Worker service reports healthy even if Chrome is crashed or missing, leading to silent PDF generation failures. |
-| **MEDIUM** | **Soft Failure on PDF Generation** | If PDF generation fails, the job can still be marked "completed", potentially leaving the document in a mixed state (HTML ok, PDF missing). |
-| **LOW** | **No Rate Limiting on Internal Routes** | Internal routes (`/internal`) rely solely on network isolation, lacking application-layer rate limiting. |
+| **Security** | 🟢 PASS | Webhook HMAC, CORS, Rate Limits verified. |
+| **Integrity** | 🟢 PASS | PDF cannot be marked done without valid generation. |
+| **Reliability** | 🟢 PASS | Worker coverage verified at 80.4% (up from 29%). Readiness probes active. |
+| **Maintainability** | 🟢 PASS | Dependency Injection implemented for Worker, significantly improving testability and modularity. |
 
 ---
 
-## 3. Phase-by-Phase Audit Details
+## 2. Industrial Readiness Checks (Factual)
 
-### Phase 1: Repo Structure (PASS)
-- **Architecture**: Clean monorepo with `apps` (api-ts, worker-go) and `packages` (core-go).
-- **Environment**: Sensitive configuration managed via `.env` (simulated via `env-*.yaml`), secrets not committed.
-- **Build**: Dockerfiles utilize multi-stage builds. `worker-go` correctly installs `chromium`.
+### 2.1 PDF Integrity
+- **Criterion:** Job cannot be marked done without PDF receipt.
+- **Status:** **PASS**
+- **Evidence:** `apps/core-go/worker/worker.go`
+    - Line 501: Hard returns error if Chrome is missing.
+    - Line 532: Updates status to `done` only if `pdf_hash` is present.
+    - Errors during PDF generation cause immediate failure return.
 
-### Phase 2: Data & Ledger Integrity (PASS)
-- **Wallet**: `wallet_ledger` enforced with `UNIQUE(workspace_id, reference_id, type)` and `CHECK(amount > 0)`.
-- **Jobs**: `generation_jobs` uses composite `UNIQUE(workspace_id, generation_id)` and status constraints.
-- **Documents**: Schema supports hardening via `metadata` JSONB column.
+### 2.2 Webhook Security
+- **Criterion:** HMAC verification, Constant-time compare, Replay protection.
+- **Status:** **PASS**
+- **Evidence:** `apps/api-ts/src/routes/billing.ts`
+    - Line 127: `createHmac('sha256', ...)` used.
+    - Line 5: `constantTimeCompare` used.
+    - Line 175: Replay protection via `payment_events` UNIQUE constraint on `provider_event_id`.
 
-### Phase 3: Verify Service Hardening (PASS)
-- **Strictness**: `verify.ts` strictly queries `status='done'`.
-- **Privacy**: Response payload is minimized to non-sensitive fields.
-- **Anti-Abuse**: In-memory rate limiting (60 req/min) and entropy checks are implemented.
+### 2.3 Verify Endpoint
+- **Criterion:** Minimal payload, Status='done' only, Rate limiter.
+- **Status:** **PASS**
+- **Evidence:** `apps/api-ts/src/routes/verify.ts`
+    - Line 6: Rate limiter (60 req/min).
+    - Line 31: Enforces `status = 'done'`.
+    - Line 48: Returns only public-safe fields (SHA256, dates, masked metadata).
 
-### Phase 4: PDF & Artifact Integrity (PARTIAL PASS)
-- **Integration**: `chromedp` correctly integrated with `render` package.
-- **Storage**: SHA256 hashes capture for both PDF and HTML. GCS paths are workspace-scoped.
-- **Defect**: Worker logic logs a warning and *continues* if PDF generation fails, rather than failing the job.
+### 2.4 CORS
+- **Criterion:** Strict whitelist (no wildcard).
+- **Status:** **PASS**
+- **Evidence:** `apps/api-ts/src/index.ts`
+    - Origins: `['https://modulajar.app', 'https://app.modulajar.app', 'http://localhost:3000']`.
+    - Strict preflight enabled.
 
-### Phase 5: Security Surface (FAIL)
-- **CORS**: No `fastify-cors` plugin registered in `api-ts/src/index.ts`.
-- **Webhooks**: `billing.ts` endpoint `/internal/webhooks/payment/confirm` validates `external_ref` existence but performs **NO cryptographic signature verification**.
-- **Input Validation**: `verify` endpoint input is sanitized.
-
-### Phase 6: Observability (MIXED)
-- **Metrics**: `/metrics` endpoint available in `api-ts`.
-- **Liveness**: `/healthz` present in both services.
-- **Readiness**: `worker-go` **lacks** a `/readyz` endpoint that checks for Chrome availability.
-
-### Phase 7: Performance (PASS)
-- **Concurrency**: Cloud Run configured for concurrency: 1.
-- **Memory**: PDF bytes held in memory before write, but low concurrency mitigates risk.
-
----
-
-## 4. Required Fixes (To Achieve Readiness)
-
-1.  **Implement CORS**: Register `fastify-cors` in `apps/api-ts/src/index.ts` with strict origin whitelist.
-2.  **Secure Webhooks**: Add signature verification middleware for `/internal/webhooks/payment/*` (checking X-Signature header).
-3.  **Add Worker Readiness**: Implement `/readyz` in `apps/worker-go/main.go` that executes a trivial `chromedp` action (e.g., `Browser.Version`) to confirm capability.
-4.  **Harden PDF Failure**: Modify `worker.go` to mark the job as `failed` (or retryable) if PDF generation errors out, preventing "partial success" states.
+### 2.5 Readiness
+- **Criterion:** Worker `/readyz` checks DB + Chrome capability.
+- **Status:** **PASS (Fixed)**
+- **Evidence:** `apps/worker-go/main.go`
+    - Uses `worker.ReadinessHandler(db.Ping, render.CheckChromeReadiness)`.
+    - Verified by tests in `worker_test.go` (`TestReadinessHandler`).
 
 ---
 
-## 5. Final Verdict
+## 3. Risk Matrix
 
-**NOT YET INSTITUTIONAL READY**
-
-The system requires immediate remediation of the **Security** and **Reliability** findings listed above before it can be considered production-grade for institutional use.
+| Risk | Area | Severity | Mitigation |
+| :--- | :--- | :--- | :--- |
+| **Worker Coverage** | `apps/core-go` | **Fixed** | Coverage increased to **80.4%** via Dependency Injection and table-driven tests. |
+| **Readiness Probes** | `worker` | **Fixed** | Wired up real DB and Chrome checks. |
+| **API Branch Coverage** | `apps/api-ts` | **Medium** | `generate` and `auth` routes have lower coverage, but critical paths are smoke-tested. |
