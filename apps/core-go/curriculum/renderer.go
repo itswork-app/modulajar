@@ -8,16 +8,20 @@ import (
 	"html/template"
 )
 
-// RenderHTML renders the Curriculum object using the provided template content.
+// RenderHTML renders the data using the provided template content and functions.
 // It returns the rendered HTML string and its SHA256 hash.
-func RenderHTML(c *Curriculum, tmplContent string) (string, string, error) {
-	tmpl, err := template.New("modul-ajar").Parse(tmplContent)
+func RenderHTML(data interface{}, tmplContent string, funcs template.FuncMap) (string, string, error) {
+	tmpl := template.New("modul-ajar")
+	if funcs != nil {
+		tmpl = tmpl.Funcs(funcs)
+	}
+	tmpl, err := tmpl.Parse(tmplContent)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, c); err != nil {
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", "", fmt.Errorf("failed to render template: %w", err)
 	}
 

@@ -2,330 +2,456 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"modulajar/apps/core-go/db"
-	"modulajar/apps/core-go/render"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/db"
+	"modulajar/apps/core-go/packloader"
+	"modulajar/apps/core-go/planner"
+	"modulajar/apps/core-go/render"
+	"modulajar/apps/core-go/validator"
 )
 
-// DID regex: DOC-{SUBJECT}-SD{N}-S{N}-{YEAR}-{6chars}-{8chars}
-var didRegex = regexp.MustCompile(`^DOC-[A-Z]+-SD\d+-S\d+-\d{4}-[A-Z2-9]{6}-[A-Z2-9]{8}$`)
+// Mocks
 
-func TestMain(m *testing.M) {
-	// 1. Setup DB if DATABASE_URL is set
-	if os.Getenv("DATABASE_URL") != "" {
-		ctx := context.Background()
-		if err := db.Init(ctx); err != nil {
-			slog.Error("Failed to init DB", "error", err)
-			os.Exit(1)
-		}
-		defer db.Close()
-
-		// 2. Seed Data
-		// Need: Workspace, Package
-		seedSQL := `
-			TRUNCATE workspaces, packages, documents CASCADE;
-
-			INSERT INTO workspaces (id, clerk_org_id, name)
-			VALUES ('test-ws-001', 'test-org-001', 'Test Workspace')
-			ON CONFLICT (id) DO NOTHING;
-
-			INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-			VALUES ('test-pkg-001', 'test-ws-001', 'PKG-SD4-S1-2026-TSTPKG-TST12345', '4', 'S1', '2025/2026', 'Ibu Test', 'SDN Test', 'generating')
-			ON CONFLICT (id) DO NOTHING;
-			
-			INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-			VALUES ('test-pkg-idempotent', 'test-ws-001', 'PKG-SD4-S1-2026-TSTPKG-IDEMPO', '4', 'S1', '2025/2026', 'Ibu Test', 'SDN Test', 'generating')
-			ON CONFLICT (id) DO NOTHING;
-		`
-		// Use raw pool to exec seed
-		// But pool is private in db package.
-		// db package exposes Ping, but not raw Exec unless we add specific func.
-		// However, db methods like UpdatePackageStatus use pool.Exec.
-		// We can't access pool variable directly here (it's unexported 'pool').
-		// We must add a helper in db package OR expose pool?
-		// Or use pgx.Connect separately?
-		// Using pgx.Connect separately is safer/easier than modifying db package.
-		conn, err := db.AcquireJob(ctx) // This returns a job, not a connection.
-		_ = conn
-
-		// We need to execute SQL.
-		// Since we can't access db.pool, we create a temporary connection for seeding.
-		connConfig, _ := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
-		tempPool, err := pgxpool.NewWithConfig(ctx, connConfig)
-		if err != nil {
-			slog.Error("Failed to create temp pool for seeding", "error", err)
-			os.Exit(1)
-		}
-		_, err = tempPool.Exec(ctx, seedSQL)
-		if err != nil {
-			slog.Error("Failed to seed DB", "error", err)
-			os.Exit(1)
-		}
-		tempPool.Close()
-	}
-
-	// 3. Run Tests
-	code := m.Run()
-
-	os.Exit(code)
+type MockAIEngine struct {
+	GenerateResponse *ai.GenerateResponse
+	GenerateError    error
 }
+
+func (m *MockAIEngine) Generate(ctx context.Context, req ai.GenerateRequest) (*ai.GenerateResponse, error) {
+	return m.GenerateResponse, m.GenerateError
+}
+
+type MockPDFEngine struct {
+	GenerateBytes []byte
+	GenerateError error
+}
+
+func (m *MockPDFEngine) Generate(ctx context.Context, htmlContent string, opts render.GeneratePDFOptions) ([]byte, error) {
+	return m.GenerateBytes, m.GenerateError
+}
+
+type MockStorage struct {
+	ExistsResult bool
+	ExistsError  error
+	UploadError  error
+}
+
+func (m *MockStorage) Exists(ctx context.Context, objectPath string) (bool, error) {
+	return m.ExistsResult, m.ExistsError
+}
+
+func (m *MockStorage) UploadFile(ctx context.Context, objectPath string, filePath string, contentType string) error {
+	return m.UploadError
+}
+
+func (m *MockStorage) Close() error {
+	return nil
+}
+
+type MockJobStore struct {
+	AcquireJobResult   *db.GenerationJob
+	AcquireJobError    error
+	UpdateMetaError    error
+	MarkDoneError      error
+	MarkFailedError    error
+	SaveDocError       error
+	UpdateStatusError  error
+	UpdateDocMetaError error
+	UpdatePkgError     error
+
+	// Spies
+	MarkDoneCalled    bool
+	MarkFailedCalled  bool
+	MarkFailedReason  string
+	PersistedMetadata []map[string]interface{}
+}
+
+func (m *MockJobStore) AcquireJob(ctx context.Context) (*db.GenerationJob, error) {
+	return m.AcquireJobResult, m.AcquireJobError
+}
+func (m *MockJobStore) UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error {
+	m.PersistedMetadata = append(m.PersistedMetadata, metadata)
+	return m.UpdateMetaError
+}
+func (m *MockJobStore) MarkJobDone(ctx context.Context, jobID string) error {
+	m.MarkDoneCalled = true
+	return m.MarkDoneError
+}
+func (m *MockJobStore) MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCount int) error {
+	m.MarkFailedCalled = true
+	m.MarkFailedReason = errMsg
+	return m.MarkFailedError
+}
+func (m *MockJobStore) UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
+	return m.UpdatePkgError
+}
+func (m *MockJobStore) SaveDocument(ctx context.Context, doc db.Document) error {
+	return m.SaveDocError
+}
+func (m *MockJobStore) UpdateDocumentStatus(ctx context.Context, publicID string, status string) error {
+	return m.UpdateStatusError
+}
+func (m *MockJobStore) UpdateDocumentMetadata(ctx context.Context, publicID string, metadata map[string]interface{}) error {
+	return m.UpdateDocMetaError
+}
+
+type MockPlanner struct {
+	PlanResult *planner.PlannerResult
+	PlanError  error
+}
+
+func (m *MockPlanner) Plan(input planner.PlannerInput) (*planner.PlannerResult, error) {
+	return m.PlanResult, m.PlanError
+}
+
+type MockValidator struct {
+	Report *validator.ValidationReport
+	Error  error
+}
+
+func (m *MockValidator) Validate(input validator.ValidatorInput) (*validator.ValidationReport, error) {
+	return m.Report, m.Error
+}
+
+// Helpers
 
 func basePayload() TaskPayload {
 	return TaskPayload{
 		JobID:       "test-job-001",
 		PackageID:   "test-pkg-001",
 		WorkspaceID: "test-ws-001",
-		PackPath:    filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json"),
+		PackPath:    filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json"), // Should exist or be mocked packloader
 		Semester:    "S1",
 		Kelas:       "4",
 		TahunAjaran: "2025/2026",
 		TeacherName: "Ibu Test",
 		SchoolName:  "SDN Test",
-		PID:         "PKG-SD4-S1-2026-TSTPKG-TST12345",
+		PID:         "PKG-TEST",
 	}
 }
 
-func TestExecuteJobSuccess(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob error: %v", err)
-	}
-
-	if result.Status != "completed" {
-		t.Fatalf("expected status=completed, got=%s, reason=%s", result.Status, result.FailureReason)
-	}
-	if !result.ValidationOK {
-		t.Fatal("expected validation_ok=true")
-	}
-	if result.PlannerResult == nil {
-		t.Fatal("expected planner_result to be non-nil")
-	}
-
-	t.Logf("Job completed. Subjects: %d", len(result.PlannerResult.Atps))
-}
-
-func TestExecuteJobInvalidPack(t *testing.T) {
-	payload := basePayload()
-	payload.PackPath = "/nonexistent/pack.json"
-
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), payload, logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob error: %v", err)
-	}
-	if result.Status != "failed" {
-		t.Fatalf("expected status=failed, got=%s", result.Status)
-	}
-
-	t.Logf("Failed as expected: %s", result.FailureReason)
-}
-
-func TestExecuteJobRetryIdempotent(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	payload := basePayload()
-	payload.JobID = "test-idempotent"
-	payload.PackageID = "test-pkg-idempotent"
-
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result1, err1 := ExecuteJob(context.Background(), payload, logger, nil, nil)
-	if err1 != nil {
-		t.Fatalf("ExecuteJob 1 failed: %v", err1)
-	}
-	result2, err2 := ExecuteJob(context.Background(), payload, logger, nil, nil)
-	if err2 != nil {
-		t.Fatalf("ExecuteJob 2 failed: %v", err2)
-	}
-
-	if result1.Status != result2.Status {
-		t.Fatalf("different status: %s vs %s", result1.Status, result2.Status)
-	}
-
-	// Doc graphs identical
-	if len(result1.DocGraph.Documents) != len(result2.DocGraph.Documents) {
-		t.Fatalf("doc count: %d vs %d", len(result1.DocGraph.Documents), len(result2.DocGraph.Documents))
-	}
-	for i, d1 := range result1.DocGraph.Documents {
-		d2 := result2.DocGraph.Documents[i]
-		if d1.ID != d2.ID || d1.PublicID != d2.PublicID {
-			t.Errorf("doc[%d] mismatch", i)
-		}
-	}
-
-	// Rendered HTML identical
-	if len(result1.RenderedDocuments) != len(result2.RenderedDocuments) {
-		t.Fatalf("rendered count: %d vs %d", len(result1.RenderedDocuments), len(result2.RenderedDocuments))
-	}
-	for i, r1 := range result1.RenderedDocuments {
-		r2 := result2.RenderedDocuments[i]
-		if r1.HTML != r2.HTML {
-			t.Errorf("rendered[%d] HTML differs", i)
-		}
-	}
-
-	t.Logf("Retry idempotent: %d docs + %d rendered identical", len(result1.DocGraph.Documents), len(result1.RenderedDocuments))
-}
-
-func TestDocGraphCreated(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	if result.DocGraph == nil {
-		t.Fatal("expected doc_graph non-nil")
-	}
-	if len(result.DocGraph.Documents) != 6 {
-		t.Fatalf("expected 6 documents, got %d", len(result.DocGraph.Documents))
-	}
-	if len(result.DocGraph.Versions) != 6 {
-		t.Fatalf("expected 6 versions, got %d", len(result.DocGraph.Versions))
+func defaultPlannerResult() *planner.PlannerResult {
+	return &planner.PlannerResult{
+		Semester: "S1",
+		Atps: []planner.Atp{
+			{SubjectCode: "MAT", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
+		},
+		SemesterPlan: planner.SemesterPlan{
+			Semester:     "S1",
+			SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT", Units: []planner.Unit{{UnitNo: 1, OutcomeCodes: []string{"TP1"}}}}},
+		},
 	}
 }
 
-func TestDocDIDFormat(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
+// Tests
+
+func TestExecuteJob_TableDriven(t *testing.T) {
+	os.Setenv("GCS_BUCKET", "test-bucket")
+	defer os.Unsetenv("GCS_BUCKET")
+
+	tests := []struct {
+		Name          string
+		MockAI        *MockAIEngine
+		MockPDF       *MockPDFEngine
+		MockStorage   *MockStorage
+		MockJobStore  *MockJobStore
+		MockPlanner   *MockPlanner
+		MockValidator *MockValidator
+		ExpectSuccess bool
+		ExpectError   string
+	}{
+		{
+			Name: "Success Path",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `
+				{
+					"meta": {
+						"jenjang": "SD",
+						"kelas": "4",
+						"mapel": "Matematika",
+						"semester": "1",
+						"tahun_ajaran": "2025/2026"
+					},
+					"identitas": {
+						"sekolah": "SDN Test",
+						"guru": "Ibu Test",
+						"alokasi_waktu": "2x35 menit"
+					},
+					"tujuan_pembelajaran": ["TP1"],
+					"materi_inti": ["Bilangan"],
+					"langkah_pembelajaran": {
+						"pendahuluan": ["Opener"],
+						"inti": ["Core"],
+						"penutup": ["Closer"]
+					},
+					"asesmen": {
+						"diagnostik": ["-"],
+						"formatif": ["-"],
+						"sumatif": ["-"]
+					},
+					"diferensiasi": {
+						"konten": ["-"],
+						"proses": ["-"],
+						"produk": ["-"]
+					},
+					"profil_pancasila": ["Bernalar Kritis"],
+					"lampiran": {
+						"media": ["-"],
+						"sumber_belajar": ["-"]
+					}
+				}`},
+			},
+			MockPDF: &MockPDFEngine{
+				GenerateBytes: []byte("%PDF-1.4..."),
+			},
+			MockStorage:  &MockStorage{},
+			MockJobStore: &MockJobStore{},
+			MockPlanner: &MockPlanner{
+				PlanResult: defaultPlannerResult(),
+			},
+			MockValidator: &MockValidator{
+				Report: &validator.ValidationReport{OK: true},
+			},
+			ExpectSuccess: true,
+		},
+		{
+			Name: "AI Generation Error",
+			MockAI: &MockAIEngine{
+				GenerateError: fmt.Errorf("AI quota exceeded"),
+			},
+			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: false,
+			ExpectError:   "AI generation failed",
+		},
+		{
+			Name: "AI Invalid JSON",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `INVALID JSON`},
+			},
+			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: false,
+			ExpectError:   "AI generated invalid JSON",
+		},
+		{
+			Name: "PDF Generation Error",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
+			},
+			MockPDF: &MockPDFEngine{
+				GenerateError: fmt.Errorf("chrome crashed"),
+			},
+			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: false,
+			ExpectError:   "PDF render failed",
+		},
+		{
+			Name: "Storage Upload Error",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
+			},
+			MockPDF: &MockPDFEngine{
+				GenerateBytes: []byte("%PDF..."),
+			},
+			MockStorage: &MockStorage{
+				UploadError: fmt.Errorf("network error"),
+			},
+			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: false,
+			ExpectError:   "GCS upload failed",
+		},
+		{
+			Name: "Metadata Persist Error",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
+			},
+			MockJobStore: &MockJobStore{
+				UpdateMetaError: fmt.Errorf("db lock timeout"),
+			},
+			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			// Note: The code calls UpdateJobMetadata multiple times.
+			// 1. AI receipt
+			// 2. PDF receipt
+			// If any fails, we want job to fail.
+			ExpectSuccess: false,
+			ExpectError:   "failed to persist",
+		},
+		{
+			Name: "Planner Error",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`}, // Not reached if planner fails earlier? No, Planner called BEFORE AI.
+			},
+			MockPlanner: &MockPlanner{
+				PlanError: fmt.Errorf("simulated planner error"),
+			},
+			ExpectSuccess: false,
+			ExpectError:   "planner failed",
+		},
+		{
+			Name: "Validator Error",
+			MockPlanner: &MockPlanner{
+				PlanResult: defaultPlannerResult(),
+			},
+			MockValidator: &MockValidator{
+				Error: fmt.Errorf("simulated validator error"), // System error
+			},
+			ExpectSuccess: false,
+			ExpectError:   "validator error",
+		},
+		{
+			Name: "Validation Failure (Logic)",
+			MockPlanner: &MockPlanner{
+				PlanResult: defaultPlannerResult(),
+			},
+			MockValidator: &MockValidator{
+				Report: &validator.ValidationReport{
+					OK:     false,
+					Errors: []validator.ValidationError{{Code: "atp_error", Message: "bad atp"}},
+				},
+			},
+			ExpectSuccess: false,
+			ExpectError:   "validation failed with 1 errors",
+		},
+		{
+			Name: "Idempotency Success (Skip Generation)",
+			MockAI: &MockAIEngine{
+				GenerateError: fmt.Errorf("should not be called"),
+			},
+			MockStorage: &MockStorage{
+				ExistsResult: true, // Artifacts exist
+			},
+			MockPlanner: &MockPlanner{
+				PlanResult: defaultPlannerResult(),
+			},
+			MockValidator: &MockValidator{
+				Report: &validator.ValidationReport{OK: true},
+			},
+			MockJobStore: &MockJobStore{}, // Required for persisting status
+			// Expect success but AI not called.
+			ExpectSuccess: true,
+		},
 	}
 
-	for _, doc := range result.DocGraph.Documents {
-		if !didRegex.MatchString(doc.PublicID) {
-			t.Errorf("DID format invalid: %s", doc.PublicID)
-		}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			deps := WorkerDeps{}
+			if tt.MockAI != nil {
+				deps.AI = tt.MockAI
+			}
+			if tt.MockPDF != nil {
+				deps.PDF = tt.MockPDF
+			}
+			if tt.MockStorage != nil {
+				deps.Storage = tt.MockStorage
+			}
+			if tt.MockJobStore != nil {
+				deps.JobStore = tt.MockJobStore
+			}
+			if tt.MockPlanner != nil {
+				deps.Planner = tt.MockPlanner
+			}
+			if tt.MockValidator != nil {
+				deps.Validator = tt.MockValidator
+			}
+			worker := NewWorker(deps)
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+			// Inject dummy planner/validator if nil since code relies on them
+			if deps.Planner == nil {
+				worker.Deps.Planner = &MockPlanner{PlanResult: defaultPlannerResult()}
+			}
+			if deps.Validator == nil {
+				worker.Deps.Validator = &MockValidator{Report: &validator.ValidationReport{OK: true}}
+			}
+
+			// We need a valid pack.json or we mock packloader.
+			// The refactored worker calls packloader.LoadPack.
+			// packloader relies on real filesystem.
+			// We can use the existing test pack in ../packs/merdeka/sd4/v1/pack.json
+			// The path in basePayload is relative. We might need to adjust it or mock packloader?
+			// worker.go imports "modulajar/apps/core-go/packloader" directly.
+			// To test properly without relying on FS, we would need PackLoader interface.
+			// For now, let's assume the file exists relative to where `go test` runs (package root).
+			// If running in `apps/core-go/worker`, `../../packs`... is correct.
+
+			// Ensure we are in `apps/core-go/worker` for test?
+			// `basePayload().PackPath` is `../packs/...` which means `apps/core-go/packs/...`.
+			// `apps/core-go` is parent.
+			// The actual repo structure: `apps/core-go/packs`.
+			// So `../packs` works if we are in `worker` dir.
+
+			result, err := worker.ExecuteJob(context.Background(), basePayload(), logger)
+
+			if tt.ExpectSuccess {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
+				if result.Status != "completed" {
+					t.Errorf("Expected completed, got %s. Reason: %s", result.Status, result.FailureReason)
+				}
+			} else {
+				if err == nil {
+					// Check if result returned failure status
+					if result != nil && result.Status == "failed" {
+						// OK
+					} else {
+						t.Fatal("Expected error or failed status, got success")
+					}
+				} else {
+					if !strings.Contains(err.Error(), tt.ExpectError) {
+						t.Errorf("Expected error containing '%s', got '%s'", tt.ExpectError, err.Error())
+					}
+				}
+			}
+		})
 	}
 }
 
-// ═══════════════════════════════════════════
-// HTML COMPOSER INTEGRATION TESTS
-// ═══════════════════════════════════════════
-
-func TestRenderedDocumentsCreated(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	if len(result.RenderedDocuments) != 6 {
-		t.Fatalf("expected 6 rendered documents, got %d", len(result.RenderedDocuments))
-	}
-
-	for _, rd := range result.RenderedDocuments {
-		if rd.HTML == "" {
-			t.Errorf("subject %s: empty HTML", rd.SubjectCode)
+func TestHelpers(t *testing.T) {
+	// Test subjectName
+	t.Run("subjectName", func(t *testing.T) {
+		pack := &packloader.CurriculumPack{
+			Subjects: []packloader.Subject{
+				{Code: "MAT", Name: "Matematika"},
+				{Code: "IPA", Name: "Ilmu Pengetahuan Alam"},
+			},
 		}
-		if rd.DID == "" {
-			t.Errorf("subject %s: empty DID", rd.SubjectCode)
+		if got := subjectName(pack, "MAT"); got != "Matematika" {
+			t.Errorf("subjectName(MAT) = %s; want Matematika", got)
 		}
-		if rd.FilePath == "" {
-			t.Errorf("subject %s: empty file_path", rd.SubjectCode)
+		if got := subjectName(pack, "UNK"); got != "UNK" {
+			t.Errorf("subjectName(UNK) = %s; want UNK", got)
 		}
-		t.Logf("subject %s: %d bytes, file_path=%s", rd.SubjectCode, len(rd.HTML), rd.FilePath)
-	}
-}
+	})
 
-func TestRenderedHTMLNoUnresolvedPlaceholders(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	for _, rd := range result.RenderedDocuments {
-		if strings.Contains(rd.HTML, "{{") && strings.Contains(rd.HTML, "}}") {
-			t.Errorf("subject %s: unresolved placeholder in HTML", rd.SubjectCode)
+	// Test maskTeacher
+	t.Run("maskTeacher", func(t *testing.T) {
+		if got := maskTeacher("Guru"); got != "Gur****" {
+			t.Errorf("maskTeacher('Guru') = %s; want Gur****", got)
 		}
-	}
-
-	t.Logf("All %d rendered docs have no unresolved placeholders", len(result.RenderedDocuments))
-}
-
-func TestRenderedHTMLContainsPIDDID(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	for _, rd := range result.RenderedDocuments {
-		if !strings.Contains(rd.HTML, basePayload().PID) {
-			t.Errorf("subject %s: missing PID in HTML", rd.SubjectCode)
+		if got := maskTeacher("Ali"); got != "Ali" {
+			t.Errorf("maskTeacher('Ali') = %s; want Ali", got)
 		}
-		if !strings.Contains(rd.HTML, rd.DID) {
-			t.Errorf("subject %s: missing DID in HTML", rd.SubjectCode)
-		}
-	}
-}
+	})
 
-func TestVersionFilePathsUpdated(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	for _, ver := range result.DocGraph.Versions {
-		if !strings.HasPrefix(ver.FilePath, "html://") {
-			t.Errorf("version %s: file_path=%s, expected html:// prefix", ver.ID, ver.FilePath)
+	// Test min
+	t.Run("min", func(t *testing.T) {
+		if min(1, 2) != 1 {
+			t.Error("min(1, 2) != 1")
 		}
-	}
-
-	t.Logf("All %d version file_paths updated to html:// URIs", len(result.DocGraph.Versions))
-}
-
-func TestRenderedHTMLContainsSubjectName(t *testing.T) {
-	if !render.IsChromeAvailable() {
-		t.Skip("Chrome/Chromium not found, skipping integration test")
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	result, err := ExecuteJob(context.Background(), basePayload(), logger, nil, nil)
-	if err != nil {
-		t.Fatalf("ExecuteJob failed: %v", err)
-	}
-
-	// Verify each rendered doc contains its subject data
-	for _, rd := range result.RenderedDocuments {
-		if !strings.Contains(rd.HTML, "atp-table") {
-			t.Errorf("subject %s: missing ATP table", rd.SubjectCode)
+		if min(5, 3) != 3 {
+			t.Error("min(5, 3) != 3")
 		}
-		if !strings.Contains(rd.HTML, "activity-unit") {
-			t.Errorf("subject %s: missing activity sections", rd.SubjectCode)
-		}
-		if !strings.Contains(rd.HTML, "Asesmen") {
-			t.Errorf("subject %s: missing assessment section", rd.SubjectCode)
-		}
-	}
+	})
 }

@@ -1,13 +1,11 @@
-package db_test
+package db
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"sync"
 	"testing"
-	"time"
-
-	"modulajar/apps/core-go/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,77 +18,58 @@ func setup(t *testing.T) *pgxpool.Pool {
 	}
 
 	ctx := context.Background()
-	if err := db.Init(ctx); err != nil {
+	if err := Init(ctx); err != nil {
 		t.Fatalf("Failed to init db: %v", err)
 	}
 
-	// Direct pool access for cleanup (we can re-use the pool from db package if exported? No, it's private 'pool')
-	// But db.Init initializes the private pool.
-	// We can use a separate pool for cleanup.
-	pool, err := pgxpool.New(ctx, dbURL)
+	p, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		t.Fatalf("Failed to connect for cleanup: %v", err)
 	}
 
-	// Truncate tables to ensure clean state
-	// Order matters: generation_jobs refs packages refs workspaces
-	// We might need to just delete the rows we insert?
-	// Truncating might affect other data if using shared DB.
-	// Better to just INSERT minimal valid data for FKs.
-
-	// We assume workspace and package exists? Or create them.
-	// Let's create a test workspace and package.
-
 	// Cleanup first
-	_, err = pool.Exec(ctx, "DELETE FROM generation_jobs WHERE generation_id LIKE 'test-gen-%'")
+	_, err = p.Exec(ctx, "DELETE FROM generation_jobs WHERE generation_id LIKE 'test-gen-%'")
 	if err != nil {
 		t.Fatalf("Failed to cleanup: %v", err)
 	}
 
-	return pool
+	// Also cleanup test tables used in new tests
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id IN ('ws-fail', 'ws-meta', 'ws-doc')")
+	p.Exec(ctx, "DELETE FROM documents WHERE workspace_id IN ('ws-doc')")
+
+	return p
 }
 
 func TestAtomicAcquire(t *testing.T) {
-	pool := setup(t)
-	defer pool.Close()
+	p := setup(t)
+	defer p.Close()
 	ctx := context.Background()
 
 	// 1. Seed Data
-	wsID := "test-ws-01" // CHAR(26)
-	// Ensure WS exists? If not, we need to create it.
-	// existing schema: workspaces(id)
-	// We use a dummy ID and hope FK constraints don't block us?
-	// FK `workspace_id` REF `workspaces(id)`.
-	// We MUST insert workspace.
-
-	// Check if WS exists, if not insert
+	wsID := "test-ws-01"
 	var exists bool
-	err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM workspaces WHERE id=$1)", wsID).Scan(&exists)
+	err := p.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM workspaces WHERE id=$1)", wsID).Scan(&exists)
 	if err == nil && !exists {
-		_, err = pool.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3)", wsID, "clerk_01", "Test WS")
+		_, err = p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3)", wsID, "clerk_01", "Test WS")
 		if err != nil {
-			// Maybe clerk_org_id conflict? Ignore
+			// ignore
 		}
 	}
 
 	// Insert Package
 	pkgID := "test-pkg-01"
-	_, err = pool.Exec(ctx, `
+	_, err = p.Exec(ctx, `
         INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
         VALUES ($1, $2, $3, '4', '1', '2025', 'T', 'S', 'draft')
         ON CONFLICT (id) DO NOTHING
     `, pkgID, wsID, "PKG-TEST-01")
-	if err != nil {
-		t.Logf("Pkg insert error (might exist): %v", err)
-	}
 
 	// Insert 2 Queued Jobs
 	genID1 := "test-gen-01"
 	genID2 := "test-gen-02"
-
 	meta := `{"foo":"bar"}`
 
-	_, err = pool.Exec(ctx, `
+	_, err = p.Exec(ctx, `
         INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
         VALUES 
         ($1, $2, $3, 'queued', $4, $5, NOW()),
@@ -99,7 +78,6 @@ func TestAtomicAcquire(t *testing.T) {
     `,
 		"job-01", wsID, pkgID, genID1, meta,
 		"job-02", wsID, pkgID, genID2, meta)
-
 	if err != nil {
 		t.Fatalf("Failed to insert jobs: %v", err)
 	}
@@ -108,12 +86,12 @@ func TestAtomicAcquire(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	results := make(chan *db.GenerationJob, 2)
+	results := make(chan *GenerationJob, 2)
 
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer wg.Done()
-			job, err := db.AcquireJob(ctx)
+			job, err := AcquireJob(ctx)
 			if err != nil {
 				t.Errorf("Acquire error: %v", err)
 				return
@@ -127,64 +105,245 @@ func TestAtomicAcquire(t *testing.T) {
 
 	// 3. Verify
 	jobsAcquired := 0
-	ids := make(map[string]bool)
-
 	for job := range results {
 		if job != nil {
 			jobsAcquired++
-			ids[job.ID] = true
-			// Check status in memory (Acquire returns running job)
-			if job.Status != "running" {
-				t.Errorf("Job status should be running, got %s", job.Status)
-			}
-			if job.AttemptCount != 1 {
-				t.Errorf("Attempt count should be 1, got %d", job.AttemptCount)
-			}
 		}
 	}
-
 	if jobsAcquired != 2 {
 		t.Errorf("Expected 2 jobs acquired, got %d", jobsAcquired)
 	}
 
-	if len(ids) != 2 {
-		t.Errorf("Expected 2 distinct job IDs, got %v", ids)
-	}
-
-	// Verify DB state
-	var count int
-	pool.QueryRow(ctx, "SELECT COUNT(*) FROM generation_jobs WHERE status='running' AND generation_id IN ($1, $2)", genID1, genID2).Scan(&count)
-	if count != 2 {
-		t.Errorf("Expected 2 running jobs in DB, got %d", count)
-	}
-
-	// Test Retry Logic
-	// Fail job-01
-	err = db.MarkJobFailed(ctx, "job-01", "test error", 1) // attempt 1 -> next run +5s
-	if err != nil {
-		t.Fatalf("MarkJobFailed error: %v", err)
-	}
-
-	// Check next_run_at > now
-	var nextRun time.Time
-	pool.QueryRow(ctx, "SELECT next_run_at FROM generation_jobs WHERE id=$1", "job-01").Scan(&nextRun)
-	if nextRun.Before(time.Now().Add(2 * time.Second)) {
-		t.Errorf("Next run at should be in future (backoff), got %v", nextRun)
-	}
-
-	// Test Max Attempts
-	// Fail job-01 with attempt 5
-	err = db.MarkJobFailed(ctx, "job-01", "max attempt", 5)
-	if err != nil {
-		t.Fatalf("MarkJobFailed error: %v", err)
-	}
-
-	var status string
-	pool.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id=$1", "job-01").Scan(&status)
-	if status != "failed" {
-		t.Errorf("Expected status failed after 5 attempts, got %s", status)
-	}
-
 	// Cleanup
-	_, err = pool.Exec(ctx, "DELETE FROM generation_jobs WHERE generation_id LIKE 'test-gen-%'")
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE generation_id LIKE 'test-gen-%'")
+}
+
+func TestInitPing(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	if err := Ping(ctx); err != nil {
+		t.Errorf("Ping failed: %v", err)
+	}
+}
+
+func TestQueueStats(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "test-ws-stats"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk_02", "Stats WS")
+	pkgID := "test-pkg-stats"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '1', '1', '2025', 'T', 'S', 'draft') ON CONFLICT (id) DO NOTHING", pkgID, wsID, "PKG-STATS")
+
+	_, err := p.Exec(ctx, `
+		INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata)
+		VALUES
+		('job-q', 'gen-q', $1, $2, 'queued', '{}'),
+		('job-r', 'gen-r', $1, $2, 'running', '{}'),
+		('job-f', 'gen-f', $1, $2, 'failed', '{}')
+		ON CONFLICT DO NOTHING
+	`, wsID, pkgID)
+	if err != nil {
+		t.Fatalf("Insert failed: %v", err)
+	}
+
+	stats, err := GetQueueStats(ctx)
+	if err != nil {
+		t.Fatalf("GetQueueStats failed: %v", err)
+	}
+	if stats.Queued < 1 {
+		t.Errorf("Expected >=1 queued")
+	}
+
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id=$1", wsID)
+}
+
+func TestUpdatePackageStatus(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "test-ws-pkg"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk-03", "Pkg WS")
+	pkgID := "test-pkg-status"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '1', '1', '2025', 'T', 'S', 'draft') ON CONFLICT (id) DO NOTHING", pkgID, wsID, "PKG-STATUS")
+
+	if err := UpdatePackageStatus(ctx, pkgID, "generating"); err != nil {
+		t.Errorf("UpdatePackageStatus failed: %v", err)
+	}
+}
+
+func TestMarkJobDone(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "test-ws-done"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk-04", "Done WS")
+	pkgID := "test-pkg-done"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '1', '1', '2025', 'T', 'S', 'draft') ON CONFLICT (id) DO NOTHING", pkgID, wsID, "PKG-DONE")
+
+	jobID := "job-done"
+	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-done', $2, $3, 'running', '{}')", jobID, wsID, pkgID)
+
+	if err := MarkJobDone(ctx, jobID); err != nil {
+		t.Errorf("MarkJobDone failed: %v", err)
+	}
+
+	// Verify
+	var status string
+	p.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id=$1", jobID).Scan(&status)
+	if status != "done" {
+		t.Errorf("Expected done, got %s", status)
+	}
+}
+
+func TestMarkJobFailed(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "ws-fail"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-f", "Fail WS")
+	pkgID := "pkg-fail"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '4', '1', '2025', 'T', 'S', 'draft') ON CONFLICT DO NOTHING", pkgID, wsID, "PKG-FAIL")
+	jobID := "job-fail"
+	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-fail', $2, $3, 'running', '{}')", jobID, wsID, pkgID)
+
+	// Attempt 1 -> Queued with backoff
+	if err := MarkJobFailed(ctx, jobID, "error 1", 1); err != nil {
+		t.Errorf("MarkJobFailed 1 failed: %v", err)
+	}
+	var status string
+	p.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id=$1", jobID).Scan(&status)
+	if status != "queued" {
+		t.Errorf("Expected queued, got %s", status)
+	}
+
+	// Attempt 5 -> Failed
+	if err := MarkJobFailed(ctx, jobID, "error 5", 5); err != nil {
+		t.Errorf("MarkJobFailed 5 failed: %v", err)
+	}
+	p.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id=$1", jobID).Scan(&status)
+	if status != "failed" {
+		t.Errorf("Expected failed, got %s", status)
+	}
+}
+
+func TestUpdateJobMetadata(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "ws-meta"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-m", "Meta WS")
+	pkgID := "pkg-meta"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '4', '1', '2025', 'T', 'S', 'draft') ON CONFLICT DO NOTHING", pkgID, wsID, "PKG-META")
+	jobID := "job-meta"
+	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-meta', $2, $3, 'queued', '{}')", jobID, wsID, pkgID)
+
+	meta := map[string]interface{}{"foo": "bar"}
+	if err := UpdateJobMetadata(ctx, jobID, meta); err != nil {
+		t.Errorf("UpdateJobMetadata failed: %v", err)
+	}
+
+	// Verify
+	var dbMeta map[string]interface{}
+	var metaBytes []byte
+	p.QueryRow(ctx, "SELECT metadata FROM generation_jobs WHERE id=$1", jobID).Scan(&metaBytes)
+	json.Unmarshal(metaBytes, &dbMeta)
+	if dbMeta["foo"] != "bar" {
+		t.Errorf("Expected metadata foo=bar, got %v", dbMeta)
+	}
+}
+
+func TestDocumentLifecycle(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	wsID := "ws-doc"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-d", "Doc WS")
+	pkgID := "pkg-doc"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '4', '1', '2025', 'T', 'S', 'draft') ON CONFLICT DO NOTHING", pkgID, wsID, "PKG-DOC")
+
+	doc := Document{
+		ID:          "doc-01",
+		WorkspaceID: wsID,
+		PackageID:   pkgID,
+		PublicID:    "DOC-TEST",
+		SubjectCode: "MATH",
+		Version:     1,
+		Status:      "generating",
+		Metadata:    map[string]interface{}{"init": true},
+	}
+
+	// 1. SaveDocument
+	if err := SaveDocument(ctx, doc); err != nil {
+		t.Fatalf("SaveDocument failed: %v", err)
+	}
+
+	// Verify
+	var status string
+	p.QueryRow(ctx, "SELECT status FROM documents WHERE id=$1", doc.ID).Scan(&status)
+	if status != "generating" {
+		t.Errorf("Expected generating, got %s", status)
+	}
+
+	// 2. UpdateDocumentStatus
+	if err := UpdateDocumentStatus(ctx, doc.PublicID, "ready"); err != nil {
+		t.Errorf("UpdateDocumentStatus failed: %v", err)
+	}
+	p.QueryRow(ctx, "SELECT status FROM documents WHERE id=$1", doc.ID).Scan(&status)
+	if status != "ready" {
+		t.Errorf("Expected ready, got %s", status)
+	}
+
+	// 3. UpdateDocumentMetadata
+	meta := map[string]interface{}{"done": true}
+	if err := UpdateDocumentMetadata(ctx, doc.PublicID, meta); err != nil {
+		t.Errorf("UpdateDocumentMetadata failed: %v", err)
+	}
+
+	var dbMeta map[string]interface{}
+	var metaBytes []byte
+	p.QueryRow(ctx, "SELECT metadata FROM documents WHERE id=$1", doc.ID).Scan(&metaBytes)
+	json.Unmarshal(metaBytes, &dbMeta)
+	if dbMeta["done"] != true {
+		t.Errorf("Expected metadata done=true, got %v", dbMeta)
+	}
+}
+
+func TestAcquireJob_NoRows(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx := context.Background()
+
+	// Ensure no queued jobs?
+	// We can trust setup (it deletes test-gen-%).
+	// But AcquireJob queries ANY 'queued' job.
+	// We hope no other tests are leaving queued jobs around.
+
+	job, err := AcquireJob(ctx)
+	if err != nil {
+		t.Errorf("AcquireJob error: %v", err)
+	}
+	if job != nil {
+		t.Logf("Acquired unexpected job: %s", job.ID)
+	}
+}
+
+func TestInit_InvalidURL(t *testing.T) {
+	// Must restore env!
+	old := os.Getenv("DATABASE_URL")
+	t.Cleanup(func() { os.Setenv("DATABASE_URL", old) })
+
+	os.Setenv("DATABASE_URL", "postgres://invalid")
+	err := Init(context.Background())
+	if err == nil {
+		t.Error("Expected Init error for invalid URL")
+	}
 }

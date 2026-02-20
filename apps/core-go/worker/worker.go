@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,7 +26,6 @@ import (
 )
 
 // TaskPayload is the internal payload used by ExecuteJob.
-// Now constructed from DB data, not Cloud Tasks payload.
 type TaskPayload struct {
 	JobID       string `json:"job_id"`
 	PackageID   string `json:"package_id"`
@@ -65,24 +65,21 @@ type WorkerResult struct {
 	RenderedDocuments []RenderedDocument          `json:"rendered_documents,omitempty"`
 }
 
-// MetadataUpdater abstracts db.UpdateJobMetadata for testing
-type MetadataUpdater interface {
-	UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error
+// Worker holds dependencies for job execution.
+type Worker struct {
+	Deps WorkerDeps
 }
 
-// RealMetadataUpdater implements MetadataUpdater using db package
-type RealMetadataUpdater struct{}
-
-func (r *RealMetadataUpdater) UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error {
-	return db.UpdateJobMetadata(ctx, jobID, metadata)
+// NewWorker creates a new Worker instance with injected dependencies.
+func NewWorker(deps WorkerDeps) *Worker {
+	return &Worker{
+		Deps: deps,
+	}
 }
 
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
-func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, aiClient *ai.GeminiClient, metaUpdater MetadataUpdater) (*WorkerResult, error) {
-	// Default to real updater if nil (backward compatibility/ease of use)
-	if metaUpdater == nil {
-		metaUpdater = &RealMetadataUpdater{}
-	}
+// Invariant: Job is marked done ONLY if PDF generation and Upload are successful.
+func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (*WorkerResult, error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
@@ -107,13 +104,13 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, a
 	config := planner.DefaultConfig()
 	config.Semester = payload.Semester
 
-	planResult, err := planner.Plan(planner.PlannerInput{Pack: pack, Config: config})
+	planResult, err := w.Deps.Planner.Plan(planner.PlannerInput{Pack: pack, Config: config})
 	if err != nil {
 		return failResult(fmt.Sprintf("planner failed: %v", err)), nil
 	}
 
 	// 3. Run validator
-	report, err := validator.Validate(validator.ValidatorInput{Pack: pack, Result: planResult})
+	report, err := w.Deps.Validator.Validate(validator.ValidatorInput{Pack: pack, Result: planResult})
 	if err != nil {
 		return failResult(fmt.Sprintf("validator error: %v", err)), nil
 	}
@@ -125,13 +122,69 @@ func ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger, a
 		return r, nil
 	}
 
-	// 4. Build document graph
-	// ... (doc graph code) ...
+	// 4. Build Document Graph
+	// Note: DocGraph logic is currently direct.
+	graphResult, err := docgraph.BuildDocGraph(docgraph.DocGraphInput{
+		WorkspaceID: payload.WorkspaceID,
+		PackageID:   payload.PackageID,
+		Kelas:       payload.Kelas,
+		Semester:    payload.Semester,
+		TahunAjaran: payload.TahunAjaran,
+		DIDSecret:   didSecret,
+		PlanResult:  planResult,
+	})
+	if err != nil {
+		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
+	}
 
-	// AI INTEGRATION (PR-023)
+	// 5. Check Idempotency (Skip if all artifacts exist)
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	if w.Deps.Storage != nil && gcsBucket != "" {
+		allExist := true
+		for _, doc := range graphResult.Documents {
+			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, doc.PublicID, 1)
+			exists, _ := w.Deps.Storage.Exists(ctx, objectPath)
+			if !exists {
+				allExist = false
+				break
+			}
+		}
+
+		if allExist {
+			logger.Info("Idempotency check passed (all artifacts exist). Skipping generation.", "job_id", payload.JobID)
+
+			// Persist documents as ready
+			for _, doc := range graphResult.Documents {
+				dbDoc := db.Document{
+					ID:          doc.ID,
+					WorkspaceID: doc.WorkspaceID,
+					PackageID:   doc.PackageID,
+					PublicID:    doc.PublicID,
+					SubjectCode: doc.SubjectCode,
+					Version:     doc.Version,
+					Status:      "ready",
+					Metadata:    map[string]interface{}{},
+				}
+				_ = w.Deps.JobStore.SaveDocument(ctx, dbDoc)
+				_ = w.Deps.JobStore.UpdateDocumentStatus(ctx, doc.PublicID, "ready")
+			}
+
+			// Return success, handler will mark job done.
+			return &WorkerResult{
+				JobID:         payload.JobID,
+				PackageID:     payload.PackageID,
+				Status:        "completed",
+				PlannerResult: planResult,
+				ValidationOK:  true,
+				DocGraph:      graphResult,
+			}, nil
+		}
+	}
+
+	// 6. AI INTEGRATION
 	var aiReceipt map[string]interface{}
 
-	if aiClient != nil {
+	if w.Deps.AI != nil {
 		// 1. Construct Schema-Driven Prompt
 		schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
 Subject: %s
@@ -181,110 +234,99 @@ No markdown formatting. Pure JSON.`,
 			subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
 
 		req := ai.GenerateRequest{Prompt: schemaPrompt}
-		resp, err := aiClient.Generate(ctx, req)
+		resp, err := w.Deps.AI.Generate(ctx, req)
 		if err != nil {
 			logger.Warn("AI generation failed", "error", err)
-		} else {
-			logger.Info("AI generation success", "model", resp.ModelName)
-
-			// 2. Parse & Validate
-			var c curriculum.Curriculum
-			if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
-				logger.Error("Failed to parse AI JSON", "error", err, "content_snippet", resp.Content[:min(len(resp.Content), 100)])
-				// In PR-023, maybe fail job? For now, we log error and continue (non-blocking).
-				// User said "Invalid JSON -> job fails".
-				// I'll return error here?
-				return nil, fmt.Errorf("AI generated invalid JSON: %w", err)
-			}
-
-			if err := c.Validate(); err != nil {
-				return nil, fmt.Errorf("AI validation failed: %w", err)
-			}
-
-			// 3. Sanitize
-			c.Sanitize()
-
-			// 4. Render
-			// Try reading template from local file
-			tmplBytes, err := os.ReadFile("templates/v1/modul-ajar.html")
-			if err != nil {
-				// Fallback to simpler path or strictly fail?
-				// Try apps/core-go/templates/modul-ajar.html if running from root
-				tmplBytes, err = os.ReadFile("apps/core-go/templates/modul-ajar.html")
-				if err != nil {
-					logger.Warn("Template not found", "error", err)
-				}
-			}
-
-			var html, hash string
-			if len(tmplBytes) > 0 {
-				html, hash, err = curriculum.RenderHTML(&c, string(tmplBytes))
-				if err != nil {
-					return nil, fmt.Errorf("Render failed: %w", err)
-				}
-			}
-
-			// 5. Persist
-			innerAIReceipt := map[string]interface{}{
-				"model":         resp.ModelName,
-				"input_tokens":  resp.TokenInput,
-				"output_tokens": resp.TokenOutput,
-				"prompt_hash":   resp.PromptHash,
-				"output_hash":   resp.OutputHash,
-				"duration_ms":   resp.DurationMs,
-				"generated_at":  time.Now().Format(time.RFC3339),
-			}
-
-			// Capture for outer scope usage
-			aiReceipt = innerAIReceipt
-
-			receipt := map[string]interface{}{
-				"ai_receipt": innerAIReceipt,
-				"curriculum": map[string]interface{}{
-					"json":      c,
-					"html_hash": hash,
-				},
-			}
-			// Note: PDF metadata is added later after generation?
-			// Actually PDF generation happens AFTER this block.
-			// We should update metadata at the END of ExecuteJob or accumulating it.
-			// Current structure: failed to persist AI receipt here.
-			// The job metadata is updated incrementally?
-			// The `UpdateJobMetadata` merges? Postgres `jsonb_set` or merge?
-			// DB implementation usually merges.
-			if err := metaUpdater.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
-				logger.Warn("Failed to persist AI receipt", "error", err)
-			}
-			_ = html // Prevent unused error if not used
+			return failResult(fmt.Sprintf("AI generation failed: %v", err)), nil
 		}
-	}
-	graphResult, err := docgraph.BuildDocGraph(docgraph.DocGraphInput{
-		WorkspaceID: payload.WorkspaceID,
-		PackageID:   payload.PackageID,
-		Kelas:       payload.Kelas,
-		Semester:    payload.Semester,
-		TahunAjaran: payload.TahunAjaran,
-		DIDSecret:   didSecret,
-		PlanResult:  planResult,
-	})
-	if err != nil {
-		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
+
+		logger.Info("AI generation success", "model", resp.ModelName)
+
+		// 2. Parse & Validate
+		var c curriculum.Curriculum
+		if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
+			logger.Error("Failed to parse AI JSON", "error", err)
+			return failResult(fmt.Sprintf("AI generated invalid JSON: %v", err)), nil
+		}
+
+		if err := c.Validate(); err != nil {
+			return failResult(fmt.Sprintf("AI validation failed: %v", err)), nil
+		}
+
+		// 3. Sanitize
+		c.Sanitize()
+
+		// 4. Render
+		templateDir := resolveTemplateDir(payload.PackPath)
+		tmplBytes, err := os.ReadFile(filepath.Join(templateDir, "modul-ajar.html"))
+		if err != nil {
+			// Try to handle missing template gracefully if possible, or warn
+			logger.Warn("Template not found", "error", err)
+		}
+
+		var html, hash string
+		if len(tmplBytes) > 0 {
+			// Construct data for template to avoid "function not defined" errors
+			// The template expects uppercase keys like SUBJECT_NAME, KELAS, etc.
+			// We provide a minimal map here for the receipt hash.
+			// Construct FuncMap to satisfy template requirements (uppercase keys used as functions/vars w/o dot)
+			funcs := template.FuncMap{
+				"SUBJECT_NAME":       func() string { return c.Meta.Mapel },
+				"KELAS":              func() string { return c.Meta.Kelas },
+				"SEMESTER":           func() string { return c.Meta.Semester },
+				"TAHUN_AJARAN":       func() string { return c.Meta.TahunAjaran },
+				"TITLE":              func() string { return "Modul Ajar " + c.Meta.Mapel },
+				"TEACHER_NAME":       func() string { return c.Identitas.Guru },
+				"SCHOOL_NAME":        func() string { return c.Identitas.Sekolah },
+				"PID":                func() string { return payload.PID },
+				"DID":                func() string { return "PREVIEW" },
+				"VERIFY_URL":         func() string { return "#" },
+				"STYLES":             func() string { return "" },
+				"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
+				"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
+				"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+			}
+
+			html, hash, err = curriculum.RenderHTML(nil, string(tmplBytes), funcs)
+			if err != nil {
+				return failResult(fmt.Sprintf("Render failed: %v", err)), nil
+			}
+		}
+
+		// 5. Persist
+		innerAIReceipt := map[string]interface{}{
+			"model":         resp.ModelName,
+			"input_tokens":  resp.TokenInput,
+			"output_tokens": resp.TokenOutput,
+			"prompt_hash":   resp.PromptHash,
+			"output_hash":   resp.OutputHash,
+			"duration_ms":   resp.DurationMs,
+			"generated_at":  time.Now().Format(time.RFC3339),
+		}
+
+		aiReceipt = innerAIReceipt
+
+		receipt := map[string]interface{}{
+			"ai_receipt": innerAIReceipt,
+			"curriculum": map[string]interface{}{
+				"json":      c,
+				"html_hash": hash,
+			},
+		}
+
+		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
+			logger.Error("Failed to persist AI receipt", "error", err)
+			return failResult(fmt.Sprintf("failed to persist AI receipt: %v", err)), nil
+		}
+		_ = html
 	}
 
-	// 4.5. Persist Documents to DB (PR-025)
-	// We do this BEFORE PDF generation to ensure they exist in DB with 'generating' or 'ready' status
-	// We also attach AI receipt if available
+	// 7. Persist Documents to DB (Generating)
 	for _, doc := range graphResult.Documents {
-		// Prepare metadata
 		meta := make(map[string]interface{})
 
-		// If AI receipt exists (from step AI INTEGRATION)
-		// We can't easily access the locally scoped 'receipt' variable from inside the if block above.
-		// However, we can check if we have one.
-		// Actually, let's define 'aiReceipt' var outside the if block.
 		if aiReceipt != nil {
 			meta["ai_config"] = aiReceipt
-			// Top level model field for easy access
 			if m, ok := aiReceipt["model"].(string); ok {
 				meta["model"] = m
 			}
@@ -297,55 +339,16 @@ No markdown formatting. Pure JSON.`,
 			PublicID:    doc.PublicID,
 			SubjectCode: doc.SubjectCode,
 			Version:     doc.Version,
-			Status:      "generating", // Initially generating
+			Status:      "generating",
 			Metadata:    meta,
 		}
-		if err := db.SaveDocument(ctx, dbDoc); err != nil {
+		if err := w.Deps.JobStore.SaveDocument(ctx, dbDoc); err != nil {
 			logger.Warn("Failed to save document to DB", "did", doc.PublicID, "error", err)
 			continue
 		}
 	}
 
-	// IDEMPOTENCY CHECK: Check if artifacts already exist
-	gcsBucket := os.Getenv("GCS_BUCKET")
-	var gcsClient *gcs.Client
-
-	if gcsBucket != "" {
-		gcsClient, err = gcs.NewClient(ctx)
-		if err == nil && gcsClient != nil {
-			defer gcsClient.Close()
-			allExist := true
-			for _, doc := range graphResult.Documents {
-				// Check version 1 (default)
-				objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, doc.PublicID, 1)
-				exists, _ := gcsClient.Exists(ctx, objectPath)
-				if !exists {
-					allExist = false
-					break
-				}
-			}
-			if allExist {
-				// Optimization: Skip regeneration
-				logger.Info("Idempotency check passed (all artifacts exist). Skipping generation.")
-
-				// Update status to ready for all docs
-				for _, doc := range graphResult.Documents {
-					db.UpdateDocumentStatus(ctx, doc.PublicID, "ready")
-				}
-
-				return &WorkerResult{
-					JobID:         payload.JobID,
-					PackageID:     payload.PackageID,
-					Status:        "completed",
-					PlannerResult: planResult,
-					ValidationOK:  true,
-					DocGraph:      graphResult,
-				}, nil
-			}
-		}
-	}
-
-	// 5. Compose HTML for each document
+	// 5. Compose HTML
 	templateDir := resolveTemplateDir(payload.PackPath)
 	renderedDocs := make([]RenderedDocument, 0, len(graphResult.Documents))
 
@@ -374,12 +377,10 @@ No markdown formatting. Pure JSON.`,
 			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
 		}
 
-		// Compute HTML hash
 		htmlHash := sha256.Sum256([]byte(html))
 		htmlHashStr := hex.EncodeToString(htmlHash[:])
 
-		// Update DB with HTML hash
-		db.UpdateDocumentMetadata(ctx, doc.PublicID, map[string]interface{}{
+		w.Deps.JobStore.UpdateDocumentMetadata(ctx, doc.PublicID, map[string]interface{}{
 			"html_sha256": htmlHashStr,
 		})
 
@@ -393,12 +394,9 @@ No markdown formatting. Pure JSON.`,
 		})
 	}
 
-	// 6. PDF render (PR-024 Chromedp)
-	// Check if Chrome is available (bundled or installed)
-	if render.IsChromeAvailable() {
+	// 6. PDF render
+	if w.Deps.PDF != nil {
 		for i, rd := range renderedDocs {
-			// Watermark Data
-			// Mask teacher name: "REJA P****" or "re***@domain.com"
 			maskedTeacher := maskTeacher(payload.TeacherName)
 			watermark := render.WatermarkData{
 				PublicID:    rd.DID,
@@ -407,70 +405,64 @@ No markdown formatting. Pure JSON.`,
 				VerifyURL:   fmt.Sprintf("verify.modulajar.app/verify/%s", rd.DID),
 			}
 
-			// Save watermark info to DB for verification
-			db.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+			w.Deps.JobStore.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
 				"watermark_summary": map[string]string{
 					"teacher_masked": maskedTeacher,
 					"school_name":    payload.SchoolName,
 				},
 			})
 
-			// Generate PDF
-			pdfBytes, err := render.GeneratePDF(ctx, rd.HTML, render.GeneratePDFOptions{
+			opts := render.GeneratePDFOptions{
 				Watermark:    watermark,
 				MarginBottom: 0.8, // inch
-			})
+			}
+			pdfBytes, err := w.Deps.PDF.Generate(ctx, rd.HTML, opts)
 			if err != nil {
-				// PR-029: Hard failure on PDF generation error
-				return nil, fmt.Errorf("PDF render failed for %s: %w", rd.SubjectCode, err)
+				return failResult(fmt.Sprintf("PDF render failed for %s: %v", rd.SubjectCode, err)), nil
 			}
 
-			// Save to temp file for GCS upload (or stream directly if client supports bytes)
-			// Existing GCS client takes path.
 			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
 			if err := os.WriteFile(tmpPDF, pdfBytes, 0644); err != nil {
-				return nil, fmt.Errorf("failed to write temp PDF: %w", err)
+				return failResult(fmt.Sprintf("failed to write temp PDF: %v", err)), nil
 			}
 
 			renderedDocs[i].PDFPath = tmpPDF
 			renderedDocs[i].PDFSizeBytes = int64(len(pdfBytes))
 
-			// Compute SHA256 for receipt
 			pdfHash := sha256.New()
 			pdfHash.Write(pdfBytes)
 			renderedDocs[i].PDFHash = hex.EncodeToString(pdfHash.Sum(nil))
 		}
 	} else {
-		// PR-029: Hard failure if Chrome is missing
-		return nil, fmt.Errorf("Chrome/Chromium not found; cannot generate PDF")
+		return failResult("PDF engine unavailable"), nil
 	}
 
 	// 7. GCS upload
-	if gcsClient != nil {
+	if w.Deps.Storage != nil {
 		for i, rd := range renderedDocs {
 			if rd.PDFPath == "" {
 				continue
 			}
 			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
-			if err := gcsClient.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
+			if err := w.Deps.Storage.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
 				metrics.GCSUploadTotal.WithLabelValues("failed").Inc()
-				return nil, fmt.Errorf("GCS upload failed for %s: %w", rd.SubjectCode, err)
+				return failResult(fmt.Sprintf("GCS upload failed for %s: %v", rd.SubjectCode, err)), nil
 			}
 			metrics.GCSUploadTotal.WithLabelValues("success").Inc()
+
 			renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
 			os.Remove(rd.PDFPath)
 			renderedDocs[i].PDFPath = ""
 		}
 	}
 
-	// 8. Update graph paths & Persist PDF Metadata
+	// 8. Update Document & Job Status
 	pdfMetadata := make(map[string]interface{})
 	for i, ver := range graphResult.Versions {
 		for _, rd := range renderedDocs {
 			if ver.DocumentID == rd.DocumentID {
 				graphResult.Versions[i].FilePath = rd.FilePath
 
-				// Collect PDF metadata for this subject
 				if rd.PDFHash != "" {
 					pdfMetadata[rd.SubjectCode] = map[string]interface{}{
 						"pdf_path":       rd.FilePath, // GCS URI
@@ -479,30 +471,30 @@ No markdown formatting. Pure JSON.`,
 						"generated_at":   time.Now().Format(time.RFC3339),
 					}
 
-					// Update individual document metadata for Verify Service
-					db.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+					w.Deps.JobStore.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
 						"pdf_sha256":   rd.PDFHash,
 						"pdf_path":     rd.FilePath,
 						"generated_at": time.Now().Format(time.RFC3339),
 					})
 
-					// Mark as done
-					db.UpdateDocumentStatus(ctx, rd.DID, "done")
+					w.Deps.JobStore.UpdateDocumentStatus(ctx, rd.DID, "done")
 				}
 				break
 			}
 		}
 	}
 
-	// Persist PDF metadata if any
+	// Persist PDF metadata
 	if len(pdfMetadata) > 0 {
 		update := map[string]interface{}{
 			"pdf_receipts": pdfMetadata,
 		}
-		if err := metaUpdater.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
-			return nil, fmt.Errorf("failed to persist PDF receipts: %w", err)
+		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
+			return failResult(fmt.Sprintf("failed to persist PDF receipts: %v", err)), nil
 		}
 	}
+
+	// Success!
 	return &WorkerResult{
 		JobID:             payload.JobID,
 		PackageID:         payload.PackageID,
@@ -514,150 +506,7 @@ No markdown formatting. Pure JSON.`,
 	}, nil
 }
 
-// Handler returns an HTTP handler for POST /tasks/generate.
-func Handler() http.HandlerFunc {
-	// Initialize default logger
-	baseLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
-	// Initialize Gemini Client
-	geminiKey := os.Getenv("GEMINI_API_KEY")
-	geminiModel := os.Getenv("GEMINI_MODEL")
-	if geminiModel == "" {
-		geminiModel = "gemini-2.0-flash" // Default to available model
-	}
-	// Parse timeout and max tokens (ignoring errors for brevity, using defaults)
-	// simple helper or just pass 0 to rely on defaults
-	apiClient := ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		// Parse payload strictly to get JobID for logging (optional)
-		// Or just ignore it as we use AcquireJob.
-		// We'll decode just to verify it's a valid request.
-		var triggerPayload struct {
-			JobID string `json:"job_id"`
-		}
-		json.NewDecoder(r.Body).Decode(&triggerPayload)
-		r.Body.Close()
-
-		ctx := r.Context()
-
-		// 1. Atomic Acquire
-		job, err := db.AcquireJob(ctx)
-		if err != nil {
-			baseLogger.Error("AcquireJob failed", "error", err)
-			http.Error(w, "acquire failed", http.StatusInternalServerError)
-			return
-		}
-
-		if job == nil {
-			// No work available
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"idle"}`))
-			return
-		}
-
-		// Construct payload from Metadata
-		payload, err := jobToPayload(job)
-		if err != nil {
-			baseLogger.Error("Invalid metadata", "job_id", job.ID, "error", err)
-			db.MarkJobFailed(ctx, job.ID, "invalid metadata", job.AttemptCount)
-			metrics.JobFailuresTotal.Inc()
-			w.WriteHeader(http.StatusOK) // Don't retry invalid metadata
-			return
-		}
-
-		// Structured trace logger
-		logger := baseLogger.With(
-			"trace_id", payload.TraceID,
-			"job_id", job.ID,
-			"package_id", job.PackageID,
-			"workspace_id", payload.WorkspaceID,
-		)
-
-		logger.Info("Job acquired", "attempt", job.AttemptCount)
-		metrics.JobsAcquiredTotal.WithLabelValues("success").Inc()
-
-		start := time.Now()
-
-		// 2. Mark package as generating
-		db.UpdatePackageStatus(ctx, job.PackageID, "generating")
-
-		// 3. Exec
-		result, err := ExecuteJob(ctx, payload, logger, apiClient, nil)
-
-		duration := time.Since(start)
-		durationMs := float64(duration.Milliseconds())
-
-		// 4. Handle Result
-		if err != nil || (result != nil && result.Status == "failed") {
-			reason := "unknown error"
-			if err != nil {
-				reason = err.Error()
-			} else if result != nil {
-				reason = result.FailureReason
-			}
-
-			logger.Error("Job failed", "error", reason, "duration_ms", durationMs)
-			metrics.JobDurationMs.WithLabelValues("failed").Observe(durationMs)
-			metrics.JobRetriesTotal.Inc()
-
-			// Retry logic handled by MarkJobFailed
-			db.MarkJobFailed(ctx, job.ID, reason, job.AttemptCount)
-
-			// Also update package
-			db.UpdatePackageStatus(ctx, job.PackageID, "failed")
-
-			w.WriteHeader(http.StatusOK) // We handled the failure, Cloud Tasks should consider it done (we manage retries via DB)
-			return
-		}
-
-		// Success
-		logger.Info("Job completed successfully", "duration_ms", durationMs)
-		metrics.JobDurationMs.WithLabelValues("completed").Observe(durationMs)
-
-		db.MarkJobDone(ctx, job.ID)
-		db.UpdatePackageStatus(ctx, job.PackageID, "ready")
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(result)
-	}
-}
-
-// CheckFunc is a function that checks a component's health.
-type CheckFunc func(context.Context) error
-
-// ReadinessHandler returns an HTTP handler for GET /readyz.
-// It accepts check functions for DB and Chrome to allow testing.
-func ReadinessHandler(dbCheck CheckFunc, chromeCheck CheckFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		// 1. Check DB
-		if err := dbCheck(ctx); err != nil {
-			slog.Error("Readiness probe failed: DB unpingable", "error", err)
-			http.Error(w, "Service Unavailable: DB", http.StatusServiceUnavailable)
-			return
-		}
-
-		// 2. Check Chrome (Critical for PDF generation)
-		if err := chromeCheck(ctx); err != nil {
-			slog.Error("Readiness probe failed: Chrome unavailable", "error", err)
-			http.Error(w, "Service Unavailable: Chrome", http.StatusServiceUnavailable)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	}
-}
-
+// Helpers
 func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 	b, err := json.Marshal(job.Metadata)
 	if err != nil {
@@ -667,14 +516,12 @@ func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 	if err := json.Unmarshal(b, &p); err != nil {
 		return TaskPayload{}, err
 	}
-	// Ensure IDs match (override metadata just in case)
 	p.JobID = job.ID
 	p.PackageID = job.PackageID
 	p.WorkspaceID = job.WorkspaceID
 	return p, nil
 }
 
-// Helpers...
 func resolveTemplateDir(packPath string) string {
 	candidates := []string{
 		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
@@ -709,9 +556,34 @@ func maskTeacher(name string) string {
 	if len(name) < 4 {
 		return name
 	}
-	// Simple mask: First word + "****"
-	// Or more robust?
-	// Request: re***@domain.com or REJA P****
-	// I'll implement simple masking for now.
 	return name[0:3] + "****"
+}
+
+// Handler functions are moved to cmd/worker/main.go or need to be adapted.
+// For now, I'll remove Handler() from here as it depends on DI which we want to inject.
+// I'll also expose CheckFunc and ReadinessHandler as they are utilities.
+// Actually, keep ReadinessHandler here as it is useful helper, but I will remove the old Handler().
+
+type CheckFunc func(context.Context) error
+
+func ReadinessHandler(dbCheck CheckFunc, chromeCheck CheckFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := dbCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: DB unpingable", "error", err)
+			http.Error(w, "Service Unavailable: DB", http.StatusServiceUnavailable)
+			return
+		}
+
+		if err := chromeCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: Chrome unavailable", "error", err)
+			http.Error(w, "Service Unavailable: Chrome", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
 }
