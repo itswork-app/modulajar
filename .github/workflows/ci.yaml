@@ -74,15 +74,25 @@ jobs:
           go install github.com/pressly/goose/v3/cmd/goose@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+      - name: Install Chromium
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+          which chromium-browser || which chromium
+
       - name: Migrate DB
         run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         env:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
           DID_SECRET: "test-did-secret"
           PID_SECRET: "test-pid-secret"
-        run: go test ./...
+          CHROME_BIN: "/usr/bin/chromium-browser"
+        run: |
+          go test -coverprofile=coverage.out ./...
+          echo "=== Coverage Summary ==="
+          go tool cover -func=coverage.out | tail -1
 
   worker-go:
     runs-on: ubuntu-latest
