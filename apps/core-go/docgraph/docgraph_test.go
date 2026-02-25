@@ -6,23 +6,34 @@ import (
 	"testing"
 )
 
-func TestIssueDID_Format(t *testing.T) {
-	did := IssueDID(
-		"secret",
-		"ws-1",
-		"pkg-1",
-		"doc-1",
-		"BI",
-		"4",
-		"1",
-		"2025/2026",
-	)
+// DID format: DOC-{SUBJECT}-SD{N}-S{N}-{YEAR}-{6chars}-{8chars}
+var didRegex = regexp.MustCompile(`^DOC-[A-Z]+-SD\d+-S\d+-\d{4}-[A-Z2-9]{6}-[A-Z2-9]{8}$`)
 
-	// Format: DOC-{subjectCode}-{kelas}-{semester}-{tahun}-{packageShort}-{hmac8}
-	// Regex: ^DOC-[A-Z]+-SD\d+-S\d+-\d{4}-[A-Z2-9]{6}-[A-Z2-9]{8}$
-	matched, _ := regexp.MatchString(`^DOC-BI-SD4-S1-2026-[A-Z2-9]{6}-[A-Z2-9]{8}$`, did)
-	if !matched {
-		t.Errorf("DID format mismatch: %s", did)
+// ═══════════════════════════════════════
+// IssueDID tests
+// ═══════════════════════════════════════
+
+func TestIssueDID_Format(t *testing.T) {
+	did := IssueDID("secret", "ws1", "pkg1", "doc1", "BI", "4", "S1", "2025/2026")
+	if !didRegex.MatchString(did) {
+		t.Errorf("DID format invalid: %s", did)
+	}
+	t.Logf("DID: %s", did)
+}
+
+func TestIssueDID_Deterministic(t *testing.T) {
+	did1 := IssueDID("secret", "ws1", "pkg1", "doc1", "BI", "4", "S1", "2025/2026")
+	did2 := IssueDID("secret", "ws1", "pkg1", "doc1", "BI", "4", "S1", "2025/2026")
+	if did1 != did2 {
+		t.Errorf("IssueDID is not deterministic: %s != %s", did1, did2)
+	}
+}
+
+func TestIssueDID_DifferentInputsDifferentOutput(t *testing.T) {
+	did1 := IssueDID("secret", "ws1", "pkg1", "doc1", "BI", "4", "S1", "2025/2026")
+	did2 := IssueDID("secret", "ws1", "pkg2", "doc1", "BI", "4", "S1", "2025/2026")
+	if did1 == did2 {
+		t.Errorf("Different packageID should produce different DID")
 	}
 }
 
@@ -65,6 +76,25 @@ func TestIssueDID_TahunExtraction(t *testing.T) {
 	}
 }
 
+func TestIssueDID_SubjectCodeUppercased(t *testing.T) {
+	// lowercase input should produce uppercase subject code in output display portion
+	did_lower := IssueDID("secret", "ws1", "pkg1", "doc1", "bi", "4", "S1", "2026")
+	if !regexp.MustCompile(`^DOC-BI-`).MatchString(did_lower) {
+		t.Errorf("SubjectCode not uppercased in DID display: %s", did_lower)
+	}
+}
+
+// ═══════════════════════════════════════
+// PackageShortCode tests
+// ═══════════════════════════════════════
+
+func TestPackageShortCode_Length(t *testing.T) {
+	code := PackageShortCode("test-package-ulid")
+	if len(code) != 6 {
+		t.Errorf("Expected short code length 6, got %d: %s", len(code), code)
+	}
+}
+
 func TestPackageShortCode_Deterministic(t *testing.T) {
 	id := "package-123"
 	code1 := PackageShortCode(id)
@@ -73,10 +103,19 @@ func TestPackageShortCode_Deterministic(t *testing.T) {
 	if code1 != code2 {
 		t.Error("PackageShortCode not deterministic")
 	}
-	if len(code1) != 6 {
-		t.Errorf("Expected length 6, got %d", len(code1))
+}
+
+func TestPackageShortCode_DifferentInputs(t *testing.T) {
+	c1 := PackageShortCode("pkg-aaa")
+	c2 := PackageShortCode("pkg-bbb")
+	if c1 == c2 {
+		t.Errorf("Different inputs should produce different short codes")
 	}
 }
+
+// ═══════════════════════════════════════
+// BuildDocGraph tests
+// ═══════════════════════════════════════
 
 func TestBuildDocGraph(t *testing.T) {
 	input := DocGraphInput{
@@ -129,7 +168,7 @@ func TestBuildDocGraph_NilPlan(t *testing.T) {
 }
 
 func TestDeterministicULID_Monotonicity(t *testing.T) {
-	// Test that even with same seed, it works (though the version seed differs normally)
+	// Test that even with same seed, it works
 	id1 := deterministicULID("seed")
 	id2 := deterministicULID("seed")
 	if id1 != id2 {

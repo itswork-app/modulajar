@@ -42,6 +42,7 @@ func Bootstrap(args []string) error {
 	}
 	defer db.Close()
 
+	// Initialize Worker with Real Dependencies
 	setupCtx, setupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer setupCancel()
 

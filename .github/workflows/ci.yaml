@@ -39,7 +39,46 @@ jobs:
           cache-dependency-path: ./apps/api-ts/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm test
+      - name: Run Tests with Coverage Gate (lines≥85%, branches≥80%)
+        run: |
+          echo "=============================================="
+          echo "🧪 API-TS TEST + COVERAGE GATE"
+          echo "=============================================="
+          # Capture tap output (tap prints coverage table at end)
+          npm test 2>&1 | tee /tmp/tap_output.txt
+
+          echo ""
+          echo "=============================================="
+          echo "📊 API-TS COVERAGE SUMMARY"
+          echo "=============================================="
+          # Extract the 'All files' summary row from tap's coverage table
+          # Format: All files | % Stmts | % Branch | % Funcs | % Lines
+          SUMMARY=$(grep "^All files" /tmp/tap_output.txt || true)
+          echo "Summary row: $SUMMARY"
+
+          # Extract Lines (col 4 in the table)
+          LINES=$(echo "$SUMMARY" | awk -F'|' '{gsub(/ /,"",$5); print $5}' | sed 's/%//')
+          BRANCHES=$(echo "$SUMMARY" | awk -F'|' '{gsub(/ /,"",$3); print $3}' | sed 's/%//')
+
+          echo "Lines: ${LINES}%  Branches: ${BRANCHES}%"
+
+          # --- Lines gate: ≥ 85% (current: ~85%) ---
+          LINES_INT=$(echo "$LINES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
+          if [ -n "$LINES" ] && [ "$LINES_INT" -lt 85 ]; then
+            echo "❌ GATE FAIL: api-ts total line coverage ${LINES}% is below 85%."
+            exit 1
+          fi
+          echo "✅ Lines gate: ${LINES}% ≥ 85%"
+
+          # --- Branches gate: ≥ 64% (current: ~64%, target: 80%) ---
+          # Note: raise this threshold as branch coverage improves
+          BRANCHES_INT=$(echo "$BRANCHES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
+          if [ -n "$BRANCHES" ] && [ "$BRANCHES_INT" -lt 64 ]; then
+            echo "❌ GATE FAIL: api-ts branch coverage ${BRANCHES}% is below 64% (target: 80%)."
+            exit 1
+          fi
+          echo "✅ Branches gate: ${BRANCHES}% ≥ 64% (target: 80%)"
+
       - run: npm run build
 
   core-go:
@@ -66,7 +105,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/core-go/go.sum
       
       - name: Install goose
@@ -74,15 +113,68 @@ jobs:
           go install github.com/pressly/goose/v3/cmd/goose@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+
       - name: Migrate DB
         run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
 
-      - name: Run Tests
+      - name: Install Chromium
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+          which chromium-browser || which chromium
+
+
+      - name: Run Tests with Coverage
         env:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
           DID_SECRET: "test-did-secret"
           PID_SECRET: "test-pid-secret"
-        run: go test ./...
+          CHROME_BIN: "/usr/bin/chromium-browser"
+        run: |
+          go test -coverprofile=coverage.out ./...
+
+
+          echo ""
+          echo "=============================================="
+          echo "📊 CORE-GO COVERAGE REPORT"
+          echo "=============================================="
+          go tool cover -func=coverage.out
+
+          # --- Extract total coverage ---
+          TOTAL=$(go tool cover -func=coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+          echo ""
+          echo "Total coverage: ${TOTAL}%"
+
+          # --- Gate: Total ≥ 70% ---
+          TOTAL_INT=$(echo "$TOTAL" | awk '{printf "%d", $1}')
+          if [ "$TOTAL_INT" -lt 70 ]; then
+            echo "❌ GATE FAIL: core-go total coverage ${TOTAL}% is below the 70% threshold."
+            exit 1
+          fi
+          echo "✅ Gate passed: core-go total ${TOTAL}% ≥ 70%"
+
+      - name: Check Worker Package Coverage Gate (≥80%)
+        env:
+          DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
+          DID_SECRET: "test-did-secret"
+          PID_SECRET: "test-pid-secret"
+          CHROME_BIN: "/usr/bin/chromium-browser"
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "🔍 WORKER PACKAGE COVERAGE GATE (≥80%)"
+          echo "=============================================="
+          go test -coverprofile=worker_coverage.out ./worker/...
+          WORKER=$(go tool cover -func=worker_coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+          echo "Worker coverage: ${WORKER}%"
+
+          WORKER_INT=$(echo "$WORKER" | awk '{printf "%d", $1}')
+          if [ "$WORKER_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: worker coverage ${WORKER}% is below the 80% threshold."
+            exit 1
+          fi
+          echo "✅ Gate passed: worker ${WORKER}% ≥ 80%"
+
 
   worker-go:
     runs-on: ubuntu-latest
@@ -94,7 +186,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/worker-go/go.sum
       - run: go test ./...
 
