@@ -6,11 +6,17 @@ import (
 )
 
 func TestBootstrap(t *testing.T) {
-	// Set environment variables for bootstrap
+	// Set environment variables for bootstrap if not already set (e.g. locally)
 	os.Setenv("SKIP_SERVER", "true")
-	os.Setenv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres")
-	os.Setenv("GEMINI_API_KEY", "test-key")
-	os.Setenv("GCS_BUCKET", "test-bucket")
+	if os.Getenv("DATABASE_URL") == "" {
+		os.Setenv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres")
+	}
+	if os.Getenv("GEMINI_API_KEY") == "" {
+		os.Setenv("GEMINI_API_KEY", "test-key")
+	}
+	if os.Getenv("GCS_BUCKET") == "" {
+		os.Setenv("GCS_BUCKET", "test-bucket")
+	}
 
 	defer os.Unsetenv("SKIP_SERVER")
 
