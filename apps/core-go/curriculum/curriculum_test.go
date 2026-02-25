@@ -6,19 +6,38 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	c := &Curriculum{}
-	if err := c.Validate(); err == nil {
-		t.Error("Expected validation error for empty curriculum")
+	tests := []struct {
+		name    string
+		base    Curriculum
+		errPart string
+	}{
+		{"Empty", Curriculum{}, "meta.jenjang is required"},
+		{"Missing Kelas", Curriculum{Meta: Meta{Jenjang: "SD"}}, "meta.kelas is required"},
+		{"Missing Mapel", Curriculum{Meta: Meta{Jenjang: "SD", Kelas: "1"}}, "meta.mapel is required"},
+		{"Missing TP", Curriculum{Meta: Meta{Jenjang: "SD", Kelas: "1", Mapel: "A"}}, "tujuan_pembelajaran is required"},
+		{"Missing Materi", Curriculum{Meta: Meta{Jenjang: "SD", Kelas: "1", Mapel: "A"}, TujuanPembelajaran: []string{"T"}}, "materi_inti is required"},
+		{"Missing Inti", Curriculum{Meta: Meta{Jenjang: "SD", Kelas: "1", Mapel: "A"}, TujuanPembelajaran: []string{"T"}, MateriInti: []string{"M"}}, "langkah_pembelajaran.inti is required"},
 	}
 
-	c.Meta.Jenjang = "SD"
-	c.Meta.Kelas = "1"
-	c.Meta.Mapel = "Math"
-	c.TujuanPembelajaran = []string{"A"}
-	c.MateriInti = []string{"B"}
-	c.LangkahPembelajaran.Inti = []string{"C"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.base.Validate()
+			if err == nil || !strings.Contains(err.Error(), tt.errPart) {
+				t.Errorf("expected error containing %q, got %v", tt.errPart, err)
+			}
+		})
+	}
 
-	if err := c.Validate(); err != nil {
+	// Success case
+	valid := Curriculum{
+		Meta:               Meta{Jenjang: "SD", Kelas: "1", Mapel: "A"},
+		TujuanPembelajaran: []string{"T"},
+		MateriInti:         []string{"M"},
+		LangkahPembelajaran: LangkahPembelajaran{
+			Inti: []string{"I"},
+		},
+	}
+	if err := valid.Validate(); err != nil {
 		t.Errorf("Unexpected validation error: %v", err)
 	}
 }

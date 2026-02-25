@@ -3,6 +3,7 @@ package gcs
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -159,5 +160,28 @@ func TestClose(t *testing.T) {
 	if err := c.Close(); err != nil {
 		// Safe to close nil client wrapper?
 		// My implementation checks c.gcsClient.
+	}
+}
+func TestUploadFile_Error(t *testing.T) {
+	os.Setenv("GCS_BUCKET", "test-bucket")
+	c := &Client{bucketName: "test-bucket"}
+	err := c.UploadFile(context.Background(), "obj", "/nonexistent/file", "text/plain")
+	if err == nil {
+		t.Error("Expected error for missing file, got nil")
+	}
+}
+
+func TestUpload_Error(t *testing.T) {
+	os.Setenv("GCS_BUCKET", "test-bucket")
+	// Using a closed client or invalid RT to trigger error
+	mockRT := &MockRoundTripper{
+		Err: fmt.Errorf("network error"),
+	}
+	clientOpt := option.WithHTTPClient(&http.Client{Transport: mockRT})
+	c, _ := NewClient(context.Background(), clientOpt, option.WithoutAuthentication())
+
+	err := c.Upload(context.Background(), "obj", []byte(""), "")
+	if err == nil {
+		t.Error("Expected upload error, got nil")
 	}
 }

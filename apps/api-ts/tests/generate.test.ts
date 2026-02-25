@@ -341,3 +341,154 @@ test('Generate Semester with PID + Package', async (t) => {
 
     t.teardown(() => { });
 });
+
+// ═══════════════════════════════════════════
+// GENERATE ENDPOINT — BRANCH COVERAGE TESTS
+// ═══════════════════════════════════════════
+
+test('Generate endpoint branch coverage', async (t) => {
+    const WS_BC = 'ws_bc_001';
+    const UID_BC = 'user_1'; // Consistent with mock_auth.ts 'Bearer user_1'
+
+    function buildBranchApp(overrides: {
+        balance?: number;
+        hasActiveJob?: boolean;
+        existingPkg?: any;
+    } = {}) {
+        const { balance = 10, hasActiveJob = false, existingPkg = null } = overrides;
+        const fastify = Fastify();
+
+        fastify.decorate('db', {
+            query: async (sql: string, values: any[]) => {
+                if (sql.includes('SELECT 1 FROM workspace_members') && sql.includes('workspace_id')) {
+                    if (values[0] === WS_BC && values[1] === UID_BC) return { rowCount: 1, rows: [] };
+                    return { rowCount: 0, rows: [] };
+                }
+                if (sql.includes('SELECT gj.id, gj.status, gj.package_id, p.public_id'))
+                    return { rowCount: 0, rows: [] };
+                if (sql.includes('SELECT id FROM generation_jobs') && sql.includes('queued'))
+                    return hasActiveJob ? { rowCount: 1, rows: [{ id: 'aj' }] } : { rowCount: 0, rows: [] };
+                if (sql.includes('SELECT COALESCE(SUM'))
+                    return { rowCount: 1, rows: [{ balance: String(balance) }] };
+                if (sql.includes('SELECT id, public_id FROM packages') && sql.includes('teacher_name'))
+                    return existingPkg ? { rowCount: 1, rows: [existingPkg] } : { rowCount: 0, rows: [] };
+                if (sql.includes('INSERT INTO packages') || sql.includes('INSERT INTO generation_jobs'))
+                    return { rowCount: 1, rows: [] };
+                if (sql.includes('SELECT id FROM wallet_ledger') && sql.includes('reference_id'))
+                    return { rowCount: 0, rows: [] };
+                if (sql.includes('balance_check') && sql.includes('INSERT INTO wallet_ledger'))
+                    return { rowCount: 1, rows: [] };
+                if (sql.includes('INSERT INTO wallet_ledger') && sql.includes('ON CONFLICT'))
+                    return { rowCount: 1, rows: [] };
+                return { rowCount: 0, rows: [] };
+            },
+            connect: async () => ({
+                query: async () => ({ rowCount: 1, rows: [] }),
+                release: () => { }
+            } as any)
+        } as any);
+
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(generateRoutes);
+        return fastify;
+    }
+
+    await t.test('400 when pack_id is missing', async (t) => {
+        const fastify = buildBranchApp();
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { semester: 'S1', tahun_ajaran: '2025/2026' }
+        });
+        t.equal(res.statusCode, 400);
+        t.match(res.json().error, /Missing required fields/);
+        await fastify.close();
+    });
+
+    await t.test('400 when semester is missing', async (t) => {
+        const fastify = buildBranchApp();
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'p1', tahun_ajaran: '2025/2026' }
+        });
+        t.equal(res.statusCode, 400);
+        await fastify.close();
+    });
+
+    await t.test('400 when tahun_ajaran is missing', async (t) => {
+        const fastify = buildBranchApp();
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'p1', semester: 'S1' }
+        });
+        t.equal(res.statusCode, 400);
+        await fastify.close();
+    });
+
+    await t.test('409 when active job exists', async (t) => {
+        const fastify = buildBranchApp({ hasActiveJob: true });
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'p1', semester: 'S1', tahun_ajaran: '2025/2026' }
+        });
+        t.equal(res.statusCode, 409);
+        t.match(res.json().error, /Conflict/);
+        await fastify.close();
+    });
+
+    await t.test('402 when balance is insufficient', async (t) => {
+        const fastify = buildBranchApp({ balance: 0 });
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'p1', semester: 'S1', tahun_ajaran: '2025/2026' }
+        });
+        t.equal(res.statusCode, 402);
+        t.ok(res.json().balance !== undefined);
+        await fastify.close();
+    });
+
+    await t.test('reuses existing package when found', async (t) => {
+        const pkg = { id: 'pkg-existing', public_id: 'PKG-SD4-S1-2026-REUSED' };
+        const fastify = buildBranchApp({ existingPkg: pkg });
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'p-a-b-c', semester: 'S1', tahun_ajaran: '2025/2026', kelas: '4', teacher_name: 'T', school_name: 'S' }
+        });
+        t.equal(res.statusCode, 201);
+        const body = res.json();
+        t.equal(body.package_id, pkg.id);
+        t.equal(body.pid, pkg.public_id);
+        await fastify.close();
+    });
+
+    await t.test('uses flat pack path for pack_id with less than 3 parts', async (t) => {
+        const fastify = buildBranchApp();
+        await fastify.ready();
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_BC}/internal/generate-semester`,
+            headers: { Authorization: `Bearer ${UID_BC}` },
+            payload: { pack_id: 'flatpack', semester: 'S1', tahun_ajaran: '2025/2026' }
+        });
+        t.ok(res.statusCode < 500, `should not crash: ${res.statusCode}`);
+        await fastify.close();
+    });
+});

@@ -29,7 +29,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         preHandler: [fastify.verifyClerk]
     }, async (request, reply) => {
         const { clerk_user_id } = request.auth!;
-        const body = request.body as { clerk_org_id?: string; name?: string };
+        const body = (request.body || {}) as { clerk_org_id?: string; name?: string };
 
         // 1. Check if user already has any workspace
         const check = await fastify.db.query(

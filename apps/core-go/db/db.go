@@ -48,6 +48,7 @@ func Init(ctx context.Context) error {
 func Close() {
 	if pool != nil {
 		pool.Close()
+		pool = nil
 	}
 }
 
@@ -185,9 +186,9 @@ func MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCoun
 	// Delay = 5 * 2^(attempt_count - 1)
 	// If attempt_count=1 (first retry), delay=5.
 	// If attempt_count=2, delay=10.
-	backoffSeconds := 5 * (1 << (attemptCount - 1))
-	if backoffSeconds < 5 {
-		backoffSeconds = 5 // Minimum 5s
+	backoffSeconds := 5
+	if attemptCount > 0 {
+		backoffSeconds = 5 * (1 << (attemptCount - 1))
 	}
 
 	intervalStr := fmt.Sprintf("%d seconds", backoffSeconds)
