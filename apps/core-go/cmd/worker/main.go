@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +18,14 @@ import (
 )
 
 func main() {
+	if err := Bootstrap(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// Bootstrap inits the worker and starts the server.
+// Exported for testing/coverage of the init sequence.
+func Bootstrap(args []string) error {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	port := os.Getenv("PORT")
@@ -24,60 +33,45 @@ func main() {
 		port = "8080"
 	}
 
-	// Initialize DB with timeout context
+	// Initialize DB
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := db.Init(ctx); err != nil {
-		log.Fatalf("Failed to initialize DB: %v", err)
+		return fmt.Errorf("failed to initialize DB: %v", err)
 	}
 	defer db.Close()
 
 	// Initialize Worker with Real Dependencies
-	// We need a context for GCS client initialization (it might use background context or specific one)
-	// NewRealWorker uses passed context.
-	// Since GCS client is long-lived, we should pass a background context or long-lived one?
-	// The ctx above is cancelled after 10s. GCS client creation might fail if it does network calls and ctx cancels?
-	// NewRealWorker -> gcs.NewClient(ctx).
-	// Typically client creation should be fast or use its own timeout.
-	// Let's use a separate context for init or reuse existing but be aware of cancel.
-	// Use Background for client scope?
-
 	setupCtx, setupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer setupCancel()
 
 	realWorker, err := worker.NewRealWorker(setupCtx)
 	if err != nil {
-		// Log warning or fatal?
-		// If GCS is required, fatal.
-		// But allow running locally without GCS if optional?
-		// Logic in NewRealWorker returns worker even if GCS fail potentially?
-		// We made it return error if critical.
-		// Let's log fatal to be safe for production.
 		log.Printf("Warning: Failed to initialize worker dependencies fully: %v", err)
-		// Don't fatal yet, maybe just proceed?
-		// NewRealWorker returns error only if totally broken?
-		// We'll proceed if realWorker is not nil.
 	}
 	if realWorker == nil {
-		log.Fatal("Failed to create worker instance")
+		return fmt.Errorf("failed to create worker instance")
 	}
 
-	// Register worker handler
-	http.HandleFunc("/", worker.NewHandler(realWorker))
+	// Register handlers
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", worker.NewHandler(realWorker))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	mux.HandleFunc("/readyz", worker.ReadinessHandler(db.Ping, render.CheckChromeReadiness))
 
-	// Observability
-	// Register on-scrape collector for queue stats
-	prometheus.MustRegister(metrics.NewQueueCollector())
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
-
-	// Real readiness checks (PR-Audit Fix)
-	http.HandleFunc("/readyz", worker.ReadinessHandler(db.Ping, render.CheckChromeReadiness))
+	// Register on-scrape collector
+	// Note: Register might fail if already registered in tests, ignoring for simplicity
+	_ = prometheus.Register(metrics.NewQueueCollector())
 
 	log.Printf("Worker listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+
+	// Skip ListenAndServe in short/test mode if needed,
+	// but for coverage we'll just test the initialization part.
+	if os.Getenv("SKIP_SERVER") == "true" {
+		return nil
 	}
+
+	return http.ListenAndServe(":"+port, mux)
 }

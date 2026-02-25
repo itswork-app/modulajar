@@ -125,3 +125,92 @@ test('Download Endpoint', async (t) => {
     });
 
 });
+
+// ═══════════════════════════════════════════
+// DOCUMENTS ROUTE — MISSING BRANCH COVERAGE
+// ═══════════════════════════════════════════
+
+test('Download endpoint — 500 branches', async (t) => {
+
+    await t.test('500 when GCS_BUCKET env var is not set', async (t) => {
+        const fastify = Fastify();
+
+        fastify.decorate('storage', {
+            generateSignedUrl: async () => 'https://never-called'
+        });
+
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                if (sql.includes('FROM workspace_members')) {
+                    return { rowCount: 1, rows: [{}] };
+                }
+                if (sql.includes('FROM documents')) {
+                    // Return a ready doc
+                    return { rowCount: 1, rows: [{ id: '1', workspace_id: 'ws-1', status: 'ready', gcs_path: 'files/doc.pdf' }] };
+                }
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(documentsRoutes);
+        await fastify.ready();
+
+        // Temporarily unset GCS_BUCKET
+        const prev = process.env.GCS_BUCKET;
+        delete process.env.GCS_BUCKET;
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: '/w/ws-1/documents/doc-ready/download',
+            headers: { Authorization: 'Bearer user_1' }
+        });
+
+        process.env.GCS_BUCKET = prev;  // restore
+
+        t.equal(res.statusCode, 500);
+        t.match(res.json().error, /Server configuration error/);
+
+        await fastify.close();
+    });
+
+    await t.test('500 when generateSignedUrl throws', async (t) => {
+        const fastify = Fastify();
+
+        fastify.decorate('storage', {
+            generateSignedUrl: async () => { throw new Error('GCS connection failed'); }
+        });
+
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                if (sql.includes('FROM workspace_members')) {
+                    return { rowCount: 1, rows: [{}] };
+                }
+                if (sql.includes('FROM documents')) {
+                    return { rowCount: 1, rows: [{ id: '1', workspace_id: 'ws-1', status: 'ready', gcs_path: 'files/doc.pdf' }] };
+                }
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+
+        // Must set GCS_BUCKET so we get past that check
+        process.env.GCS_BUCKET = 'mock-bucket';
+
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(documentsRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: '/w/ws-1/documents/doc-ready/download',
+            headers: { Authorization: 'Bearer user_1' }
+        });
+
+        t.equal(res.statusCode, 500);
+        t.match(res.json().error, /Failed to generate download link/);
+
+        await fastify.close();
+    });
+});

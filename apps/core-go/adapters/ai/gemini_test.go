@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -109,4 +110,80 @@ func TestGeminiClient_Generate_CostGuard(t *testing.T) {
 		t.Fatal("expected cost guard error")
 	}
 	// Error check could be more specific
+}
+func TestGeminiClient_Generate_APIStatusError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("invalid prompt"))
+	}))
+	defer server.Close()
+
+	client := NewGeminiClient("key", "model", 1000, 100)
+	client.baseURL = server.URL
+
+	_, err := client.Generate(context.Background(), GenerateRequest{Prompt: "Hi"})
+	if err == nil || !strings.Contains(err.Error(), "status 400") {
+		t.Fatalf("expected 400 error, got %v", err)
+	}
+}
+
+func TestGeminiClient_Generate_EmptyResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"candidates": []interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	client := NewGeminiClient("key", "model", 1000, 100)
+	client.baseURL = server.URL
+
+	_, err := client.Generate(context.Background(), GenerateRequest{Prompt: "Hi"})
+	if err == nil || !strings.Contains(err.Error(), "empty response") {
+		t.Fatalf("expected empty response error, got %v", err)
+	}
+}
+
+func TestGeminiClient_Generate_MalformedJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{invalid: json}`))
+	}))
+	defer server.Close()
+
+	client := NewGeminiClient("key", "model", 1000, 100)
+	client.baseURL = server.URL
+
+	_, err := client.Generate(context.Background(), GenerateRequest{Prompt: "Hi"})
+	if err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestGeminiClient_Generate_MissingUsageMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]interface{}{
+			"candidates": []map[string]interface{}{
+				{
+					"content": map[string]interface{}{
+						"parts": []map[string]interface{}{
+							{"text": "OK"},
+						},
+					},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	client := NewGeminiClient("key", "model", 1000, 100)
+	client.baseURL = server.URL
+
+	resp, err := client.Generate(context.Background(), GenerateRequest{Prompt: "Hi"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.TokenInput != 0 || resp.TokenOutput != 0 {
+		t.Errorf("expected 0 tokens, got %d/%d", resp.TokenInput, resp.TokenOutput)
+	}
 }

@@ -218,3 +218,19 @@ func TestComposeAllSubjects(t *testing.T) {
 		t.Logf("subject %s: %d bytes ✓", s.code, len(html))
 	}
 }
+func TestIsPDFRenderAvailable(t *testing.T) {
+	// Should at least run without crashing
+	_ = IsPDFRenderAvailable()
+}
+
+func TestRenderPDF_ErrorPaths(t *testing.T) {
+	// 1. Invalid output path (directory doesn't exist and can't be created)
+	// We use a path that is likely invalid or read-only
+	_, err := RenderPDF("<html></html>", "/proc/invalid/out.pdf")
+	if err == nil {
+		t.Error("Expected error for invalid output path, got nil")
+	}
+
+	// 2. Empty HTML (should still work or fail gracefully in node)
+	// If node/script is missing, it fails at findRenderScript or exec.
+}

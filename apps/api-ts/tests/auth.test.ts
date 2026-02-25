@@ -5,197 +5,225 @@ import authRoutes from '../src/routes/auth';
 
 const test = tap.test;
 
+// mock_auth maps:
+//   'Bearer user_1' → clerk_user_id: 'user_1'
+//   anything else   → clerk_user_id: 'test_user'
+const AUTH_TOKEN = 'Bearer user_1';
+const CLERK_USER_ID = 'user_1';
+
+/**
+ * Build a test Fastify app wired with mock_auth + authRoutes.
+ * DB behaviour can be customised per-test with overrides.
+ */
+function buildApp(opts: {
+    memberRows?: number;          // 0 = new user, 1 = already bootstrapped
+    workspaceRows?: any[];        // rows returned by GET /me query
+    simulateInsertError?: boolean;// make client.query throw after BEGIN
+    existingWorkspaceRows?: any[];// rows returned by SELECT id FROM workspaces
+} = {}) {
+    const fastify = Fastify();
+    const {
+        memberRows = 0,
+        workspaceRows = [{ id: 'ws-1', name: 'My Workspace', clerk_org_id: 'org-1', role: 'owner' }],
+        simulateInsertError = false,
+        existingWorkspaceRows = []
+    } = opts;
+
+    fastify.decorate('db', {
+        // Pool-level query (non-transactional)
+        query: async (sql: string, _values: any[]) => {
+            // GET /me — user's workspaces
+            if (sql.includes('SELECT w.id, w.name, w.clerk_org_id')) {
+                return { rowCount: workspaceRows.length, rows: workspaceRows };
+            }
+            // POST /bootstrap — has membership?
+            if (sql.includes('SELECT 1 FROM workspace_members')) {
+                return { rowCount: memberRows, rows: [] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        // Client checkout for transactional bootstrap
+        connect: async () => {
+            return {
+                query: async (sql: string, _values?: any[]) => {
+                    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK')
+                        return { rowCount: 0, rows: [] };
+
+                    if (simulateInsertError)
+                        throw new Error('Simulated DB insert failure');
+
+                    // SELECT id FROM workspaces WHERE clerk_org_id = ?
+                    if (sql.includes('SELECT id FROM workspaces') && sql.includes('clerk_org_id')) {
+                        return {
+                            rowCount: existingWorkspaceRows.length,
+                            rows: existingWorkspaceRows
+                        };
+                    }
+
+                    // INSERT INTO workspaces / workspace_members
+                    return { rowCount: 1, rows: [] };
+                },
+                release: () => { }
+            } as any;
+        }
+    } as any);
+
+    fastify.register(mockAuthPlugin);
+    fastify.register(authRoutes);
+    return fastify;
+}
+
 // ═══════════════════════════════════════════
-// AUTH ROUTE TESTS
+// GET /me
 // ═══════════════════════════════════════════
+test('GET /me', async (t) => {
 
-test('Auth Routes', async (t) => {
-    const MOCK_TOKEN = 'Bearer user_1';
-    const USER_ID = 'user_1'; // must match mock_auth.ts user_1 mapping
+    await t.test('200 — returns clerk_user_id and workspace list', async (t) => {
+        const fastify = buildApp({
+            workspaceRows: [{ id: 'ws-1', name: 'Work', clerk_org_id: 'org-1', role: 'owner' }]
+        });
+        await fastify.ready();
 
-    function buildApp() {
-        const workspaces: Record<string, any> = {};
-        const members: Record<string, any[]> = {};
-
-        const app = Fastify({ logger: false });
-
-        // Mock auth plugin (injects verifyClerk decorator)
-        app.register(mockAuthPlugin);
-
-        // Mock DB
-        app.decorate('db', {
-            query: async (sql: string, params: any[]) => {
-                // GET /me: SELECT workspaces
-                if (sql.includes('FROM workspaces w')) {
-                    const userMembers = members[params[0]] || [];
-                    const rows = userMembers.map((m: any) => ({
-                        id: m.workspace_id,
-                        name: workspaces[m.workspace_id]?.name || 'Unknown',
-                        clerk_org_id: workspaces[m.workspace_id]?.clerk_org_id,
-                        role: m.role,
-                    }));
-                    return { rows, rowCount: rows.length };
-                }
-                // POST /bootstrap: check membership
-                if (sql.includes('FROM workspace_members WHERE clerk_user_id')) {
-                    const userMembers = members[params[0]] || [];
-                    return { rows: userMembers, rowCount: userMembers.length };
-                }
-                return { rows: [], rowCount: 0 };
-            },
-            connect: async () => {
-                return {
-                    query: async (sql: string, params?: any[]) => {
-                        if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
-                            return { rows: [], rowCount: 0 };
-                        }
-                        if (sql.includes('INSERT INTO workspaces')) {
-                            const wsId = params![0];
-                            const orgId = params![1];
-                            const name = params![2];
-                            if (!workspaces[wsId]) {
-                                workspaces[wsId] = { id: wsId, clerk_org_id: orgId, name };
-                            }
-                            return { rows: [], rowCount: 1 };
-                        }
-                        if (sql.includes('INSERT INTO workspace_members')) {
-                            const wsId = params![1];
-                            const userId = params![2];
-                            const role = params![3];
-                            if (!members[userId]) members[userId] = [];
-                            const exists = members[userId].some((m: any) => m.workspace_id === wsId);
-                            if (!exists) {
-                                members[userId].push({ workspace_id: wsId, role });
-                            }
-                            return { rows: [], rowCount: 1 };
-                        }
-                        // SELECT workspace by clerk_org_id (inside transaction)
-                        if (sql.includes('FROM workspaces WHERE clerk_org_id')) {
-                            const orgId = params![0];
-                            const ws = Object.values(workspaces).find((w: any) => w.clerk_org_id === orgId) as any;
-                            return { rows: ws ? [ws] : [], rowCount: ws ? 1 : 0 };
-                        }
-                        return { rows: [], rowCount: 0 };
-                    },
-                    release: () => { },
-                };
-            },
-        } as any);
-
-        app.register(authRoutes, { prefix: '/auth' });
-        return app;
-    }
-
-    // ─── GET /me ───────────────────────────────────────────────────
-    await t.test('GET /me returns 401 without auth', async (t) => {
-        const app = buildApp();
-        await app.ready();
-
-        const res = await app.inject({
+        const res = await fastify.inject({
             method: 'GET',
-            url: '/auth/me',
-            // No authorization header
+            url: '/me',
+            headers: { Authorization: AUTH_TOKEN }
         });
 
-        t.equal(res.statusCode, 401, 'Should return 401 without auth header');
-        await app.close();
+        t.equal(res.statusCode, 200);
+        const body = res.json();
+        t.ok(body.clerk_user_id, 'has clerk_user_id');
+        t.equal(body.clerk_user_id, CLERK_USER_ID);
+        t.ok(Array.isArray(body.workspaces), 'has workspaces array');
+        t.equal(body.workspaces.length, 1);
+
+        await fastify.close();
     });
 
-    await t.test('GET /me returns clerk_user_id and workspaces', async (t) => {
-        const app = buildApp();
-        await app.ready();
+    await t.test('200 — empty workspace list when user has no workspaces', async (t) => {
+        const fastify = buildApp({ workspaceRows: [] });
+        await fastify.ready();
 
-        const res = await app.inject({
+        const res = await fastify.inject({
             method: 'GET',
-            url: '/auth/me',
-            headers: { authorization: MOCK_TOKEN },
+            url: '/me',
+            headers: { Authorization: AUTH_TOKEN }
         });
 
-        t.equal(res.statusCode, 200, 'Should return 200');
-        const body = JSON.parse(res.payload);
-        t.equal(body.clerk_user_id, USER_ID, 'Should return correct user ID');
-        t.ok(Array.isArray(body.workspaces), 'Should return workspaces array');
-        await app.close();
+        t.equal(res.statusCode, 200);
+        t.same(res.json().workspaces, []);
+
+        await fastify.close();
     });
 
-    // ─── POST /bootstrap — new user ────────────────────────────────
-    await t.test('POST /bootstrap creates workspace for new user', async (t) => {
-        const app = buildApp();
-        await app.ready();
+    await t.test('401 — no auth header', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
 
-        const res = await app.inject({
-            method: 'POST',
-            url: '/auth/bootstrap',
-            headers: {
-                authorization: MOCK_TOKEN,
-                'content-type': 'application/json',
-            },
-            payload: JSON.stringify({ name: 'Test Workspace' }),
-        });
+        const res = await fastify.inject({ method: 'GET', url: '/me' });
+        t.equal(res.statusCode, 401);
 
-        t.equal(res.statusCode, 200, 'Should return 200');
-        const body = JSON.parse(res.payload);
-        t.equal(body.status, 'bootstrapped', 'Should return bootstrapped status');
-        t.ok(body.workspaceId, 'Should return workspaceId');
-        await app.close();
+        await fastify.close();
+    });
+});
+
+// ═══════════════════════════════════════════
+// POST /bootstrap — already bootstrapped
+// ═══════════════════════════════════════════
+test('POST /bootstrap — already bootstrapped', async (t) => {
+    const fastify = buildApp({ memberRows: 1 });
+    await fastify.ready();
+
+    const res = await fastify.inject({
+        method: 'POST',
+        url: '/bootstrap',
+        headers: { Authorization: AUTH_TOKEN }
     });
 
-    // ─── POST /bootstrap — idempotent ──────────────────────────────
-    await t.test('POST /bootstrap is idempotent for existing user', async (t) => {
-        const app = buildApp();
-        await app.ready();
+    t.equal(res.statusCode, 200);
+    t.equal(res.json().message, 'User already bootstrapped');
 
-        // First bootstrap
-        const first = await app.inject({
-            method: 'POST',
-            url: '/auth/bootstrap',
-            headers: {
-                authorization: MOCK_TOKEN,
-                'content-type': 'application/json',
-            },
-            payload: JSON.stringify({ name: 'My Workspace' }),
-        });
-        t.equal(first.statusCode, 200, 'First bootstrap should succeed');
+    await fastify.close();
+});
 
-        // Second bootstrap (idempotent) — same user, now has a workspace
-        const res = await app.inject({
+// ═══════════════════════════════════════════
+// POST /bootstrap — new user (success paths)
+// ═══════════════════════════════════════════
+test('POST /bootstrap — new user creates workspace', async (t) => {
+
+    await t.test('creates workspace with default name + personal org fallback', async (t) => {
+        const fastify = buildApp({ memberRows: 0 });
+        await fastify.ready();
+
+        const res = await fastify.inject({
             method: 'POST',
-            url: '/auth/bootstrap',
-            headers: {
-                authorization: MOCK_TOKEN,
-                'content-type': 'application/json',
-            },
-            payload: JSON.stringify({ name: 'My Workspace' }),
+            url: '/bootstrap',
+            headers: { Authorization: AUTH_TOKEN }
         });
 
-        t.equal(res.statusCode, 200, 'Should return 200 for idempotent call');
-        const body = JSON.parse(res.payload);
-        t.equal(body.message, 'User already bootstrapped', 'Should indicate already bootstrapped');
-        await app.close();
+        t.equal(res.statusCode, 200, `Expected 200, got ${res.statusCode}: ${res.body}`);
+        const body = res.json();
+        t.equal(body.status, 'bootstrapped');
+        t.ok(body.workspaceId, 'returns workspaceId');
+
+        await fastify.close();
     });
 
-    // ─── POST /bootstrap — with custom clerk_org_id ─────────────────
-    await t.test('POST /bootstrap accepts custom clerk_org_id', async (t) => {
-        const app = buildApp();
-        await app.ready();
+    await t.test('custom name + clerk_org_id are accepted', async (t) => {
+        const fastify = buildApp({ memberRows: 0 });
+        await fastify.ready();
 
-        const res = await app.inject({
+        const res = await fastify.inject({
             method: 'POST',
-            url: '/auth/bootstrap',
-            headers: {
-                authorization: MOCK_TOKEN,
-                'content-type': 'application/json',
-            },
-            payload: JSON.stringify({
-                clerk_org_id: 'org_custom_123',
-                name: 'Custom Org Workspace',
-            }),
+            url: '/bootstrap',
+            headers: { Authorization: AUTH_TOKEN },
+            payload: { name: 'Sekolah Kita', clerk_org_id: 'org-custom-123' }
         });
 
-        t.equal(res.statusCode, 200, 'Should return 200');
-        const body = JSON.parse(res.payload);
-        t.equal(body.status, 'bootstrapped', 'Should bootstrap successfully');
-        t.ok(body.workspaceId, 'Should return workspaceId');
-        await app.close();
+        t.equal(res.statusCode, 200);
+        t.equal(res.json().status, 'bootstrapped');
+
+        await fastify.close();
     });
+
+    await t.test('existing workspace resolved via SELECT after ON CONFLICT DO NOTHING', async (t) => {
+        // existing.rows.length > 0 → finalWorkspaceId = existing.rows[0].id
+        const fastify = buildApp({
+            memberRows: 0,
+            existingWorkspaceRows: [{ id: 'existing-ws-999' }]
+        });
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: '/bootstrap',
+            headers: { Authorization: AUTH_TOKEN }
+        });
+
+        t.equal(res.statusCode, 200, `Expected 200, got ${res.statusCode}: ${res.body}`);
+        const body = res.json();
+        t.equal(body.status, 'bootstrapped');
+        t.equal(body.workspaceId, 'existing-ws-999', 'should resolve existing workspace id');
+
+        await fastify.close();
+    });
+});
+
+// ═══════════════════════════════════════════
+// POST /bootstrap — DB error → ROLLBACK + rethrow
+// ═══════════════════════════════════════════
+test('POST /bootstrap — DB error triggers ROLLBACK', async (t) => {
+    const fastify = buildApp({ memberRows: 0, simulateInsertError: true });
+    await fastify.ready();
+
+    const res = await fastify.inject({
+        method: 'POST',
+        url: '/bootstrap',
+        headers: { Authorization: AUTH_TOKEN }
+    });
+
+    // Fastify translates unhandled throws to 500
+    t.equal(res.statusCode, 500, `Expected 500 on DB error, got ${res.statusCode}: ${res.body}`);
+
+    await fastify.close();
 });

@@ -153,3 +153,71 @@ func TestRenderWithCustomData(t *testing.T) {
 
 	t.Logf("Custom render output: %d bytes", len(html))
 }
+
+func TestTemplateDir(t *testing.T) {
+	dir := TemplateDir()
+	if dir == "" {
+		t.Error("TemplateDir returned empty string")
+	}
+	if !strings.Contains(dir, "v1") {
+		t.Error("TemplateDir does not contain 'v1'")
+	}
+}
+
+func TestRenderSample_BadDirectory(t *testing.T) {
+	_, err := RenderSample("/nonexistent/dir")
+	if err == nil {
+		t.Error("expected error for nonexistent template dir")
+	}
+}
+
+func TestRenderSample_MissingStyles(t *testing.T) {
+	// Create dir with modul-ajar.html but no styles.css
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+
+	_, err := RenderSample(tmpDir)
+	if err == nil {
+		t.Error("expected error for missing styles.css")
+	}
+}
+
+func TestRenderSample_MissingSampleJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "styles.css"), []byte("body{}"), 0644)
+
+	_, err := RenderSample(tmpDir)
+	if err == nil {
+		t.Error("expected error for missing sample.json")
+	}
+}
+
+func TestRenderSample_BadSampleJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "styles.css"), []byte("body{}"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "sample.json"), []byte("{invalid"), 0644)
+
+	_, err := RenderSample(tmpDir)
+	if err == nil {
+		t.Error("expected error for malformed sample.json")
+	}
+}
+
+func TestRender_BadDirectory(t *testing.T) {
+	_, err := Render("/nonexistent/dir", map[string]string{})
+	if err == nil {
+		t.Error("expected error for nonexistent template dir")
+	}
+}
+
+func TestRender_MissingStyles(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+
+	_, err := Render(tmpDir, map[string]string{})
+	if err == nil {
+		t.Error("expected error for missing styles.css")
+	}
+}
