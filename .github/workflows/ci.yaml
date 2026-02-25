@@ -62,22 +62,21 @@ jobs:
 
           echo "Lines: ${LINES}%  Branches: ${BRANCHES}%"
 
-          # --- Lines gate: ≥ 85% (current: ~85%) ---
+          # --- Lines gate: ≥ 90% (industrial standard) ---
           LINES_INT=$(echo "$LINES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
-          if [ -n "$LINES" ] && [ "$LINES_INT" -lt 85 ]; then
-            echo "❌ GATE FAIL: api-ts total line coverage ${LINES}% is below 85%."
+          if [ -n "$LINES" ] && [ "$LINES_INT" -lt 90 ]; then
+            echo "❌ GATE FAIL: api-ts total line coverage ${LINES}% is below 90%."
             exit 1
           fi
-          echo "✅ Lines gate: ${LINES}% ≥ 85%"
+          echo "✅ Lines gate: ${LINES}% ≥ 90%"
 
-          # --- Branches gate: ≥ 64% (current: ~64%, target: 80%) ---
-          # Note: raise this threshold as branch coverage improves
+          # --- Branches gate: ≥ 80% (industrial standard) ---
           BRANCHES_INT=$(echo "$BRANCHES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
-          if [ -n "$BRANCHES" ] && [ "$BRANCHES_INT" -lt 64 ]; then
-            echo "❌ GATE FAIL: api-ts branch coverage ${BRANCHES}% is below 64% (target: 80%)."
+          if [ -n "$BRANCHES" ] && [ "$BRANCHES_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: api-ts branch coverage ${BRANCHES}% is below 80%."
             exit 1
           fi
-          echo "✅ Branches gate: ${BRANCHES}% ≥ 64% (target: 80%)"
+          echo "✅ Branches gate: ${BRANCHES}% ≥ 80%"
 
       - run: npm run build
 
@@ -117,11 +116,9 @@ jobs:
       - name: Migrate DB
         run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
 
-      - name: Install Chromium
+      - name: Verify Chrome/Chromium (Using pre-installed)
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
-          which chromium-browser || which chromium
+          google-chrome --version || chromium-browser --version || echo "No pre-installed browser"
 
 
       - name: Run Tests with Coverage
@@ -145,13 +142,13 @@ jobs:
           echo ""
           echo "Total coverage: ${TOTAL}%"
 
-          # --- Gate: Total ≥ 70% ---
+          # --- Gate: Total ≥ 80% (Industrial standard) ---
           TOTAL_INT=$(echo "$TOTAL" | awk '{printf "%d", $1}')
-          if [ "$TOTAL_INT" -lt 70 ]; then
-            echo "❌ GATE FAIL: core-go total coverage ${TOTAL}% is below the 70% threshold."
+          if [ "$TOTAL_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: core-go total coverage ${TOTAL}% is below the 80% threshold."
             exit 1
           fi
-          echo "✅ Gate passed: core-go total ${TOTAL}% ≥ 70%"
+          echo "✅ Gate passed: core-go total ${TOTAL}% ≥ 80%"
 
       - name: Check Worker Package Coverage Gate (≥80%)
         env:
