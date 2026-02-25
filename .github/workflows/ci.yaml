@@ -126,7 +126,7 @@ jobs:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
           DID_SECRET: "test-did-secret"
           PID_SECRET: "test-pid-secret"
-          CHROME_BIN: "/usr/bin/chromium-browser"
+          CHROME_BIN: "/usr/bin/google-chrome"
         run: |
           go test -coverprofile=coverage.out ./...
 
@@ -155,7 +155,7 @@ jobs:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
           DID_SECRET: "test-did-secret"
           PID_SECRET: "test-pid-secret"
-          CHROME_BIN: "/usr/bin/chromium-browser"
+          CHROME_BIN: "/usr/bin/google-chrome"
         run: |
           echo ""
           echo "=============================================="
