@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,7 +19,8 @@ func setup(t *testing.T) *pgxpool.Pool {
 		t.Skip("DATABASE_URL not set")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	if err := Init(ctx); err != nil {
 		t.Fatalf("Failed to init db: %v", err)
 	}
@@ -44,7 +46,8 @@ func setup(t *testing.T) *pgxpool.Pool {
 func TestAtomicAcquire(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// 1. Seed Data
 	wsID := "test-ws-01"
@@ -122,7 +125,8 @@ func TestAtomicAcquire(t *testing.T) {
 func TestInitPing(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	if err := Ping(ctx); err != nil {
 		t.Errorf("Ping failed: %v", err)
@@ -132,7 +136,8 @@ func TestInitPing(t *testing.T) {
 func TestQueueStats(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "test-ws-stats"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk_02", "Stats WS")
@@ -165,7 +170,8 @@ func TestQueueStats(t *testing.T) {
 func TestUpdatePackageStatus(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "test-ws-pkg"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk-03", "Pkg WS")
@@ -180,7 +186,8 @@ func TestUpdatePackageStatus(t *testing.T) {
 func TestMarkJobDone(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "test-ws-done"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk-04", "Done WS")
@@ -205,7 +212,8 @@ func TestMarkJobDone(t *testing.T) {
 func TestMarkJobFailed(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "ws-fail"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-f", "Fail WS")
@@ -237,7 +245,8 @@ func TestMarkJobFailed(t *testing.T) {
 func TestUpdateJobMetadata(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "ws-meta"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-m", "Meta WS")
@@ -264,7 +273,8 @@ func TestUpdateJobMetadata(t *testing.T) {
 func TestDocumentLifecycle(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	wsID := "ws-doc"
 	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", wsID, "clerk-d", "Doc WS")
@@ -321,7 +331,8 @@ func TestDocumentLifecycle(t *testing.T) {
 func TestAcquireJob_NoRows(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Ensure no queued jobs?
 	// We can trust setup (it deletes test-gen-%).
@@ -354,7 +365,8 @@ func TestUninitialized(t *testing.T) {
 	pool = nil
 	defer func() { pool = oldPool }()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	if err := Ping(ctx); err == nil {
 		t.Error("expected error for uninitialized Ping")
@@ -394,7 +406,8 @@ func TestClosedPool(t *testing.T) {
 	// Close it through our wrapper which sets pool = nil
 	Close()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	// Now all should return uninitialized error from our guards
 	if err := Ping(ctx); err == nil {
 		t.Error("expected error after Close")
@@ -428,7 +441,8 @@ func TestClosedPool(t *testing.T) {
 func TestSerializationErrors(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Non-serializable type (channel)
 	badMeta := map[string]interface{}{"ch": make(chan int)}
@@ -449,7 +463,8 @@ func TestSerializationErrors(t *testing.T) {
 func TestAcquireJob_MalformedJSON(t *testing.T) {
 	p := setup(t)
 	defer p.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Ensure queue is empty first
 	p.Exec(ctx, "DELETE FROM generation_jobs")
@@ -512,7 +527,8 @@ func TestAcquireJob_Errors(t *testing.T) {
 	internal := pool
 	internal.Close()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	_, err := AcquireJob(ctx)
 	if err == nil {
 		t.Error("expected error on closed pool Begin in AcquireJob")
@@ -527,7 +543,8 @@ func TestAcquireJob_Errors(t *testing.T) {
 
 func TestMarkJobFailed_EdgeCases(t *testing.T) {
 	setup(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Test attemptCount = 0 for backoffSeconds < 5 path
 	err := MarkJobFailed(ctx, "any", "err", 0)
