@@ -105,13 +105,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/core-go/go.sum
       
       - name: Install goose
         run: |
           go install github.com/pressly/goose/v3/cmd/goose@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
 
       - name: Migrate DB
         run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
@@ -122,6 +123,7 @@ jobs:
           sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
           which chromium-browser || which chromium
 
+
       - name: Run Tests with Coverage
         env:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
@@ -130,6 +132,7 @@ jobs:
           CHROME_BIN: "/usr/bin/chromium-browser"
         run: |
           go test -coverprofile=coverage.out ./...
+
 
           echo ""
           echo "=============================================="
@@ -172,6 +175,7 @@ jobs:
           fi
           echo "✅ Gate passed: worker ${WORKER}% ≥ 85%"
 
+
   worker-go:
     runs-on: ubuntu-latest
     defaults:
@@ -182,7 +186,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/worker-go/go.sum
       - run: go test ./...
 
