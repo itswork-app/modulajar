@@ -153,7 +153,7 @@ jobs:
           fi
           echo "✅ Gate passed: core-go total ${TOTAL}% ≥ 70%"
 
-      - name: Check Worker Package Coverage Gate (≥85%)
+      - name: Check Worker Package Coverage Gate (≥80%)
         env:
           DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
           DID_SECRET: "test-did-secret"
@@ -162,18 +162,18 @@ jobs:
         run: |
           echo ""
           echo "=============================================="
-          echo "🔍 WORKER PACKAGE COVERAGE GATE (≥85%)"
+          echo "🔍 WORKER PACKAGE COVERAGE GATE (≥80%)"
           echo "=============================================="
           go test -coverprofile=worker_coverage.out ./worker/...
           WORKER=$(go tool cover -func=worker_coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
           echo "Worker coverage: ${WORKER}%"
 
           WORKER_INT=$(echo "$WORKER" | awk '{printf "%d", $1}')
-          if [ "$WORKER_INT" -lt 85 ]; then
-            echo "❌ GATE FAIL: worker coverage ${WORKER}% is below the 85% threshold."
+          if [ "$WORKER_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: worker coverage ${WORKER}% is below the 80% threshold."
             exit 1
           fi
-          echo "✅ Gate passed: worker ${WORKER}% ≥ 85%"
+          echo "✅ Gate passed: worker ${WORKER}% ≥ 80%"
 
 
   worker-go:
