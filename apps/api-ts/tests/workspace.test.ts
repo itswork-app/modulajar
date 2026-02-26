@@ -9,7 +9,7 @@ const test = tap.test;
 const WORKSPACE_ID = 'ws-test-001';
 const USER_ID = 'user_1';
 
-function buildApp(documents: any[] = []) {
+function buildApp(documents: any[] = [], workspaceData: any = null) {
     const fastify = Fastify();
 
     fastify.decorate('db', {
@@ -21,6 +21,39 @@ function buildApp(documents: any[] = []) {
                     return { rowCount: 1, rows: [{}] };
                 }
                 return { rowCount: 0, rows: [] };
+            }
+
+            // Get Workspace Identity
+            if (sql.includes('FROM workspaces') && sql.includes('SELECT') && !sql.includes('npsn = $1')) {
+                return {
+                    rowCount: 1,
+                    rows: [workspaceData || {
+                        id: WORKSPACE_ID,
+                        workspace_type: 'personal',
+                        npsn: null,
+                        school_name: null,
+                        province: null,
+                        regency: null,
+                        address: null,
+                        logo_url: null,
+                        is_verified: false
+                    }]
+                };
+            }
+
+            // NPSN Duplicate Check
+            if (sql.includes('npsn = $1') && sql.includes('SELECT id FROM workspaces')) {
+                const [npsn] = params;
+                // Mock: '1234567890' is taken by another workspace
+                if (npsn === '1234567890') {
+                    return { rowCount: 1, rows: [{ id: 'ws-other' }] };
+                }
+                return { rowCount: 0, rows: [] };
+            }
+
+            // Update Workspace
+            if (sql.includes('UPDATE workspaces SET')) {
+                return { rowCount: 1, rows: [] };
             }
 
             // List documents
@@ -192,6 +225,129 @@ test('GET /w/:workspaceId/documents', async (t) => {
         t.equal(kelas4?.public_id, 'PKG-SD4-S1-2026-ABCDEF');
         t.equal(kelas4?.school_name, 'SDN 1');
         t.equal(kelas4?.teacher_name, 'Ibu Ani');
+
+        await fastify.close();
+    });
+});
+
+// ═══════════════════════════════════════════
+// Workspace Identity (PR-033)
+// ═══════════════════════════════════════════
+test('Workspace Identity (PR-033)', async (t) => {
+
+    await t.test('GET /w/:wid/workspace returns defaults (personal)', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 200);
+        const body = res.json();
+        t.equal(body.workspace_type, 'personal');
+        t.equal(body.is_verified, false);
+        t.equal(body.npsn, null);
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH school_name only -> 200', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { school_name: 'SDN Test' }
+        });
+
+        t.equal(res.statusCode, 200);
+        t.equal(res.json().status, 'ok');
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH valid npsn -> 200', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { npsn: '20261234' }
+        });
+
+        t.equal(res.statusCode, 200);
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH duplicate npsn -> 409', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { npsn: '1234567890' } // Mocked as duplicate
+        });
+
+        t.equal(res.statusCode, 409);
+        t.equal(res.json().error, 'Conflict');
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH invalid npsn (too short) -> 400', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { npsn: '12345' }
+        });
+
+        t.equal(res.statusCode, 400);
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH invalid logo_url (not https) -> 400', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { logo_url: 'http://evil.com/logo' }
+        });
+
+        t.equal(res.statusCode, 400);
+
+        await fastify.close();
+    });
+
+    await t.test('Cross-workspace update attempt -> 403', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/ws-OTHER/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { school_name: 'Illegal Update' }
+        });
+
+        t.equal(res.statusCode, 403);
 
         await fastify.close();
     });
