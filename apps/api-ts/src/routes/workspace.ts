@@ -111,7 +111,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                     `SELECT id FROM workspaces WHERE npsn = $1 AND id != $2`,
                     [updates.npsn, request.workspaceId]
                 );
-                if (dupCheck.rowCount > 0) {
+                if ((dupCheck.rowCount ?? 0) > 0) {
                     return reply.code(409).send({
                         error: 'Conflict',
                         message: 'NPSN already registered to another workspace'
