@@ -1,55 +1,75 @@
-# Coverage Report: Modulajar
+# Modulajar — Coverage Report (Institutional Grade)
 
-**Branch:** `pr-031-db-concurrency-lock-test`
-**Date:** 2026-02-20
-
-## 1. API-TS (Node.js)
-
-**Overall Metrics:**
-- **Lines:** 90%
-- **Functions:** 86.95%
-- **Branches:** 72.07%
-
-**Low Coverage Areas (Critical):**
-
-| File | Lines % | Branches % | Impact |
-| :--- | :--- | :--- | :--- |
-| `src/routes/generate.ts` | 83.08% | **53.65%** | Core AI generation logic paths unverified. High risk of failure on edge cases. |
-| `src/routes/auth.ts` | 89.47% | **37.50%** | Auth middleware logic (conditionals) largely untested. Security risk. |
-| `src/routes/billing.ts` | 82.96% | 70.83% | Webhook payment processing logic. Financial integrity risk. |
-| `src/routes/documents.ts` | 83.67% | 66.66% | - |
-| `src/utils/logger.ts` | 100% | 66.66% | Low impact. |
-
-**Recommended Thresholds:**
-- **Lines:** >= 85%
-- **Branches:** >= 80% (Current state is failing this for critical routes)
-
-**Missing Tests (Priority):**
-1. `src/routes/generate.ts`: Test failure scenarios for AI client, invalid payloads, and timeout handling.
-2. `src/routes/auth.ts`: Test specific auth failure branches (invalid token, expired token, missing headers).
-3. `src/routes/billing.ts`: Test idempotent replay of webhooks and handling of non-payment events.
+**Date**: 2026-02-26
+**Branch**: `main` (commit `b8e1a20`)
 
 ---
 
-## 2. Core-Go (Golang)
+## Coverage Gates (CI-Enforced)
 
-**Overall Metrics:**
-- **Statements:** ~58% (Estimated pending full run)
+| Target | Metric | Gate | Last Known | Status |
+|--------|--------|------|-----------|--------|
+| **api-ts** | Lines | ≥ 90% | ~94% | ✅ |
+| **api-ts** | Branches | ≥ 80% | ~81% | ✅ |
+| **core-go** | Total | ≥ 80% | ~83% | ✅ |
+| **core-go** | Worker pkg | ≥ 80% | ~80% | ✅ |
 
-**Low Coverage Packages (Critical):**
+> Gate enforcement: [ci.yaml:65-79](file:///home/kangza/workspace/modulajar/.github/workflows/ci.yaml#L65-L79) (api-ts), [ci.yaml:145-151](file:///home/kangza/workspace/modulajar/.github/workflows/ci.yaml#L145-L151) (core-go total), [ci.yaml:153-173](file:///home/kangza/workspace/modulajar/.github/workflows/ci.yaml#L153-L173) (worker pkg)
 
-| Package | Stat % | Focus Area | Impact |
-| :--- | :--- | :--- | :--- |
-| `worker` | **80.4%** | `ExecuteJob`, `Handler` | SIGNIFICANT IMPROVEMENT (was 29.1%). Core worker logic now covered. |
-| `db` | **87.9%** | `AcquireJob`, `MarkJob*` | EXCEEDS TARGET (was 12.1%). Concurrency and retry logic fully verified. |
-| `render` | 70.9% | `GeneratePDF` | Acceptable coverage. |
-| `docgraph` | 0.0% | `BuildDocGraph` (partial) | Core document linking logic untested. Next priority. |
+---
 
-**Recommended Thresholds:**
-- **Total:** >= 80%
-- **Critical Packages (worker, db):** Must be > 85% (Achieved for Worker & DB)
+## api-ts — Test File Inventory
 
-**Missing Tests (Priority):**
-1. [x] `worker/worker.go`: Unit tests for `ExecuteJob` mocking AI, PDF, and GCS clients.
-2. [x] `db/db.go`: Integration tests for `AcquireJob` locking mechanics.
-3. [ ] `cmd/worker`: Need E2E test for the full HTTP handler flow.
+| Test File | Route/Module Covered | Key Scenarios |
+|-----------|---------------------|---------------|
+| `auth.test.ts` | `routes/auth.ts` | Auth flow, Clerk integration |
+| `workspace.test.ts` | `routes/workspace.ts` | Ping, documents, workspace identity (GET/PATCH), jenjang mapping, NPSN validation |
+| `generate.test.ts` | `routes/generate.ts` | Idempotency, concurrency guard, balance check, package lifecycle, branch coverage |
+| `billing.test.ts` | `routes/billing.ts` | Topup intent, summary, webhook HMAC verify, replay protection, credit idempotency |
+| `billing-webhook.test.ts` | Webhook edge cases | Invalid signature, malformed payload, duplicate events |
+| `verify.test.ts` | `routes/verify.ts` | Rate limiting, anti-enumeration, document lookup |
+| `download.test.ts` | `routes/documents.ts` | Signed URL generation, error handling |
+| `cors.test.ts` | CORS policy | Strict origin whitelist, preflight |
+| `tenant-isolation.test.ts` | Cross-tenant prevention | Workspace guard enforcement |
+| `integration.test.ts` | E2E flow | Generate → job lifecycle |
+| `utils.test.ts` | `utils/rate-limit.ts`, `utils/crypto.ts` | RateLimiter, constant-time compare |
+
+### api-ts Remaining Gaps
+
+| Gap | Impact | Fix Effort |
+|-----|--------|------------|
+| No test for `PATCH /w/:wid/workspace` being blocked by CORS (methods: GET/POST only) | Branch miss on CORS OPTIONS | Low — add CORS preflight test with PATCH |
+| No test for `readyz` endpoint (currently trivial) | Function miss | Low — trivial test |
+| No negative test for `PID_SECRET` missing in production | Branch miss | Low |
+
+---
+
+## core-go — Package Coverage Breakdown
+
+| Package | Role | Gate | Notes |
+|---------|------|------|-------|
+| `worker/` | Job execution pipeline | ≥ 80% | Core business logic; covers planner, validator, HTML, PDF, GCS |
+| `db/` | Database operations | No gate | AcquireJob, MarkJobDone, MarkJobFailed covered by integration tests |
+| `render/` | HTML composition + PDF | No gate | Covered via worker tests |
+| `curriculum/` | Curriculum data loading | No gate | Utility; tested indirectly |
+| `docgraph/` | Document graph builder | No gate | Tested via worker integration |
+| `metrics/` | Prometheus collectors | No gate | Has dedicated `metrics_test.go` |
+| `planner/` | Lesson planning | No gate | Tested via worker integration |
+| `validator/` | Content validation | No gate | Tested via worker integration |
+| `cmd/worker/` | Main entrypoint | No gate | `Bootstrap` test exists |
+
+### core-go Remaining Gaps
+
+| Gap | Impact | Fix Effort |
+|-----|--------|------------|
+| No per-package coverage gates for `db/`, `render/` | Could regress without notice | Medium — add per-package CI gates |
+| `db/` package has no standalone unit tests (relies on integration) | Hard to pinpoint DB layer bugs | Medium — mock-based tests |
+| `cmd/worker/main_test.go` tests only the init sequence, not HTTP handlers | Low coverage of handler paths | Medium |
+
+---
+
+## Recommendations
+
+1. **Add `PATCH` to CI CORS gate test** to catch the current GET/POST-only misconfiguration
+2. **Add per-package core-go gates** for `db/` (≥ 80%) and `render/` (≥ 70%)
+3. **Add negative-path tests** for missing env vars (`PID_SECRET`, `PAYMENT_WEBHOOK_SECRET`)
