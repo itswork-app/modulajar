@@ -1,9 +1,6 @@
-import { GenerateForm } from "@/components/generate-form";
+import { redirect } from 'next/navigation';
 
 export default function GeneratePage() {
-    return (
-        <div className="max-w-4xl mx-auto py-8">
-            <GenerateForm />
-        </div>
-    );
+    // Deprecated for v1: Legacy generation form has been moved to the structured onboarding wizard.
+    redirect('/onboarding');
 }
