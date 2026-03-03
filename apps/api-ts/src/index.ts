@@ -5,6 +5,7 @@ import storagePlugin from './plugins/storage';
 import workspaceGuardPlugin from './plugins/workspace-guard';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspace';
+import profileRoutes from './routes/profile';
 import generateRoutes from './routes/generate';
 import billingRoutes from './routes/billing';
 import documentsRoutes from './routes/documents';
@@ -113,6 +114,7 @@ if (SERVICE_MODE === 'verify') {
 
     fastify.register(authRoutes);
     fastify.register(workspaceRoutes);
+    fastify.register(profileRoutes);
     fastify.register(generateRoutes);
     fastify.register(billingRoutes);
     fastify.register(documentsRoutes);

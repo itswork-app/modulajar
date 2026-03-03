@@ -1,0 +1,73 @@
+import { FastifyInstance } from 'fastify';
+
+export default async function profileRoutes(fastify: FastifyInstance) {
+
+    fastify.register(async (childServer) => {
+
+        // GET /w/:workspaceId/profile
+        childServer.get('/:workspaceId/profile', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const result = await fastify.db.query(
+                `SELECT full_name, primary_grade, primary_subject, nip 
+                 FROM teachers 
+                 WHERE workspace_id = $1`,
+                [request.workspaceId]
+            );
+
+            if (result.rowCount === 0) {
+                return reply.code(404).send({ error: 'Teacher profile not found' });
+            }
+
+            return result.rows[0];
+        });
+
+        // POST /w/:workspaceId/profile
+        childServer.post('/:workspaceId/profile', {
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                body: {
+                    type: 'object',
+                    required: ['full_name', 'primary_subject'],
+                    properties: {
+                        full_name: { type: 'string', minLength: 2 },
+                        primary_subject: { type: 'string', minLength: 1 },
+                        primary_grade: { type: 'integer', minimum: 1, maximum: 12, default: 4 },
+                        nip: { type: 'string', nullable: true }
+                    }
+                }
+            }
+        }, async (request, reply) => {
+            const body = request.body as {
+                full_name: string;
+                primary_subject: string;
+                primary_grade?: number;
+                nip?: string | null;
+            };
+
+            const grade = body.primary_grade ?? 4;
+            const nipVal = body.nip || null;
+
+            // Upsert profile
+            const result = await fastify.db.query(
+                `INSERT INTO teachers (workspace_id, full_name, primary_grade, primary_subject, nip)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (workspace_id) 
+                 DO UPDATE SET 
+                    full_name = EXCLUDED.full_name,
+                    primary_grade = EXCLUDED.primary_grade,
+                    primary_subject = EXCLUDED.primary_subject,
+                    nip = EXCLUDED.nip,
+                    updated_at = NOW()
+                 RETURNING full_name, primary_grade, primary_subject, nip`,
+                [request.workspaceId, body.full_name, grade, body.primary_subject, nipVal]
+            );
+
+            // Do not log PII (like NIP) down here, only structured logic points
+            // Fastify's default logger might log request bodies if trace is on, but we configured it false above.
+
+            return result.rows[0];
+        });
+
+    }, { prefix: '/w' });
+}

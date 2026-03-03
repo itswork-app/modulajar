@@ -23,8 +23,9 @@ export function GenerateForm() {
     // State
     const [workspaceId, setWorkspaceId] = useState<string | null>(null);
     const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     // const [step, setStep] = useState(1); // Unused for now
-    const step = 1;
+    const step = 2; // Generation is step 2 (Profile is Step 1)
 
     const [formData, setFormData] = useState({
         jenjang: 'SD',
@@ -82,6 +83,38 @@ export function GenerateForm() {
 
         fetchWorkspace();
     }, [isAuthLoaded, getToken]);
+
+    // Fetch Profile check on Mount
+    useEffect(() => {
+        async function fetchProfile() {
+            if (!workspaceId) return;
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE}/w/${workspaceId}/profile`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (res.status === 404) {
+                    router.replace('/profile-setup');
+                    return;
+                }
+
+                if (res.ok) {
+                    const profileData = await res.json();
+                    // Optional: prefill from profile
+                    handleChange('mapel', profileData.primary_subject);
+                    // Generate UI locking to primary grade in v1:
+                    handleChange('kelas', profileData.primary_grade.toString());
+                }
+            } catch (err) {
+                console.error('Profile fetch error:', err);
+            } finally {
+                setIsLoadingProfile(false);
+            }
+        }
+
+        fetchProfile();
+    }, [workspaceId, getToken, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -145,11 +178,13 @@ export function GenerateForm() {
         });
     };
 
-    if (isLoadingWorkspace) {
+    if (isLoadingWorkspace || isLoadingProfile) {
         return (
-            <div className="flex items-center justify-center p-12 bg-white rounded-2xl shadow-sm border border-slate-200">
-                <Loader2 className="w-6 h-6 animate-spin text-emerald-600 mr-2" />
-                <span className="text-slate-500">Menyiapkan workspace...</span>
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-sm border border-slate-200 min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-4" />
+                <span className="text-slate-500 font-medium">
+                    {isLoadingWorkspace ? 'Menyiapkan workspace...' : 'Memuat profil guru...'}
+                </span>
             </div>
         );
     }
