@@ -95,10 +95,10 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
                     const cleanVal = val.replace(/<[^>]*>?/gm, ''); // simple sanitize strip HTML
 
                     if (cleanVal.length > 120) {
-                        return reply.code(400).send({ error: \`\${part.fieldname} must not exceed 120 characters\` });
+                        return reply.code(400).send({ error: `${part.fieldname} must not exceed 120 characters` });
                     }
 
-                    switch(part.fieldname) {
+                    switch (part.fieldname) {
                         case 'letterhead_line1': line1 = cleanVal || null; break;
                         case 'letterhead_line2': line2 = cleanVal || null; break;
                         case 'letterhead_line3': line3 = cleanVal || null; break;
@@ -117,7 +117,7 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
                 queryOptions = `, logo_file_path = EXCLUDED.logo_file_path, logo_sha256 = EXCLUDED.logo_sha256`;
             }
 
-            const query = \`
+            const query = `
                 INSERT INTO workspace_settings (
                     workspace_id, 
                     school_display_name,
@@ -126,8 +126,8 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
                     letterhead_line3,
                     letterhead_line4,
                     letterhead_contact
-                    \${logoFilePath ? ', logo_file_path, logo_sha256' : ''}
-                ) VALUES ($1, 'Workspace Config', $2, $3, $4, $5, $6 \${logoFilePath ? ', $7, $8' : ''})
+                    ${logoFilePath ? ', logo_file_path, logo_sha256' : ''}
+                ) VALUES ($1, 'Workspace Config', $2, $3, $4, $5, $6 ${logoFilePath ? ', $7, $8' : ''})
                 ON CONFLICT (workspace_id) 
                 DO UPDATE SET 
                     letterhead_line1 = EXCLUDED.letterhead_line1,
@@ -135,9 +135,9 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
                     letterhead_line3 = EXCLUDED.letterhead_line3,
                     letterhead_line4 = EXCLUDED.letterhead_line4,
                     letterhead_contact = EXCLUDED.letterhead_contact
-                    \${queryOptions}
+                    ${queryOptions}
                 RETURNING letterhead_line1, letterhead_line2, letterhead_line3, letterhead_line4, letterhead_contact, logo_file_path, logo_sha256
-            \`;
+            `;
 
             const { rows } = await fastify.db.query(query, values);
             const updated = rows[0];
@@ -146,7 +146,7 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
             if (updated.logo_file_path) {
                 try {
                     logo_preview_url = await fastify.storage.generateSignedUrl(GCS_BUCKET, updated.logo_file_path, 3600);
-                } catch(e) {}
+                } catch (e) { }
             }
 
             request.log.info({ workspaceId, action: 'upsert_letterhead' }, "Letterhead updated");
@@ -168,12 +168,12 @@ export default async function letterheadRoutes(fastify: FastifyInstance) {
         }, async (request, reply) => {
             const { workspaceId } = request.params;
 
-            const query = \`
+            const query = `
                 UPDATE workspace_settings 
                 SET logo_file_path = NULL, logo_sha256 = NULL
                 WHERE workspace_id = $1
                 RETURNING letterhead_line1
-            \`;
+            `;
 
             const { rowCount } = await fastify.db.query(query, [workspaceId]);
             if (rowCount === 0) {

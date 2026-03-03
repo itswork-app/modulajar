@@ -51,6 +51,10 @@ func (m *MockStorage) UploadFile(ctx context.Context, objectPath string, filePat
 	return m.UploadError
 }
 
+func (m *MockStorage) DownloadFile(ctx context.Context, objectPath string) ([]byte, error) {
+	return nil, nil
+}
+
 func (m *MockStorage) Close() error {
 	return nil
 }

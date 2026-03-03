@@ -31,7 +31,7 @@ var RequiredPlaceholders = []string{
 	"{{PID}}",
 	"{{DID}}",
 	"{{VERIFY_URL}}",
-	"{{STYLES}}",
+	"/* STYLES_PLACEHOLDER */",
 	"{{KOP_SURAT}}",
 }
 
@@ -64,14 +64,16 @@ func RenderSample(templateDir string) (string, error) {
 		return "", fmt.Errorf("failed to parse sample JSON: %w", err)
 	}
 
-	// Replace {{STYLES}} first
-	result := strings.Replace(string(html), "{{STYLES}}", string(css), 1)
+	// Replace /* STYLES_PLACEHOLDER */ first
+	result := strings.Replace(string(html), "/* STYLES_PLACEHOLDER */", string(css), 1)
 
 	// Replace all other placeholders
 	for key, value := range data {
 		placeholder := fmt.Sprintf("{{%s}}", key)
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
+
+	result = strings.ReplaceAll(result, "{{KOP_SURAT}}", "")
 
 	return result, nil
 }
@@ -93,8 +95,8 @@ func Render(templateDir string, data map[string]string) (string, error) {
 		return "", fmt.Errorf("failed to read styles: %w", err)
 	}
 
-	// Replace {{STYLES}} first
-	result := strings.Replace(string(html), "{{STYLES}}", string(css), 1)
+	// Replace /* STYLES_PLACEHOLDER */ first
+	result := strings.Replace(string(html), "/* STYLES_PLACEHOLDER */", string(css), 1)
 
 	// Replace all data placeholders (excluding custom HTML blocks evaluated natively)
 	for key, value := range data {

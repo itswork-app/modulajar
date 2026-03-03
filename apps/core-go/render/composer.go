@@ -67,21 +67,21 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 	// 5. Replace all placeholders (deterministic order)
 	html := string(tmplBytes)
 	replacements := map[string]string{
-		"{{STYLES}}":             string(cssBytes),
-		"{{TITLE}}":              title,
-		"{{TEACHER_NAME}}":       input.TeacherName,
-		"{{SCHOOL_NAME}}":        input.SchoolName,
-		"{{KELAS}}":              input.Kelas,
-		"{{SEMESTER}}":           input.Semester,
-		"{{TAHUN_AJARAN}}":       input.TahunAjaran,
-		"{{SUBJECT_NAME}}":       input.SubjectName,
-		"{{ATP_TABLE}}":          atpTable,
-		"{{ACTIVITY_SECTIONS}}":  activitySections,
-		"{{ASSESSMENT_SECTION}}": assessmentSection,
-		"{{PID}}":                input.PID,
-		"{{DID}}":                input.DID,
-		"{{VERIFY_URL}}":         input.VerifyURL,
-		"{{KOP_SURAT}}":          buildKopSuratHtml(input),
+		"/* STYLES_PLACEHOLDER */": string(cssBytes),
+		"{{TITLE}}":                title,
+		"{{TEACHER_NAME}}":         input.TeacherName,
+		"{{SCHOOL_NAME}}":          input.SchoolName,
+		"{{KELAS}}":                input.Kelas,
+		"{{SEMESTER}}":             input.Semester,
+		"{{TAHUN_AJARAN}}":         input.TahunAjaran,
+		"{{SUBJECT_NAME}}":         input.SubjectName,
+		"{{ATP_TABLE}}":            atpTable,
+		"{{ACTIVITY_SECTIONS}}":    activitySections,
+		"{{ASSESSMENT_SECTION}}":   assessmentSection,
+		"{{PID}}":                  input.PID,
+		"{{DID}}":                  input.DID,
+		"{{VERIFY_URL}}":           input.VerifyURL,
+		"{{KOP_SURAT}}":            buildKopSuratHtml(input),
 	}
 
 	for placeholder, value := range replacements {

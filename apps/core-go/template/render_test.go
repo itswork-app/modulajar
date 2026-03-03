@@ -183,7 +183,7 @@ func TestRenderSample_BadDirectory(t *testing.T) {
 func TestRenderSample_MissingStyles(t *testing.T) {
 	// Create dir with modul-ajar.html but no styles.css
 	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>/* STYLES_PLACEHOLDER */</html>"), 0644)
 
 	_, err := RenderSample(tmpDir)
 	if err == nil {
@@ -193,7 +193,7 @@ func TestRenderSample_MissingStyles(t *testing.T) {
 
 func TestRenderSample_MissingSampleJSON(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>/* STYLES_PLACEHOLDER */</html>"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "styles.css"), []byte("body{}"), 0644)
 
 	_, err := RenderSample(tmpDir)
@@ -204,7 +204,7 @@ func TestRenderSample_MissingSampleJSON(t *testing.T) {
 
 func TestRenderSample_BadSampleJSON(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>/* STYLES_PLACEHOLDER */</html>"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "styles.css"), []byte("body{}"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "sample.json"), []byte("{invalid"), 0644)
 
@@ -223,7 +223,7 @@ func TestRender_BadDirectory(t *testing.T) {
 
 func TestRender_MissingStyles(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>{{STYLES}}</html>"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "modul-ajar.html"), []byte("<html>/* STYLES_PLACEHOLDER */</html>"), 0644)
 
 	_, err := Render(tmpDir, map[string]string{})
 	if err == nil {
