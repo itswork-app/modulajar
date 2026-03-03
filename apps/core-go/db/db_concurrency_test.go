@@ -192,6 +192,15 @@ func setupSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			metadata JSONB
 		)`,
+		`CREATE TABLE workspace_settings (
+			workspace_id CHAR(26) PRIMARY KEY REFERENCES workspaces(id),
+			letterhead_line1 TEXT,
+			letterhead_line2 TEXT,
+			letterhead_line3 TEXT,
+			letterhead_line4 TEXT,
+			letterhead_contact TEXT,
+			logo_file_path TEXT
+		)`,
 		// Uniqueness
 		`CREATE UNIQUE INDEX uniq_generation_workspace ON generation_jobs (workspace_id, generation_id)`,
 		`CREATE UNIQUE INDEX idx_documents_workspace_public ON documents(workspace_id, public_id)`,

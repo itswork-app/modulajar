@@ -99,7 +99,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 	// Atomic Acquire Query with Workspace Settings joined
 	query := `
 		WITH next_job AS (
-			SELECT id
+			SELECT id, workspace_id
 			FROM generation_jobs
 			WHERE status = 'queued'
 			  AND next_run_at <= NOW()
@@ -114,7 +114,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 			attempt_count = attempt_count + 1,
 			next_run_at = NOW() + (INTERVAL '1 second' * POWER(2, attempt_count + 1))
 		FROM next_job
-		LEFT JOIN workspace_settings ws ON j.workspace_id = ws.workspace_id
+		LEFT JOIN workspace_settings ws ON next_job.workspace_id = ws.workspace_id
 		WHERE j.id = next_job.id
 		RETURNING 
 			j.id, 
