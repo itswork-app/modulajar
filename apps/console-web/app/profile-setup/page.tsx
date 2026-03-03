@@ -240,7 +240,6 @@ export default function ProfileSetupPage() {
                                         disabled
                                         className="w-full rounded-xl border-slate-200 bg-slate-50 text-slate-500 px-4 py-3 focus:ring-0 opacity-80 cursor-not-allowed appearance-none"
                                         value={formData.primary_grade}
-                                        readOnly
                                     >
                                         <option value="4">Kelas 4 (SD)</option>
                                     </select>
