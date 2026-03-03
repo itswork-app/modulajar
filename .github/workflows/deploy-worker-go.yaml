@@ -15,6 +15,7 @@ env:
   SERVICE_NAME: modulajar-worker
   REPOSITORY: modulajar-repo # Adjust if needed
   IMAGE_NAME: worker-go
+  IMAGE_PATH: ''
 
 jobs:
   deploy:
