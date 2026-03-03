@@ -41,6 +41,10 @@ func (r *RealStorage) UploadFile(ctx context.Context, objectPath string, filePat
 	return r.Client.UploadFile(ctx, objectPath, filePath, contentType)
 }
 
+func (r *RealStorage) DownloadFile(ctx context.Context, objectPath string) ([]byte, error) {
+	return r.Client.DownloadFile(ctx, objectPath)
+}
+
 func (r *RealStorage) Close() error {
 	return r.Client.Close()
 }

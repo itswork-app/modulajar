@@ -24,6 +24,7 @@ type PDFEngine interface {
 type Storage interface {
 	Exists(ctx context.Context, objectPath string) (bool, error)
 	UploadFile(ctx context.Context, objectPath string, filePath string, contentType string) error
+	DownloadFile(ctx context.Context, objectPath string) ([]byte, error)
 	Close() error
 }
 

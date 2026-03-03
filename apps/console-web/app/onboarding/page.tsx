@@ -37,10 +37,13 @@ export default function OnboardingWizardPage() {
 
     // 1. Guard & Prerequisites Load
     useEffect(() => {
+        let isMounted = true;
+        const abortController = new AbortController();
+
         async function checkPrerequisites() {
             if (!isAuthLoaded || isLoadingWorkspace) return;
             if (!workspace) {
-                setIsCheckingPrerequisites(false);
+                if (isMounted) setIsCheckingPrerequisites(false);
                 return;
             }
 
@@ -49,26 +52,30 @@ export default function OnboardingWizardPage() {
 
                 // A) Teacher Profile
                 const profileRes = await fetch(`${API_BASE}/w/${workspace.id}/profile`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal
                 });
 
                 if (profileRes.status === 404) {
-                    router.replace('/profile-setup');
+                    if (isMounted) router.replace('/profile-setup');
                     return;
                 }
                 const pData = await profileRes.json();
+                if (!isMounted) return;
                 setTeacherProfile(pData);
 
                 // B) School Identity
                 const schoolRes = await fetch(`${API_BASE}/w/${workspace.id}/school`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal
                 });
 
                 if (schoolRes.status === 404) {
-                    router.replace('/workspace/school-setup');
+                    if (isMounted) router.replace('/workspace/school-setup');
                     return;
                 }
                 const sData = await schoolRes.json();
+                if (!isMounted) return;
                 setSchoolIdentity(sData);
 
                 // C) Pre-fill defaults or drafts
@@ -80,14 +87,22 @@ export default function OnboardingWizardPage() {
                 }
 
                 setIsCheckingPrerequisites(false);
-            } catch (err) {
-                console.error('Prereq check failed:', err);
-                setIsCheckingPrerequisites(false);
-                setError('Gagal memuat profil. Silakan muat ulang.');
+            } catch (err: unknown) {
+                if (!isMounted) return;
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('Prereq check failed:', err);
+                    setIsCheckingPrerequisites(false);
+                    setError('Gagal memuat profil. Silakan muat ulang.');
+                }
             }
         }
 
         checkPrerequisites();
+
+        return () => {
+            isMounted = false;
+            abortController.abort();
+        };
     }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
     // Update draft on change
@@ -164,7 +179,7 @@ export default function OnboardingWizardPage() {
                 </div>
 
                 {/* Main Card Wrap */}
-                <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8 sm:p-12 relative overflow-hidden">
+                <div className="bg-white rounded-4xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 sm:p-12 relative overflow-hidden">
 
                     {error && (
                         <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-xl flex items-start text-sm border border-red-100">
@@ -176,7 +191,7 @@ export default function OnboardingWizardPage() {
                     {currentStep === 'CHOOSE_PATH' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="text-center mb-10 max-w-2xl mx-auto">
-                                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700 mb-4">Pilih Cara Mulai</h1>
+                                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-700 to-indigo-700 mb-4">Pilih Cara Mulai</h1>
                                 <p className="text-slate-500 text-lg">Bagaimana Anda ingin membuat perangkat ajar hari ini?</p>
                             </div>
 
@@ -320,7 +335,7 @@ export default function OnboardingWizardPage() {
                         <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto">
                             <div className="mb-8">
                                 <button onClick={() => setCurrentStep('FORM')} className="text-sm font-semibold text-slate-400 hover:text-slate-700 mb-4 inline-block">&larr; Koreksi Form</button>
-                                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600 mb-2">Konfirmasi Generasi</h2>
+                                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-emerald-600 to-teal-600 mb-2">Konfirmasi Generasi</h2>
                                 <p className="text-slate-500">AI kami akan menyusun silabus dan alat ajar berdasarkan identitas berikut.</p>
                             </div>
 
@@ -336,7 +351,7 @@ export default function OnboardingWizardPage() {
                                     <div className="col-span-2 my-2 border-b border-slate-200 border-dashed" />
 
                                     <div className="text-slate-500">Target Kurikulum</div>
-                                    <div className="font-bold text-slate-900 bg-blue-100 text-blue-700 px-2 py-0.5 rounded inline-block w-max">SD Kelas 4</div>
+                                    <div className="font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded inline-block w-max">SD Kelas 4</div>
 
                                     <div className="text-slate-500">Mata Pelajaran</div>
                                     <div className="font-bold text-slate-900">{formData.mapel}</div>

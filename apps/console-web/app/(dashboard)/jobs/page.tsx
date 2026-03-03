@@ -71,51 +71,54 @@ export default function JobsListPage() {
     }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
 
-    // 2. Fetch Jobs & Polling
-    const fetchJobs = async () => {
-        if (!workspace?.id) return;
-        try {
-            const token = await getToken();
-            const res = await fetch(`${API_BASE}/w/${workspace.id}/jobs`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Gagal mengambil data jobs.');
-            }
-
-            const data = await res.json();
-            // Expected data shape matches standard list returns.
-            // If data is wrapped in `{ jobs: [] }` handle it gracefully
-            const jobsList: Job[] = Array.isArray(data) ? data : data.jobs || [];
-
-            // Sort Descending by default natively in UI if not guaranteed by API
-            const sortedJobs = jobsList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            setJobs(sortedJobs);
-            setError(null);
-        } catch (err: unknown) {
-            console.error(err);
-            setError((err as Error).message);
-        } finally {
-            setIsLoadingJobs(false);
-        }
-    };
-
     // Run interval poll every 3 seconds IF there are active jobs
     useEffect(() => {
+        let isMounted = true;
+        const abortController = new AbortController();
+
+        const doFetch = async () => {
+            if (!workspace?.id) return;
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE}/w/${workspace.id}/jobs`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal
+                });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Gagal mengambil data jobs.');
+                }
+                const data = await res.json();
+                if (!isMounted) return;
+                const jobsList: Job[] = Array.isArray(data) ? data : data.jobs || [];
+                const sortedJobs = jobsList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                setJobs(sortedJobs);
+                setError(null);
+            } catch (err: unknown) {
+                if (!isMounted) return;
+                if ((err as Error).name !== 'AbortError') {
+                    console.error(err);
+                    setError((err as Error).message);
+                }
+            } finally {
+                if (isMounted) setIsLoadingJobs(false);
+            }
+        };
+
         if (isCheckingPrerequisites || !workspace) return;
 
-        fetchJobs(); // initial fetch
-
-        const hasActiveJobs = jobs.some(j => j.status === 'QUEUED' || j.status === 'RUNNING');
+        doFetch(); // initial fetch
 
         // Wait till we have initial load to lock intervals or unconditionally poll
         const interval = setInterval(() => {
-            fetchJobs();
+            doFetch();
         }, 3000);
 
-        return () => clearInterval(interval);
+        return () => {
+            isMounted = false;
+            abortController.abort();
+            clearInterval(interval);
+        };
     }, [isCheckingPrerequisites, workspace, getToken]);
 
 

@@ -96,10 +96,10 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 	}
 	defer tx.Rollback(ctx)
 
-	// Atomic Acquire Query
+	// Atomic Acquire Query with Workspace Settings joined
 	query := `
 		WITH next_job AS (
-			SELECT id
+			SELECT id, workspace_id
 			FROM generation_jobs
 			WHERE status = 'queued'
 			  AND next_run_at <= NOW()
@@ -112,14 +112,31 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 			status = 'running',
 			locked_at = NOW(),
 			attempt_count = attempt_count + 1,
-			next_run_at = NOW() + (INTERVAL '1 second' * POWER(2, attempt_count + 1)) -- default backoff, overridden on failure
+			next_run_at = NOW() + (INTERVAL '1 second' * POWER(2, attempt_count + 1))
 		FROM next_job
+		LEFT JOIN workspace_settings ws ON next_job.workspace_id = ws.workspace_id
 		WHERE j.id = next_job.id
-		RETURNING j.id, j.workspace_id, j.generation_id, j.package_id, j.status, j.attempt_count, j.metadata
+		RETURNING 
+			j.id, 
+			j.workspace_id, 
+			j.generation_id, 
+			j.package_id, 
+			j.status, 
+			j.attempt_count, 
+			j.metadata,
+			ws.letterhead_line1,
+			ws.letterhead_line2,
+			ws.letterhead_line3,
+			ws.letterhead_line4,
+			ws.letterhead_contact,
+			ws.logo_file_path
 	`
 
 	var job GenerationJob
 	var metadataJSON []byte
+
+	// Letterhead Optional Fields
+	var l1, l2, l3, l4, contact, logo *string
 
 	err = tx.QueryRow(ctx, query).Scan(
 		&job.ID,
@@ -129,6 +146,12 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 		&job.Status,
 		&job.AttemptCount,
 		&metadataJSON,
+		&l1,
+		&l2,
+		&l3,
+		&l4,
+		&contact,
+		&logo,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -140,6 +163,26 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 
 	if err := json.Unmarshal(metadataJSON, &job.Metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
+
+	// Merge Letterhead fields into Metadata if they exist
+	if l1 != nil {
+		job.Metadata["letterhead_line1"] = *l1
+	}
+	if l2 != nil {
+		job.Metadata["letterhead_line2"] = *l2
+	}
+	if l3 != nil {
+		job.Metadata["letterhead_line3"] = *l3
+	}
+	if l4 != nil {
+		job.Metadata["letterhead_line4"] = *l4
+	}
+	if contact != nil {
+		job.Metadata["letterhead_contact"] = *contact
+	}
+	if logo != nil {
+		job.Metadata["logo_file_path"] = *logo
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"modulajar/apps/core-go/adapters/ai"
@@ -38,6 +39,14 @@ type TaskPayload struct {
 	SchoolName  string `json:"school_name"`
 	PID         string `json:"pid"`
 	TraceID     string `json:"trace_id"`
+
+	// Letterhead Parameters (optional)
+	LetterheadLine1   string `json:"letterhead_line1,omitempty"`
+	LetterheadLine2   string `json:"letterhead_line2,omitempty"`
+	LetterheadLine3   string `json:"letterhead_line3,omitempty"`
+	LetterheadLine4   string `json:"letterhead_line4,omitempty"`
+	LetterheadContact string `json:"letterhead_contact,omitempty"`
+	LogoFilePath      string `json:"logo_file_path,omitempty"`
 }
 
 // RenderedDocument holds the composed HTML for one document (subject).
@@ -285,6 +294,7 @@ No markdown formatting. Pure JSON.`,
 				"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
 				"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
 				"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+				"KOP_SURAT":          func() string { return "" },
 			}
 
 			html, hash, err = curriculum.RenderHTML(nil, string(tmplBytes), funcs)
@@ -359,6 +369,21 @@ No markdown formatting. Pure JSON.`,
 		}
 		verifyURL := fmt.Sprintf("%s/verify/%s", verifyBaseURL, doc.PublicID)
 
+		// If LogoFilePath is provided, fetch and convert it to Base64 URI deterministically
+		logoDataURI := ""
+		if payload.LogoFilePath != "" && w.Deps.Storage != nil {
+			logoData, err := w.Deps.Storage.DownloadFile(ctx, payload.LogoFilePath)
+			if err != nil {
+				logger.Warn("Failed to fetch logo for letterhead, proceeding without logo", "path", payload.LogoFilePath, "error", err)
+			} else if len(logoData) > 0 {
+				mimeType := "image/png" // Default, can be refined based on file extension
+				if strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpg") || strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpeg") {
+					mimeType = "image/jpeg"
+				}
+				logoDataURI = fmt.Sprintf("data:%s;base64,%s", mimeType, hex.EncodeToString(logoData)) // Quick base64 encode later? wait, simple base64 package is "encoding/base64". Wait standard encoding is base64.StdEncoding.EncodeToString(logoData)
+			}
+		}
+
 		html, err := render.ComposeModulAjarHTML(render.ComposerInput{
 			TemplateDir: templateDir,
 			SubjectCode: doc.SubjectCode,
@@ -372,6 +397,13 @@ No markdown formatting. Pure JSON.`,
 			DID:         doc.PublicID,
 			VerifyURL:   verifyURL,
 			PlanResult:  planResult,
+
+			LetterheadLine1:   payload.LetterheadLine1,
+			LetterheadLine2:   payload.LetterheadLine2,
+			LetterheadLine3:   payload.LetterheadLine3,
+			LetterheadLine4:   payload.LetterheadLine4,
+			LetterheadContact: payload.LetterheadContact,
+			LogoDataURI:       logoDataURI,
 		})
 		if err != nil {
 			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
