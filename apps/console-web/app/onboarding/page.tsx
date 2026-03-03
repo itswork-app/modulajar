@@ -131,8 +131,8 @@ export default function OnboardingWizardPage() {
             // Clean draft
             localStorage.removeItem('onboarding_draft');
             router.push('/jobs');
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
             setIsSubmitting(false);
         }
     };
@@ -351,7 +351,7 @@ export default function OnboardingWizardPage() {
                                         <div className="text-sm space-y-1">
                                             {formData.tema && <div>• Tema: <span className="font-medium text-slate-700">{formData.tema}</span></div>}
                                             {formData.topik && <div>• Unit: <span className="font-medium text-slate-700">{formData.topik}</span></div>}
-                                            {formData.catatan && <div className="mt-2 p-3 bg-white border border-slate-100 rounded-lg text-slate-600 italic">"{formData.catatan}"</div>}
+                                            {formData.catatan && <div className="mt-2 p-3 bg-white border border-slate-100 rounded-lg text-slate-600 italic">&quot;{formData.catatan}&quot;</div>}
                                         </div>
                                     </div>
                                 )}

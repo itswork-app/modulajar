@@ -38,6 +38,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('redirects to /profile-setup if teacher profile is missing (404)', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) {
                 return Promise.resolve({
@@ -57,6 +58,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('redirects to /workspace/school-setup if school identity is missing (404)', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) {
                 return Promise.resolve({
@@ -82,6 +84,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('loads wizard successfully and locks Jenjang & Kelas structurally', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) {
                 return Promise.resolve({
