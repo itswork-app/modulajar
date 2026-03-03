@@ -359,7 +359,7 @@ export default function LetterheadSetupPage() {
                                     type="submit"
                                     disabled={isSubmitting}
                                     className={cn(
-                                        "flex-[2] inline-flex items-center justify-center px-6 py-4 rounded-xl text-white font-semibold transition-all duration-200 shadow-xl shadow-indigo-200/50",
+                                        "flex-2 inline-flex items-center justify-center px-6 py-4 rounded-xl text-white font-semibold transition-all duration-200 shadow-xl shadow-indigo-200/50",
                                         isSubmitting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-0.5"
                                     )}
                                 >
