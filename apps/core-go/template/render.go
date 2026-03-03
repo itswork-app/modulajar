@@ -32,6 +32,7 @@ var RequiredPlaceholders = []string{
 	"{{DID}}",
 	"{{VERIFY_URL}}",
 	"{{STYLES}}",
+	"{{KOP_SURAT}}",
 }
 
 // RenderSample reads the template and sample.json, replaces placeholders,
@@ -95,11 +96,59 @@ func Render(templateDir string, data map[string]string) (string, error) {
 	// Replace {{STYLES}} first
 	result := strings.Replace(string(html), "{{STYLES}}", string(css), 1)
 
-	// Replace all data placeholders
+	// Replace all data placeholders (excluding custom HTML blocks evaluated natively)
 	for key, value := range data {
+		if key == "KOP_SURAT" || strings.HasPrefix(key, "LETTERHEAD_") || strings.HasPrefix(key, "LOGO_") {
+			continue // handled separately below or ignored implicitly
+		}
 		placeholder := fmt.Sprintf("{{%s}}", key)
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
 
+	// Dynamic Kop Surat evaluation mapping
+	kopHtml := buildKopSuratHtml(data)
+	result = strings.ReplaceAll(result, "{{KOP_SURAT}}", kopHtml)
+
 	return result, nil
+}
+
+func buildKopSuratHtml(data map[string]string) string {
+	line1 := strings.TrimSpace(data["LETTERHEAD_LINE1"])
+	line2 := strings.TrimSpace(data["LETTERHEAD_LINE2"])
+	line3 := strings.TrimSpace(data["LETTERHEAD_LINE3"])
+	line4 := strings.TrimSpace(data["LETTERHEAD_LINE4"])
+	contact := strings.TrimSpace(data["LETTERHEAD_CONTACT"])
+	logoDataURI := strings.TrimSpace(data["LOGO_DATA_URI"])
+
+	if line1 == "" && line2 == "" && logoDataURI == "" {
+		return "" // no configuration provided
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<div class=\"kop-surat\">\n")
+
+	if logoDataURI != "" {
+		sb.WriteString(fmt.Sprintf("    <img class=\"kop-logo\" src=\"%s\" alt=\"Logo\" />\n", logoDataURI))
+	}
+
+	sb.WriteString("    <div class=\"kop-content\">\n")
+
+	if line1 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line1\">%s</div>\n", line1))
+	}
+	if line2 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line2\">%s</div>\n", line2))
+	}
+	if line3 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line3\">%s</div>\n", line3))
+	}
+	if line4 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line4\">%s</div>\n", line4))
+	}
+	if contact != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-contact\">%s</div>\n", contact))
+	}
+
+	sb.WriteString("    </div>\n</div>\n")
+	return sb.String()
 }

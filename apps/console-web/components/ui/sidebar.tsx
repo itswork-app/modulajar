@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Building, FileSignature } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserButton } from '@clerk/nextjs';
 
 const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Buat Baru', href: '/generate', icon: PlusCircle },
+    { name: 'Identitas Sekolah', href: '/workspace/school-setup', icon: Building },
+    { name: 'Kop Surat', href: '/workspace/letterhead', icon: FileSignature },
 ];
 
 export function Sidebar() {

@@ -16,7 +16,9 @@
 }
 
 /* ── Reset & Base ── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -34,11 +36,91 @@ body {
 }
 
 /* ── Typography ── */
-h1 { font-size: 22pt; font-weight: 700; color: #0d1b2a; }
-h2 { font-size: 15pt; font-weight: 700; color: #1b263b; }
-h3 { font-size: 13pt; font-weight: 600; color: #415a77; }
-h4 { font-size: 11pt; font-weight: 600; color: #415a77; }
-p  { margin-bottom: 0.6em; }
+h1 {
+    font-size: 22pt;
+    font-weight: 700;
+    color: #0d1b2a;
+}
+
+h2 {
+    font-size: 15pt;
+    font-weight: 700;
+    color: #1b263b;
+}
+
+h3 {
+    font-size: 13pt;
+    font-weight: 600;
+    color: #415a77;
+}
+
+h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #415a77;
+}
+
+p {
+    margin-bottom: 0.6em;
+}
+
+/* ── Kop Surat (Letterhead) ── */
+.kop-surat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 3px solid #0d1b2a;
+    padding-bottom: 12px;
+    margin-bottom: 25px;
+    position: relative;
+}
+
+.kop-logo {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: 80px;
+    max-height: 80px;
+}
+
+.kop-content {
+    text-align: center;
+    flex: 1;
+}
+
+.kop-line1 {
+    font-size: 14pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.kop-line2 {
+    font-size: 16pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.kop-line3 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.kop-line4 {
+    font-size: 11pt;
+    font-style: italic;
+}
+
+.kop-contact {
+    font-size: 9pt;
+    margin-top: 4px;
+    border-top: 1px solid #ddd;
+    padding-top: 4px;
+    display: inline-block;
+}
 
 /* ── Cover Page ── */
 .cover-page {

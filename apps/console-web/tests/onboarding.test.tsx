@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import OnboardingWizardPage from '../app/onboarding/page';
 
 // Mock Dependencies
@@ -110,5 +110,100 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
 
         // The API defaults form mock
         expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('progresses from CHOOSE_PATH to FORM, fills inputs, and proceeds to REVIEW', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: '' }) });
+            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
+        });
+
+        render(<OnboardingWizardPage />);
+        await waitFor(() => { expect(screen.getByText('Pilih Cara Mulai')).toBeDefined(); });
+
+        // Navigate to Form
+        fireEvent.click(screen.getByText('Generate dari Template'));
+
+        await waitFor(() => { expect(screen.getByText('Target Pengajaran')).toBeDefined(); });
+
+        // Fill form fields
+        const selectMapel = screen.getByRole('combobox');
+        fireEvent.change(selectMapel, { target: { value: 'Matematika' } });
+
+        const radioSemester2 = screen.getByLabelText('Genap (2)');
+        fireEvent.click(radioSemester2);
+
+        const inputTema = screen.getByPlaceholderText('Fokus Tema (misal: Pecahan)');
+        fireEvent.change(inputTema, { target: { value: 'Bilangan Prima' } });
+
+        const inputTopik = screen.getByPlaceholderText('Unit Khusus (misal: Unit 2)');
+        fireEvent.change(inputTopik, { target: { value: 'Unit 4' } });
+
+        const inputCatatan = screen.getByPlaceholderText(/Catatan tambahan/i);
+        fireEvent.change(inputCatatan, { target: { value: 'Tolong gunakan contoh sehari-hari' } });
+
+        // Proceed to Review
+        const reviewBtn = screen.getByText(/Review Data/i);
+        fireEvent.click(reviewBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Konfirmasi Generasi')).toBeDefined();
+            expect(screen.getByText('Matematika')).toBeDefined();
+            expect(screen.getByText('Bilangan Prima')).toBeDefined();
+            expect(screen.getByText('Unit 4')).toBeDefined();
+            expect(screen.getByText(/"Tolong gunakan contoh sehari-hari"/i)).toBeDefined();
+        });
+    });
+
+    it('submits the generation successfully and redirects to /jobs', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global.fetch as any).mockImplementation((url: string, opts: any) => {
+            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
+            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
+            if (url.includes('/generate-semester')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true }) });
+        });
+
+        render(<OnboardingWizardPage />);
+        await waitFor(() => { expect(screen.getByText('Pilih Cara Mulai')).toBeDefined(); });
+
+        // Step 1 to 2
+        fireEvent.click(screen.getByText('Generate dari Template'));
+        await waitFor(() => { expect(screen.getByText('Target Pengajaran')).toBeDefined(); });
+
+        // Step 2 to 3 (Mapel defaults to profile 'Matematika' here)
+        fireEvent.click(screen.getByText(/Review Data/i));
+        await waitFor(() => { expect(screen.getByText('Konfirmasi Generasi')).toBeDefined(); });
+
+        // Submit Step 3
+        fireEvent.click(screen.getByText(/Mulai Generate AI Sekarang/i));
+
+        await waitFor(() => {
+            expect(mockPush).toHaveBeenCalledWith('/jobs');
+        });
+    });
+
+    it('handles generate validation errors gracefully', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'IPAS' }) });
+            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
+            if (url.includes('/generate-semester')) return Promise.resolve({ status: 400, ok: false, json: () => Promise.resolve({ error: 'AI Error: Rate Limit' }) });
+        });
+
+        render(<OnboardingWizardPage />);
+        await waitFor(() => { expect(screen.getByText('Pilih Cara Mulai')).toBeDefined(); });
+
+        fireEvent.click(screen.getByText('Generate dari Template'));
+        await waitFor(() => { expect(screen.getByText('Target Pengajaran')).toBeDefined(); });
+
+        fireEvent.click(screen.getByText(/Review Data/i));
+        await waitFor(() => { expect(screen.getByText('Konfirmasi Generasi')).toBeDefined(); });
+
+        fireEvent.click(screen.getByText(/Mulai Generate AI Sekarang/i));
+
+        await waitFor(() => {
+            expect(screen.getByText('AI Error: Rate Limit')).toBeDefined();
+        });
     });
 });

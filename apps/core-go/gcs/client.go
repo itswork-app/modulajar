@@ -77,6 +77,27 @@ func (c *Client) UploadFile(ctx context.Context, objectPath string, filePath str
 	return c.Upload(ctx, objectPath, data, contentType)
 }
 
+// DownloadFile downloads a file from GCS into memory.
+func (c *Client) DownloadFile(ctx context.Context, objectPath string) ([]byte, error) {
+	if c == nil || c.gcsClient == nil {
+		return nil, fmt.Errorf("GCS client is nil (GCS_BUCKET not set?)")
+	}
+
+	obj := c.gcsClient.Bucket(c.bucketName).Object(objectPath)
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open GCS object: %w", err)
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GCS object: %w", err)
+	}
+
+	return data, nil
+}
+
 // Exists checks if an object exists in GCS.
 func (c *Client) Exists(ctx context.Context, objectPath string) (bool, error) {
 	if c == nil || c.gcsClient == nil {

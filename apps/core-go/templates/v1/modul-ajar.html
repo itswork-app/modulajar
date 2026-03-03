@@ -1,97 +1,144 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modul Ajar — {{SUBJECT_NAME}} | {{KELAS}} {{SEMESTER}} {{TAHUN_AJARAN}}</title>
     <style>
-        {{STYLES}}
+        {
+                {
+                STYLES
+            }
+        }
     </style>
 </head>
+
 <body>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- COVER PAGE                                 -->
-<!-- ═══════════════════════════════════════════ -->
-<section class="cover-page">
-    <div class="cover-logo">
-        <div class="cover-logo-icon">📘</div>
-    </div>
-    <h1 class="cover-title">{{TITLE}}</h1>
-    <div class="cover-subtitle">Modul Ajar — Kurikulum Merdeka</div>
-    <table class="cover-info">
-        <tr><td class="cover-label">Mata Pelajaran</td><td class="cover-value">{{SUBJECT_NAME}}</td></tr>
-        <tr><td class="cover-label">Kelas</td><td class="cover-value">{{KELAS}}</td></tr>
-        <tr><td class="cover-label">Semester</td><td class="cover-value">{{SEMESTER}}</td></tr>
-        <tr><td class="cover-label">Tahun Ajaran</td><td class="cover-value">{{TAHUN_AJARAN}}</td></tr>
-        <tr><td class="cover-label">Guru Pengajar</td><td class="cover-value">{{TEACHER_NAME}}</td></tr>
-        <tr><td class="cover-label">Sekolah</td><td class="cover-value">{{SCHOOL_NAME}}</td></tr>
-    </table>
-</section>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- COVER PAGE                                 -->
+    <!-- ═══════════════════════════════════════════ -->
+    <section class="cover-page">
+        {{KOP_SURAT}}
+        <div class="cover-logo">
+            <div class="cover-logo-icon">📘</div>
+        </div>
+        <h1 class="cover-title">{{TITLE}}</h1>
+        <div class="cover-subtitle">Modul Ajar — Kurikulum Merdeka</div>
+        <table class="cover-info">
+            <tr>
+                <td class="cover-label">Mata Pelajaran</td>
+                <td class="cover-value">{{SUBJECT_NAME}}</td>
+            </tr>
+            <tr>
+                <td class="cover-label">Kelas</td>
+                <td class="cover-value">{{KELAS}}</td>
+            </tr>
+            <tr>
+                <td class="cover-label">Semester</td>
+                <td class="cover-value">{{SEMESTER}}</td>
+            </tr>
+            <tr>
+                <td class="cover-label">Tahun Ajaran</td>
+                <td class="cover-value">{{TAHUN_AJARAN}}</td>
+            </tr>
+            <tr>
+                <td class="cover-label">Guru Pengajar</td>
+                <td class="cover-value">{{TEACHER_NAME}}</td>
+            </tr>
+            <tr>
+                <td class="cover-label">Sekolah</td>
+                <td class="cover-value">{{SCHOOL_NAME}}</td>
+            </tr>
+        </table>
+    </section>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- IDENTITAS MODUL                            -->
-<!-- ═══════════════════════════════════════════ -->
-<section class="section page-break-before">
-    <h2 class="section-title">Identitas Modul</h2>
-    <table class="info-table">
-        <tr><td class="info-label">Nama Modul</td><td>{{TITLE}}</td></tr>
-        <tr><td class="info-label">Mata Pelajaran</td><td>{{SUBJECT_NAME}}</td></tr>
-        <tr><td class="info-label">Kelas / Fase</td><td>{{KELAS}} / Fase B</td></tr>
-        <tr><td class="info-label">Semester</td><td>{{SEMESTER}}</td></tr>
-        <tr><td class="info-label">Tahun Ajaran</td><td>{{TAHUN_AJARAN}}</td></tr>
-        <tr><td class="info-label">Penyusun</td><td>{{TEACHER_NAME}}</td></tr>
-        <tr><td class="info-label">Satuan Pendidikan</td><td>{{SCHOOL_NAME}}</td></tr>
-    </table>
-</section>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- IDENTITAS MODUL                            -->
+    <!-- ═══════════════════════════════════════════ -->
+    <section class="section page-break-before">
+        <h2 class="section-title">Identitas Modul</h2>
+        <table class="info-table">
+            <tr>
+                <td class="info-label">Nama Modul</td>
+                <td>{{TITLE}}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Mata Pelajaran</td>
+                <td>{{SUBJECT_NAME}}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Kelas / Fase</td>
+                <td>{{KELAS}} / Fase B</td>
+            </tr>
+            <tr>
+                <td class="info-label">Semester</td>
+                <td>{{SEMESTER}}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Tahun Ajaran</td>
+                <td>{{TAHUN_AJARAN}}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Penyusun</td>
+                <td>{{TEACHER_NAME}}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Satuan Pendidikan</td>
+                <td>{{SCHOOL_NAME}}</td>
+            </tr>
+        </table>
+    </section>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- ALUR TUJUAN PEMBELAJARAN (ATP)             -->
-<!-- ═══════════════════════════════════════════ -->
-<section class="section page-break-before">
-    <h2 class="section-title">Alur Tujuan Pembelajaran (ATP)</h2>
-    <p class="section-desc">
-        Tabel berikut menunjukkan distribusi Capaian Pembelajaran (CP) ke dalam
-        unit-unit pembelajaran sepanjang semester.
-    </p>
-    {{ATP_TABLE}}
-</section>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ALUR TUJUAN PEMBELAJARAN (ATP)             -->
+    <!-- ═══════════════════════════════════════════ -->
+    <section class="section page-break-before">
+        <h2 class="section-title">Alur Tujuan Pembelajaran (ATP)</h2>
+        <p class="section-desc">
+            Tabel berikut menunjukkan distribusi Capaian Pembelajaran (CP) ke dalam
+            unit-unit pembelajaran sepanjang semester.
+        </p>
+        {{ATP_TABLE}}
+    </section>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- KEGIATAN PEMBELAJARAN                      -->
-<!-- ═══════════════════════════════════════════ -->
-<section class="section page-break-before">
-    <h2 class="section-title">Kegiatan Pembelajaran</h2>
-    {{ACTIVITY_SECTIONS}}
-</section>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- KEGIATAN PEMBELAJARAN                      -->
+    <!-- ═══════════════════════════════════════════ -->
+    <section class="section page-break-before">
+        <h2 class="section-title">Kegiatan Pembelajaran</h2>
+        {{ACTIVITY_SECTIONS}}
+    </section>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- ASESMEN                                    -->
-<!-- ═══════════════════════════════════════════ -->
-<section class="section page-break-before">
-    <h2 class="section-title">Asesmen</h2>
-    {{ASSESSMENT_SECTION}}
-</section>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ASESMEN                                    -->
+    <!-- ═══════════════════════════════════════════ -->
+    <section class="section page-break-before">
+        <h2 class="section-title">Asesmen</h2>
+        {{ASSESSMENT_SECTION}}
+    </section>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- FOOTER WATERMARK                           -->
-<!-- ═══════════════════════════════════════════ -->
-<footer class="watermark-footer">
-    <div class="watermark-line">
-        <span class="watermark-label">PID:</span>
-        <span class="watermark-value">{{PID}}</span>
-        <span class="watermark-sep">|</span>
-        <span class="watermark-label">DID:</span>
-        <span class="watermark-value">{{DID}}</span>
-    </div>
-    <div class="watermark-line">
-        <span class="watermark-label">Verify:</span>
-        <a href="{{VERIFY_URL}}" class="watermark-link">{{VERIFY_URL}}</a>
-    </div>
-    <div class="watermark-line watermark-powered">
-        Digenerate oleh Modulajar — modulajar.com
-    </div>
-</footer>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- FOOTER WATERMARK                           -->
+    <!-- ═══════════════════════════════════════════ -->
+    <footer class="watermark-footer">
+        <div class="watermark-line">
+            <span class="watermark-label">PID:</span>
+            <span class="watermark-value">{{PID}}</span>
+            <span class="watermark-sep">|</span>
+            <span class="watermark-label">DID:</span>
+            <span class="watermark-value">{{DID}}</span>
+        </div>
+        <div class="watermark-line">
+            <span class="watermark-label">Verify:</span>
+            <a href="{{VERIFY_URL}}" class="watermark-link">{{VERIFY_URL}}</a>
+        </div>
+        <div class="watermark-line watermark-powered">
+            Digenerate oleh Modulajar — modulajar.com
+        </div>
+    </footer>
 
 </body>
+
 </html>

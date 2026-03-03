@@ -37,10 +37,13 @@ export default function OnboardingWizardPage() {
 
     // 1. Guard & Prerequisites Load
     useEffect(() => {
+        let isMounted = true;
+        const abortController = new AbortController();
+
         async function checkPrerequisites() {
             if (!isAuthLoaded || isLoadingWorkspace) return;
             if (!workspace) {
-                setIsCheckingPrerequisites(false);
+                if (isMounted) setIsCheckingPrerequisites(false);
                 return;
             }
 
@@ -49,26 +52,30 @@ export default function OnboardingWizardPage() {
 
                 // A) Teacher Profile
                 const profileRes = await fetch(`${API_BASE}/w/${workspace.id}/profile`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal
                 });
 
                 if (profileRes.status === 404) {
-                    router.replace('/profile-setup');
+                    if (isMounted) router.replace('/profile-setup');
                     return;
                 }
                 const pData = await profileRes.json();
+                if (!isMounted) return;
                 setTeacherProfile(pData);
 
                 // B) School Identity
                 const schoolRes = await fetch(`${API_BASE}/w/${workspace.id}/school`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal
                 });
 
                 if (schoolRes.status === 404) {
-                    router.replace('/workspace/school-setup');
+                    if (isMounted) router.replace('/workspace/school-setup');
                     return;
                 }
                 const sData = await schoolRes.json();
+                if (!isMounted) return;
                 setSchoolIdentity(sData);
 
                 // C) Pre-fill defaults or drafts
@@ -80,14 +87,22 @@ export default function OnboardingWizardPage() {
                 }
 
                 setIsCheckingPrerequisites(false);
-            } catch (err) {
-                console.error('Prereq check failed:', err);
-                setIsCheckingPrerequisites(false);
-                setError('Gagal memuat profil. Silakan muat ulang.');
+            } catch (err: unknown) {
+                if (!isMounted) return;
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('Prereq check failed:', err);
+                    setIsCheckingPrerequisites(false);
+                    setError('Gagal memuat profil. Silakan muat ulang.');
+                }
             }
         }
 
         checkPrerequisites();
+
+        return () => {
+            isMounted = false;
+            abortController.abort();
+        };
     }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
     // Update draft on change

@@ -24,6 +24,14 @@ type ComposerInput struct {
 	DID         string
 	VerifyURL   string
 	PlanResult  *planner.PlannerResult
+
+	// Letterhead Config (Optional)
+	LetterheadLine1   string
+	LetterheadLine2   string
+	LetterheadLine3   string
+	LetterheadLine4   string
+	LetterheadContact string
+	LogoDataURI       string
 }
 
 // ComposeModulAjarHTML loads the template, builds fragments, replaces all placeholders,
@@ -73,6 +81,7 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 		"{{PID}}":                input.PID,
 		"{{DID}}":                input.DID,
 		"{{VERIFY_URL}}":         input.VerifyURL,
+		"{{KOP_SURAT}}":          buildKopSuratHtml(input),
 	}
 
 	for placeholder, value := range replacements {
@@ -80,6 +89,47 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 	}
 
 	return html, nil
+}
+
+func buildKopSuratHtml(input ComposerInput) string {
+	line1 := strings.TrimSpace(input.LetterheadLine1)
+	line2 := strings.TrimSpace(input.LetterheadLine2)
+	line3 := strings.TrimSpace(input.LetterheadLine3)
+	line4 := strings.TrimSpace(input.LetterheadLine4)
+	contact := strings.TrimSpace(input.LetterheadContact)
+	logoDataURI := strings.TrimSpace(input.LogoDataURI)
+
+	if line1 == "" && line2 == "" && logoDataURI == "" {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<div class=\"kop-surat\">\n")
+
+	if logoDataURI != "" {
+		sb.WriteString(fmt.Sprintf("    <img class=\"kop-logo\" src=\"%s\" alt=\"Logo\" />\n", logoDataURI))
+	}
+
+	sb.WriteString("    <div class=\"kop-content\">\n")
+
+	if line1 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line1\">%s</div>\n", line1))
+	}
+	if line2 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line2\">%s</div>\n", line2))
+	}
+	if line3 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line3\">%s</div>\n", line3))
+	}
+	if line4 != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-line4\">%s</div>\n", line4))
+	}
+	if contact != "" {
+		sb.WriteString(fmt.Sprintf("        <div class=\"kop-contact\">%s</div>\n", contact))
+	}
+
+	sb.WriteString("    </div>\n</div>\n")
+	return sb.String()
 }
 
 // HasUnresolvedPlaceholders checks if any {{...}} placeholders remain in the HTML.

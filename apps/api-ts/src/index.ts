@@ -11,7 +11,9 @@ import generateRoutes from './routes/generate';
 import billingRoutes from './routes/billing';
 import documentsRoutes from './routes/documents';
 import verifyRoutes from './routes/verify';
+import letterheadRoutes from './routes/letterhead';
 import dotenv from 'dotenv';
+import multipart from '@fastify/multipart';
 
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './utils/logger';
@@ -112,6 +114,7 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(authPlugin);
     fastify.register(workspaceGuardPlugin);
     fastify.register(storagePlugin);
+    fastify.register(multipart, { limits: { fileSize: 512 * 1024 } });
 
     fastify.register(authRoutes);
     fastify.register(workspaceRoutes);
@@ -120,6 +123,7 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(generateRoutes);
     fastify.register(billingRoutes);
     fastify.register(documentsRoutes);
+    fastify.register(letterheadRoutes);
 }
 
 const start = async () => {
