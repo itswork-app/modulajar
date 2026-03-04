@@ -1,0 +1,29 @@
+{
+    "identitas": {
+        "sekolah": "",
+        "mata_pelajaran": "Matematika",
+        "kelas": 4,
+        "fase": "B",
+        "semester": "",
+        "topik": "",
+        "alokasi_waktu": ""
+    },
+    "kompetensi_awal": "",
+    "profil_pelajar_pancasila": [],
+    "sarana_prasarana": [],
+    "target_peserta_didik": "",
+    "model_pembelajaran": "",
+    "tujuan_pembelajaran": "",
+    "materi_pembelajaran": "",
+    "kegiatan_pembelajaran": {
+        "pendahuluan": "",
+        "inti": "",
+        "penutup": ""
+    },
+    "penilaian": {
+        "sikap": "",
+        "pengetahuan": "",
+        "keterampilan": ""
+    },
+    "refleksi_guru": ""
+}

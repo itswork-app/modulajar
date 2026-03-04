@@ -145,11 +145,11 @@ func defaultPlannerResult() *planner.PlannerResult {
 	return &planner.PlannerResult{
 		Semester: "S1",
 		Atps: []planner.Atp{
-			{SubjectCode: "MAT", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
+			{SubjectCode: "LEGACY", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
 		},
 		SemesterPlan: planner.SemesterPlan{
 			Semester:     "S1",
-			SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT", Units: []planner.Unit{{UnitNo: 1, OutcomeCodes: []string{"TP1"}}}}},
+			SubjectPlans: []planner.SubjectPlan{{SubjectCode: "LEGACY", Units: []planner.Unit{{UnitNo: 1, OutcomeCodes: []string{"TP1"}}}}},
 		},
 	}
 }
@@ -172,14 +172,69 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 		ExpectError   string
 	}{
 		{
-			Name: "Success Path",
+			Name: "Success Path (SD4 Template)",
+			MockAI: &MockAIEngine{
+				GenerateResponse: &ai.GenerateResponse{Content: `
+				{
+					"identitas": {
+						"sekolah": "SDN Test",
+						"mata_pelajaran": "Matematika",
+						"kelas": 4,
+						"fase": "B",
+						"semester": "1",
+						"topik": "Penjumlahan",
+						"alokasi_waktu": "2x35 menit"
+					},
+					"kompetensi_awal": "Siswa mengenal angka 1-100",
+					"profil_pelajar_pancasila": ["Bernalar Kritis"],
+					"sarana_prasarana": ["Buku Paket"],
+					"target_peserta_didik": "Siswa Reguler",
+					"model_pembelajaran": "Tatap Muka",
+					"tujuan_pembelajaran": "Siswa dapat melakukan penjumlahan dua digit",
+					"materi_pembelajaran": "Penjumlahan Bersusun",
+					"kegiatan_pembelajaran": {
+						"pendahuluan": "Berdoa dan apersepsi",
+						"inti": "Penjelasan guru dan latihan soal",
+						"penutup": "Kesimpulan dan doa"
+					},
+					"penilaian": {
+						"sikap": "Observasi",
+						"pengetahuan": "Tes Tertulis",
+						"keterampilan": "Unjuk Kerja"
+					},
+					"refleksi_guru": "Apakah siswa senang?"
+				}`},
+			},
+			MockPDF: &MockPDFEngine{
+				GenerateBytes: []byte("%PDF-1.4..."),
+			},
+			MockStorage:  &MockStorage{},
+			MockJobStore: &MockJobStore{},
+			MockPlanner: &MockPlanner{
+				PlanResult: &planner.PlannerResult{
+					Semester: "S1",
+					Atps: []planner.Atp{
+						{SubjectCode: "MAT", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
+					},
+					SemesterPlan: planner.SemesterPlan{
+						SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}},
+					},
+				},
+			},
+			MockValidator: &MockValidator{
+				Report: &validator.ValidationReport{OK: true},
+			},
+			ExpectSuccess: true,
+		},
+		{
+			Name: "Success Path (Legacy Flow)",
 			MockAI: &MockAIEngine{
 				GenerateResponse: &ai.GenerateResponse{Content: `
 				{
 					"meta": {
 						"jenjang": "SD",
 						"kelas": "4",
-						"mapel": "Matematika",
+						"mapel": "Seni",
 						"semester": "1",
 						"tahun_ajaran": "2025/2026"
 					},
@@ -189,7 +244,7 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 						"alokasi_waktu": "2x35 menit"
 					},
 					"tujuan_pembelajaran": ["TP1"],
-					"materi_inti": ["Bilangan"],
+					"materi_inti": ["Gambar"],
 					"langkah_pembelajaran": {
 						"pendahuluan": ["Opener"],
 						"inti": ["Core"],
@@ -218,7 +273,15 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 			MockStorage:  &MockStorage{},
 			MockJobStore: &MockJobStore{},
 			MockPlanner: &MockPlanner{
-				PlanResult: defaultPlannerResult(),
+				PlanResult: &planner.PlannerResult{
+					Semester: "S1",
+					Atps: []planner.Atp{
+						{SubjectCode: "SENI", SubjectName: "Seni", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
+					},
+					SemesterPlan: planner.SemesterPlan{
+						SubjectPlans: []planner.SubjectPlan{{SubjectCode: "SENI"}},
+					},
+				},
 			},
 			MockValidator: &MockValidator{
 				Report: &validator.ValidationReport{OK: true},

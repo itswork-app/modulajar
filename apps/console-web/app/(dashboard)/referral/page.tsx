@@ -95,7 +95,7 @@ export default function ReferralPage() {
             </div>
 
             {/* Referral Link Card */}
-            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-6 space-y-4">
+            <div className="bg-linear-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-6 space-y-4">
                 <div className="flex items-center gap-2 text-indigo-700 font-semibold">
                     <LinkIcon className="h-5 w-5" />
                     Link Referral Anda
