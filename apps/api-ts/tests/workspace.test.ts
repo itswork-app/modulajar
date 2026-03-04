@@ -9,7 +9,7 @@ const test = tap.test;
 const WORKSPACE_ID = 'ws-test-001';
 const USER_ID = 'user_1';
 
-function buildApp(documents: any[] = [], workspaceData: any = null) {
+function buildApp(documents: any[] = [], workspaceData: any = null, notFound: boolean = false) {
     const fastify = Fastify();
 
     fastify.decorate('db', {
@@ -25,6 +25,7 @@ function buildApp(documents: any[] = [], workspaceData: any = null) {
 
             // Get Workspace Identity
             if (sql.includes('FROM workspaces') && sql.includes('SELECT') && !sql.includes('npsn = $1')) {
+                if (notFound) return { rowCount: 0, rows: [] };
                 return {
                     rowCount: 1,
                     rows: [workspaceData || {
@@ -250,6 +251,39 @@ test('Workspace Identity (PR-033)', async (t) => {
         t.equal(body.workspace_type, 'personal');
         t.equal(body.is_verified, false);
         t.equal(body.npsn, null);
+
+        await fastify.close();
+    });
+
+    await t.test('GET /w/:wid/workspace returns 404 if not found', async (t) => {
+        const fastify = buildApp([], null, true);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 404);
+        t.equal(res.json().error, 'Workspace not found');
+
+        await fastify.close();
+    });
+
+    await t.test('PATCH /w/:wid/workspace returns 400 with no fields', async (t) => {
+        const fastify = buildApp();
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PATCH',
+            url: `/w/${WORKSPACE_ID}/workspace`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: {}
+        });
+
+        t.equal(res.statusCode, 400);
+        t.equal(res.json().error, 'No fields to update');
 
         await fastify.close();
     });
