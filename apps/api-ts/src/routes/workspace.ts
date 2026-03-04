@@ -202,5 +202,71 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
             };
         });
 
+        // PR-057: Usage Summary Dashboard
+        childServer.get('/:workspaceId/usage-summary', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+
+            // 1. Compute credits_remaining
+            const creditsResult = await fastify.db.query(
+                `SELECT 
+                    COALESCE(SUM(CASE WHEN type='credit' THEN amount END), 0) - 
+                    COALESCE(SUM(CASE WHEN type='debit' THEN amount END), 0) AS balance
+                 FROM wallet_ledger 
+                 WHERE workspace_id = $1`,
+                [workspaceId]
+            );
+            const creditsRemaining = parseInt(creditsResult.rows[0]?.balance || '0', 10);
+
+            // 2. documents_generated (Using generation_jobs status = 'done')
+            const generatedResult = await fastify.db.query(
+                `SELECT COUNT(*) AS count 
+                 FROM generation_jobs 
+                 WHERE workspace_id = $1 AND status = 'done'`,
+                [workspaceId]
+            );
+            const documentsGenerated = parseInt(generatedResult.rows[0]?.count || '0', 10);
+
+            // 3. jobs_failed
+            const failedResult = await fastify.db.query(
+                `SELECT COUNT(*) AS count 
+                 FROM generation_jobs 
+                 WHERE workspace_id = $1 AND status = 'failed'`,
+                [workspaceId]
+            );
+            const jobsFailed = parseInt(failedResult.rows[0]?.count || '0', 10);
+
+            // 4. recent_jobs
+            const recentJobsResult = await fastify.db.query(
+                `SELECT 
+                    generation_id, 
+                    metadata->>'subject' AS subject,
+                    metadata->>'semester' AS semester,
+                    status, 
+                    created_at 
+                 FROM generation_jobs 
+                 WHERE workspace_id = $1 
+                 ORDER BY created_at DESC 
+                 LIMIT 10`,
+                [workspaceId]
+            );
+
+            const recentJobs = recentJobsResult.rows.map(row => ({
+                generation_id: row.generation_id,
+                subject: row.subject || 'Modul Ajar', // Fallback if missing
+                semester: row.semester ? parseInt(row.semester, 10) : 1,
+                status: row.status,
+                created_at: row.created_at
+            }));
+
+            return {
+                credits_remaining: creditsRemaining,
+                documents_generated: documentsGenerated,
+                jobs_failed: jobsFailed,
+                recent_jobs: recentJobs
+            };
+        });
+
     }, { prefix: '/w' });
 }
