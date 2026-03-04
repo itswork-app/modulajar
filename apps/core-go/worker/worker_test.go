@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/oklog/ulid/v2"
+
 	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/packloader"
@@ -22,9 +24,18 @@ import (
 type MockAIEngine struct {
 	GenerateResponse *ai.GenerateResponse
 	GenerateError    error
+	Responses        []*ai.GenerateResponse
+	Errors           []error
+	CallCount        int
 }
 
 func (m *MockAIEngine) Generate(ctx context.Context, req ai.GenerateRequest) (*ai.GenerateResponse, error) {
+	defer func() { m.CallCount++ }()
+
+	if len(m.Responses) > m.CallCount {
+		return m.Responses[m.CallCount], m.Errors[m.CallCount]
+	}
+
 	return m.GenerateResponse, m.GenerateError
 }
 
@@ -299,6 +310,66 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 			ExpectError:   "AI generation failed",
 		},
 		{
+			Name: "Quality Retry Success",
+			MockAI: &MockAIEngine{
+				// Attempt 1: Score 0 (Missing TP) -> Retry
+				// Attempt 2: Score 100 -> Pass
+				Responses: []*ai.GenerateResponse{
+					{Content: `{"identitas":{"sekolah":"X","mata_pelajaran":"Matematika","kelas":4,"fase":"B","semester":"1","topik":"X"}, "tujuan_pembelajaran":""}`},
+					{Content: `
+					{
+						"identitas": {
+							"sekolah": "SDN Test",
+							"mata_pelajaran": "Matematika",
+							"kelas": 4,
+							"fase": "B",
+							"semester": "1",
+							"topik": "Penjumlahan",
+							"alokasi_waktu": "2x35 menit"
+						},
+						"kompetensi_awal": "Siswa mengenal angka 1-100",
+						"profil_pelajar_pancasila": ["Bernalar Kritis"],
+						"sarana_prasarana": ["Buku Paket"],
+						"target_peserta_didik": "Siswa Reguler",
+						"model_pembelajaran": "Tatap Muka",
+						"tujuan_pembelajaran": "Siswa dapat melakukan penjumlahan dua digit yang sah dan benar sesuai kurikulum",
+						"materi_pembelajaran": "Penjumlahan Bersusun yang sangat detail materi intinya",
+						"kegiatan_pembelajaran": {
+							"pendahuluan": "Berdoa dan apersepsi pembukaan pelajaran hari ini",
+							"inti": "Penjelasan guru dan latihan soal secara mendalam dan terstruktur rapih sekali",
+							"penutup": "Kesimpulan dan doa bersama seluruh siswa di kelas"
+						},
+						"penilaian": {
+							"sikap": "Observasi sikap siswa",
+							"pengetahuan": "Tes Tertulis pilihan ganda",
+							"keterampilan": "Unjuk Kerja mandiri"
+						},
+						"refleksi_guru": "Apakah siswa senang dengan metode ini?"
+					}`},
+				},
+				Errors: []error{nil, nil},
+			},
+			MockPDF:       &MockPDFEngine{GenerateBytes: []byte("pdf")},
+			MockStorage:   &MockStorage{},
+			MockJobStore:  &MockJobStore{},
+			MockPlanner:   &MockPlanner{PlanResult: &planner.PlannerResult{SemesterPlan: planner.SemesterPlan{SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}}}}},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: true,
+		},
+		{
+			Name: "Quality Fail (Low Score)",
+			MockAI: &MockAIEngine{
+				// Constant low score: Missing TP, Missing Materi, Short Content, no Pancasila
+				GenerateResponse: &ai.GenerateResponse{Content: `{"identitas":{"sekolah":"X","mata_pelajaran":"Matematika","kelas":4,"fase":"B","semester":"1","topik":"X"}, "tujuan_pembelajaran":"","materi_pembelajaran":"","kegiatan_pembelajaran":{"pendahuluan":"","inti":"short","penutup":""}, "profil_pelajar_pancasila":[]}`},
+			},
+			MockStorage:   &MockStorage{},
+			MockJobStore:  &MockJobStore{},
+			MockPlanner:   &MockPlanner{PlanResult: &planner.PlannerResult{SemesterPlan: planner.SemesterPlan{SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}}}}},
+			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
+			ExpectSuccess: false,
+			ExpectError:   "quality_evaluation_failed",
+		},
+		{
 			Name: "AI Invalid JSON",
 			MockAI: &MockAIEngine{
 				GenerateResponse: &ai.GenerateResponse{Content: `INVALID JSON`},
@@ -412,6 +483,15 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			// Disable idempotency check for most tests, except the one designed to test it
+			if !strings.Contains(tt.Name, "Idempotency") {
+				os.Setenv("SKIP_IDEMPOTENCY", "true")
+				defer os.Setenv("SKIP_IDEMPOTENCY", "")
+			} else {
+				os.Setenv("SKIP_IDEMPOTENCY", "false")
+				defer os.Setenv("SKIP_IDEMPOTENCY", "")
+			}
+
 			deps := WorkerDeps{}
 			if tt.MockAI != nil {
 				deps.AI = tt.MockAI
@@ -456,9 +536,21 @@ func TestExecuteJob_TableDriven(t *testing.T) {
 			// `basePayload().PackPath` is `../packs/...` which means `apps/core-go/packs/...`.
 			// `apps/core-go` is parent.
 			// The actual repo structure: `apps/core-go/packs`.
-			// So `../packs` works if we are in `worker` dir.
+			// Random job ID, PID, and DID per test case to avoid idempotency skips
+			payload := basePayload()
+			payload.JobID = ulid.Make().String()
+			payload.PID = ulid.Make().String()
+			// DID is inside graphResult... wait, ExecuteJob creates docgraph results.
+			// Actually, docgraph.GenerateDocGraph generates public IDs.
+			// But the basePayload has PackPath which leads to a specific pack.
+			// Idempotency check in worker.go:
+			// checkArtifactsExist(ctx, pack, doc, payload)
+			// It checks for /{workspace_id}/{pid}/{did}/v1/modul-ajar.html
 
-			result, err := worker.ExecuteJob(context.Background(), basePayload(), logger)
+			// To truly bypass, we need unique PID or WorkspaceID.
+			payload.WorkspaceID = ulid.Make().String()
+
+			result, err := worker.ExecuteJob(context.Background(), payload, logger)
 
 			if tt.ExpectSuccess {
 				if err != nil {

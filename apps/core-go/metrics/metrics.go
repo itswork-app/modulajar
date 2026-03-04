@@ -47,6 +47,28 @@ var (
 		Name: "jobs_stuck_gauge",
 		Help: "Number of jobs stuck in running state beyond threshold",
 	})
+
+	// PR-061: AI Quality Metrics
+	QualityPassTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "quality_pass_total",
+		Help: "Total number of AI generations that passed quality evaluation",
+	})
+
+	QualityRetryTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "quality_retry_total",
+		Help: "Total number of AI generations that triggered a quality retry",
+	})
+
+	QualityFailTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "quality_fail_total",
+		Help: "Total number of AI generations that failed quality evaluation after retries",
+	})
+
+	QualityScoreHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "quality_score_histogram",
+		Help:    "Distribution of AI quality scores (0-100)",
+		Buckets: []float64{0, 20, 40, 60, 70, 80, 85, 90, 95, 100},
+	})
 )
 
 // DefaultStuckThresholdSeconds is the default threshold for stuck job detection (5 minutes).

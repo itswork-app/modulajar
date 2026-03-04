@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"modulajar/apps/core-go/curriculum"
 	"modulajar/apps/core-go/packloader"
 	"modulajar/apps/core-go/planner"
 )
@@ -218,6 +219,98 @@ func TestComposeAllSubjects(t *testing.T) {
 		t.Logf("subject %s: %d bytes ✓", s.code, len(html))
 	}
 }
+
+func TestComposeWithAIContent(t *testing.T) {
+	result := buildTestPlanResult()
+	html, err := ComposeModulAjarHTML(ComposerInput{
+		TemplateDir: templateDir(),
+		SubjectCode: "MAT",
+		SubjectName: "Matematika",
+		PlanResult:  result,
+		ModulAjarSD4: &curriculum.ModulAjarSD4{
+			Identitas: curriculum.IdentitasSD4{
+				MataPelajaran: "Matematika SD",
+				Kelas:         4,
+				Semester:      "1",
+			},
+			TujuanPembelajaran: "Siswa dapat berhitung",
+			MateriPembelajaran: "Penjumlahan",
+			KegiatanPembelajaran: curriculum.KegiatanPembelajaranSD4{
+				Pendahuluan: "Apersepsi",
+				Inti:        "Belajar",
+				Penutup:     "Doa",
+			},
+			Penilaian: curriculum.PenilaianSD4{
+				Sikap:        "Baik",
+				Pengetahuan:  "Tes",
+				Keterampilan: "Kinerja",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to compose with AI: %v", err)
+	}
+	if !strings.Contains(html, "Matematika SD") {
+		t.Error("Missing AI subject name")
+	}
+	if !strings.Contains(html, "Siswa dapat berhitung") {
+		t.Error("Missing AI TP")
+	}
+}
+
+func TestComposeWithKopSurat(t *testing.T) {
+	result := buildTestPlanResult()
+	// Test full kop
+	html, err := ComposeModulAjarHTML(ComposerInput{
+		TemplateDir:       templateDir(),
+		PlanResult:        result,
+		LetterheadLine1:   "PEMERINTAH KOTA JAKARTA",
+		LetterheadLine2:   "DINAS PENDIDIKAN",
+		LetterheadLine3:   "SD NEGERI 01",
+		LetterheadContact: "Telp: 021-123456",
+		LogoDataURI:       "data:image/png;base64,xxx",
+	})
+	if err != nil {
+		t.Fatalf("Failed to compose with Kop: %v", err)
+	}
+	if !strings.Contains(html, "PEMERINTAH KOTA JAKARTA") {
+		t.Error("Missing kop line 1")
+	}
+	if !strings.Contains(html, "kop-logo") {
+		t.Error("Missing kop logo")
+	}
+
+	// Test empty kop
+	html2, _ := ComposeModulAjarHTML(ComposerInput{
+		TemplateDir: templateDir(),
+		PlanResult:  result,
+	})
+	if strings.Contains(html2, "<div class=\"kop-surat\">") {
+		t.Error("Kop surat HTML should not be present when no lines provided")
+	}
+}
+
+func TestComposeWithLegacyContent(t *testing.T) {
+	result := buildTestPlanResult()
+	html, err := ComposeModulAjarHTML(ComposerInput{
+		TemplateDir: templateDir(),
+		PlanResult:  result,
+		LegacyCurriculum: &curriculum.Curriculum{
+			Meta: curriculum.Meta{
+				Mapel:    "Matematika",
+				Kelas:    "4",
+				Semester: "1",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to compose with Legacy: %v", err)
+	}
+	if !strings.Contains(html, "Matematika") {
+		t.Error("Missing legacy subject name")
+	}
+}
+
 func TestIsPDFRenderAvailable(t *testing.T) {
 	// Should at least run without crashing
 	_ = IsPDFRenderAvailable()

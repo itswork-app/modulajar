@@ -17,6 +17,7 @@ import (
 	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/adapters/ai/prompts"
 	"modulajar/apps/core-go/curriculum"
+	"modulajar/apps/core-go/curriculum/qeval"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
@@ -149,7 +150,8 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 
 	// 5. Check Idempotency (Skip if all artifacts exist)
 	gcsBucket := os.Getenv("GCS_BUCKET")
-	if w.Deps.Storage != nil && gcsBucket != "" {
+	skipIdempotency := os.Getenv("SKIP_IDEMPOTENCY") == "true"
+	if w.Deps.Storage != nil && gcsBucket != "" && !skipIdempotency {
 		allExist := true
 		for _, doc := range graphResult.Documents {
 			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, doc.PublicID, 1)
@@ -217,68 +219,29 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 
 		var resp *ai.GenerateResponse
 		var aiErr error
+		var qualityResult qeval.QualityResult
 
-		if useSD4Template {
-			// PR-060: Schema-guided generation with retry
-			const maxRetries = 2
-			var lastErr error
+		// PR-061: Consolidated AI generation with quality gate and retry
+		const maxAttempts = 2
+		var lastErr error
 
-			for attempt := 0; attempt <= maxRetries; attempt++ {
-				if attempt > 0 {
-					logger.Warn("Retrying AI generation", "attempt", attempt+1, "last_error", lastErr)
-				}
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			if attempt > 0 && lastErr != nil {
+				logger.Warn("Retrying AI generation due to quality/parsing failure", "attempt", attempt, "last_error", lastErr)
+				metrics.QualityRetryTotal.Inc()
+			}
 
-				// Build structured prompt
-				schemaPrompt := prompts.BuildFullPrompt(
+			var schemaPrompt string
+			if useSD4Template {
+				schemaPrompt = prompts.BuildFullPrompt(
 					payload.SchoolName,
 					subjectForTemplate,
 					payload.Semester,
 					subjectForTemplate, // topic = subject for now
 					string(templateJSON),
 				)
-
-				req := ai.GenerateRequest{Prompt: schemaPrompt}
-				resp, aiErr = w.Deps.AI.Generate(ctx, req)
-				if aiErr != nil {
-					lastErr = fmt.Errorf("AI call failed: %v", aiErr)
-					continue
-				}
-
-				// Parse JSON into ModulAjarSD4
-				var modulAjar curriculum.ModulAjarSD4
-				if err := json.Unmarshal([]byte(resp.Content), &modulAjar); err != nil {
-					lastErr = fmt.Errorf("invalid JSON: %v", err)
-					continue
-				}
-
-				// Validate required fields
-				if err := curriculum.ValidateModulAjar(&modulAjar); err != nil {
-					lastErr = fmt.Errorf("validation failed: %v", err)
-					continue
-				}
-
-				// Evaluate quality
-				if err := curriculum.EvaluateModulAjar(&modulAjar); err != nil {
-					lastErr = fmt.Errorf("evaluation failed: %v", err)
-					continue
-				}
-
-				// Sanitize
-				curriculum.SanitizeModulAjar(&modulAjar)
-				resultSD4 = &modulAjar
-
-				// Success — build receipt and break
-				lastErr = nil
-				logger.Info("AI generation success (SD4 template)", "model", resp.ModelName, "attempt", attempt+1)
-				break
-			}
-
-			if lastErr != nil {
-				return failResult(fmt.Sprintf("AI generation failed after %d attempts: %v", maxRetries+1, lastErr)), nil
-			}
-		} else {
-			// Legacy flow: inline schema prompt (backward compatibility)
-			schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
+			} else {
+				schemaPrompt = fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
 Subject: %s
 Class: %s
 Semester: %s
@@ -323,31 +286,84 @@ STRICT RULE: Output must be valid JSON matching this schema:
   }
 }
 No markdown formatting. Pure JSON.`,
-				subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
+					subjectForTemplate, payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
+			}
 
 			req := ai.GenerateRequest{Prompt: schemaPrompt}
 			resp, aiErr = w.Deps.AI.Generate(ctx, req)
 			if aiErr != nil {
-				logger.Warn("AI generation failed", "error", aiErr)
-				return failResult(fmt.Sprintf("AI generation failed: %v", aiErr)), nil
+				lastErr = fmt.Errorf("AI protocol error: %v", aiErr)
+				continue
 			}
 
-			logger.Info("AI generation success", "model", resp.ModelName)
+			// 2. Parse & Validate Schema
+			if useSD4Template {
+				var modulAjar curriculum.ModulAjarSD4
+				if err := json.Unmarshal([]byte(resp.Content), &modulAjar); err != nil {
+					lastErr = fmt.Errorf("invalid JSON (SD4): %v", err)
+					continue
+				}
+				if err := curriculum.ValidateModulAjar(&modulAjar); err != nil {
+					lastErr = fmt.Errorf("schema validation failed (SD4): %v", err)
+					continue
+				}
 
-			// 2. Parse & Validate
-			var c curriculum.Curriculum
-			if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
-				logger.Error("Failed to parse AI JSON", "error", err)
-				return failResult(fmt.Sprintf("AI generated invalid JSON: %v", err)), nil
+				// PR-061: Quality Evaluation
+				qualityResult, _ = qeval.Evaluate(&modulAjar)
+				metrics.QualityScoreHistogram.Observe(float64(qualityResult.Score))
+
+				if qualityResult.Verdict == qeval.VerdictRetry && attempt < maxAttempts {
+					lastErr = fmt.Errorf("quality verdict: retry (score %d)", qualityResult.Score)
+					continue
+				}
+				if qualityResult.Verdict == qeval.VerdictFail {
+					metrics.QualityFailTotal.Inc()
+					return failResult(fmt.Sprintf("quality_evaluation_failed: score %d, flags %v", qualityResult.Score, qualityResult.Flags)), nil
+				}
+
+				curriculum.SanitizeModulAjar(&modulAjar)
+				resultSD4 = &modulAjar
+			} else {
+				var c curriculum.Curriculum
+				if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
+					lastErr = fmt.Errorf("invalid JSON (legacy): %v", err)
+					continue
+				}
+				if err := c.Validate(); err != nil {
+					lastErr = fmt.Errorf("schema validation failed (legacy): %v", err)
+					continue
+				}
+
+				// PR-061: Quality Evaluation
+				qualityResult, _ = qeval.Evaluate(&c)
+				metrics.QualityScoreHistogram.Observe(float64(qualityResult.Score))
+
+				if qualityResult.Verdict == qeval.VerdictRetry && attempt < maxAttempts {
+					lastErr = fmt.Errorf("quality verdict: retry (score %d)", qualityResult.Score)
+					continue
+				}
+				if qualityResult.Verdict == qeval.VerdictFail {
+					metrics.QualityFailTotal.Inc()
+					return failResult(fmt.Sprintf("quality_evaluation_failed: score %d, flags %v", qualityResult.Score, qualityResult.Flags)), nil
+				}
+
+				c.Sanitize()
+				resultLegacy = &c
 			}
 
-			if err := c.Validate(); err != nil {
-				return failResult(fmt.Sprintf("AI validation failed: %v", err)), nil
-			}
+			// Success Path
+			lastErr = nil
+			metrics.QualityPassTotal.Inc()
+			logger.Info("AI generation success with quality gate",
+				"model", resp.ModelName,
+				"score", qualityResult.Score,
+				"verdict", qualityResult.Verdict,
+				"flags", qualityResult.Flags)
+			break
+		}
 
-			// 3. Sanitize
-			c.Sanitize()
-			resultLegacy = &c
+		if lastErr != nil {
+			return failResult(fmt.Sprintf("AI generation failed after %d attempts: %v", maxAttempts, lastErr)), nil
 		}
 
 		if resp != nil {
@@ -394,6 +410,12 @@ No markdown formatting. Pure JSON.`,
 				"duration_ms":   resp.DurationMs,
 				"generated_at":  time.Now().Format(time.RFC3339),
 				"template_mode": useSD4Template,
+				"quality": map[string]interface{}{
+					"score":          qualityResult.Score,
+					"verdict":        qualityResult.Verdict,
+					"flags":          qualityResult.Flags,
+					"rubric_version": qualityResult.RubricVersion,
+				},
 			}
 
 			aiReceipt = innerAIReceipt
