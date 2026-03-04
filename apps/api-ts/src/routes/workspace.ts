@@ -131,6 +131,76 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
             return { status: 'ok' };
         });
 
+        // PR-056: Verify School with NPSN
+        childServer.post('/:workspaceId/verify-school', {
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                body: {
+                    type: 'object',
+                    required: ['npsn'],
+                    properties: {
+                        npsn: { type: 'string', pattern: '^[0-9]{8}$' }
+                    }
+                }
+            }
+        }, async (request, reply) => {
+            const body = request.body as { npsn: string };
+            const npsn = body.npsn;
+
+            // 1. Lookup in reference database
+            const lookupResult = await fastify.db.query(
+                `SELECT nama_resmi, jenjang, alamat, kab_kota, provinsi 
+                 FROM schools_reference 
+                 WHERE npsn = $1`,
+                [npsn]
+            );
+
+            if (lookupResult.rowCount === 0) {
+                return reply.code(404).send({ error: 'NPSN not found in official reference.' });
+            }
+
+            const school = lookupResult.rows[0];
+
+            // 2. Update workspace settings
+            await fastify.db.query(
+                `INSERT INTO workspace_settings (workspace_id, school_display_name, kab_kota, provinsi, alamat, school_npsn, school_verified, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
+                 ON CONFLICT (workspace_id) DO UPDATE SET
+                    school_display_name = $2,
+                    kab_kota = $3,
+                    provinsi = $4,
+                    alamat = $5,
+                    school_npsn = $6,
+                    school_verified = true,
+                    updated_at = NOW()`,
+                [
+                    request.workspaceId,
+                    school.nama_resmi,
+                    school.kab_kota,
+                    school.provinsi,
+                    school.alamat,
+                    npsn
+                ]
+            );
+
+            // 3. Mark workspace identity as verified as well
+            await fastify.db.query(
+                `UPDATE workspaces 
+                 SET is_verified = true, 
+                     npsn = $2, 
+                     school_name = $3, 
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                [request.workspaceId, npsn, school.nama_resmi]
+            );
+
+            return {
+                verified: true,
+                school_display_name: school.nama_resmi,
+                kab_kota: school.kab_kota,
+                provinsi: school.provinsi
+            };
+        });
 
     }, { prefix: '/w' });
 }
