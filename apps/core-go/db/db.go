@@ -192,18 +192,41 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 	return &job, nil
 }
 
-// MarkJobDone updates the job status to 'done'.
+// MarkJobDone updates the job status to 'done', and atomically evaluates referral rewards.
 func MarkJobDone(ctx context.Context, jobID string) error {
 	if pool == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
+	// Atomically:
+	// 1. Update the generation_job to 'done'
+	// 2. Find the workspace_id that owns this job
+	// 3. Check if that workspace has an UNREWARDED referral
+	// 4. Update the referral to reward_granted = true
+	// 5. Insert +5 credits into the referrer's wallet
 	query := `
-		UPDATE generation_jobs
-		SET status = 'done', locked_at = NULL
-		WHERE id = $1
+		WITH updated_job AS (
+			UPDATE generation_jobs
+			SET status = 'done', locked_at = NULL
+			WHERE id = $1
+			RETURNING workspace_id
+		),
+		updated_referral AS (
+			UPDATE referrals r
+			SET reward_granted = true
+			FROM updated_job uj
+			WHERE r.referred_workspace = uj.workspace_id
+			  AND r.reward_granted = false
+			RETURNING r.referrer_workspace
+		)
+		INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference_id)
+		SELECT REPLACE(gen_random_uuid()::text, '-', '')::CHAR(26), referrer_workspace, 'credit', 5, 'referral_reward'
+		FROM updated_referral;
 	`
 	_, err := pool.Exec(ctx, query, jobID)
+
+	// If the CTE doesn't update a referral, no wallet_ledger entry is inserted.
+	// The job status is always updated to 'done'.
 	return err
 }
 
