@@ -570,3 +570,64 @@ func TestInit_Errors(t *testing.T) {
 		t.Error("expected Init to fail for unreachable DB")
 	}
 }
+
+func TestCountStuckJobs(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsID := "ws-stuck-test"
+	p.Exec(ctx, "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING", wsID, "clerk-stuck", "Stuck WS")
+	pkgID := "pkg-stuck-test"
+	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '1', '1', '2025', 'T', 'S', 'draft') ON CONFLICT (id) DO NOTHING", pkgID, wsID, "PKG-STUCK")
+
+	// Cleanup any previous test jobs
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id = $1", wsID)
+
+	// Insert a stuck job (locked_at 10 minutes ago)
+	stuckJobID := "job-stuck-old"
+	p.Exec(ctx, `INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata, locked_at)
+		VALUES ($1, 'gen-stuck-old', $2, $3, 'running', '{}', NOW() - interval '10 minutes')
+		ON CONFLICT (workspace_id, generation_id) DO UPDATE SET status='running', locked_at=NOW() - interval '10 minutes'`,
+		stuckJobID, wsID, pkgID)
+
+	// Insert a recently locked job (not stuck)
+	recentJobID := "job-stuck-recent"
+	p.Exec(ctx, `INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata, locked_at)
+		VALUES ($1, 'gen-stuck-recent', $2, $3, 'running', '{}', NOW())
+		ON CONFLICT (workspace_id, generation_id) DO UPDATE SET status='running', locked_at=NOW()`,
+		recentJobID, wsID, pkgID)
+
+	// Count stuck jobs with 5-minute threshold
+	count, err := CountStuckJobs(ctx, 300)
+	if err != nil {
+		t.Fatalf("CountStuckJobs failed: %v", err)
+	}
+	if count < 1 {
+		t.Errorf("Expected at least 1 stuck job, got %d", count)
+	}
+
+	// Count stuck jobs with 20-minute threshold (nothing should be stuck)
+	count2, err := CountStuckJobs(ctx, 1200)
+	if err != nil {
+		t.Fatalf("CountStuckJobs (high threshold) failed: %v", err)
+	}
+	if count2 != 0 {
+		t.Errorf("Expected 0 stuck jobs with high threshold, got %d", count2)
+	}
+
+	// Cleanup
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id = $1", wsID)
+}
+
+func TestCountStuckJobs_NilPool(t *testing.T) {
+	origPool := pool
+	pool = nil
+	defer func() { pool = origPool }()
+
+	_, err := CountStuckJobs(context.Background(), 300)
+	if err == nil {
+		t.Error("expected error when pool is nil")
+	}
+}

@@ -290,6 +290,7 @@ type QueueStats struct {
 	Queued  int
 	Running int
 	Failed  int
+	Stuck   int
 }
 
 // GetQueueStats returns the count of jobs in each status.
@@ -308,4 +309,23 @@ func GetQueueStats(ctx context.Context) (QueueStats, error) {
 	var s QueueStats
 	err := pool.QueryRow(ctx, query).Scan(&s.Queued, &s.Running, &s.Failed)
 	return s, err
+}
+
+// CountStuckJobs returns the number of jobs that are running but locked
+// for longer than the given threshold in seconds.
+func CountStuckJobs(ctx context.Context, thresholdSeconds int) (int, error) {
+	if pool == nil {
+		return 0, fmt.Errorf("database not initialized")
+	}
+
+	query := `
+		SELECT count(*)
+		FROM generation_jobs
+		WHERE status = 'running'
+		  AND locked_at IS NOT NULL
+		  AND locked_at < NOW() - make_interval(secs => $1)
+	`
+	var count int
+	err := pool.QueryRow(ctx, query, thresholdSeconds).Scan(&count)
+	return count, err
 }

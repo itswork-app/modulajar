@@ -87,6 +87,8 @@ func TestQueueCollector(t *testing.T) {
 			stats["running"] = val
 		} else if strings.Contains(desc, "jobs_failed_gauge") {
 			stats["failed"] = val
+		} else if strings.Contains(desc, "jobs_stuck") {
+			stats["stuck"] = val
 		}
 	}
 
@@ -110,7 +112,7 @@ func TestQueueCollector(t *testing.T) {
 	for range descs {
 		count++
 	}
-	if count != 3 {
-		t.Errorf("Expected 3 descriptors, got %d", count)
+	if count != 4 {
+		t.Errorf("Expected 4 descriptors, got %d", count)
 	}
 }
