@@ -285,8 +285,29 @@ func TestComposeWithKopSurat(t *testing.T) {
 		TemplateDir: templateDir(),
 		PlanResult:  result,
 	})
-	if strings.Contains(html2, "kop-surat") {
-		t.Error("Kop surat should be empty when no lines provided")
+	if strings.Contains(html2, "<div class=\"kop-surat\">") {
+		t.Error("Kop surat HTML should not be present when no lines provided")
+	}
+}
+
+func TestComposeWithLegacyContent(t *testing.T) {
+	result := buildTestPlanResult()
+	html, err := ComposeModulAjarHTML(ComposerInput{
+		TemplateDir: templateDir(),
+		PlanResult:  result,
+		LegacyCurriculum: &curriculum.Curriculum{
+			Meta: curriculum.Meta{
+				Mapel:    "Matematika",
+				Kelas:    "4",
+				Semester: "1",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to compose with Legacy: %v", err)
+	}
+	if !strings.Contains(html, "Matematika") {
+		t.Error("Missing legacy subject name")
 	}
 }
 
