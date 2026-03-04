@@ -39,20 +39,20 @@ func EvaluateSD4(m *curriculum.ModulAjarSD4) QualityResult {
 
 	// 2. Pedagogical Clarity (20 points)
 	if len(m.KegiatanPembelajaran.Inti) < 50 {
-		sb.Penalty(10, FlagShortContent)
+		sb.Penalty(20, FlagShortContent)
 	}
 
 	// 3. Assessment Quality (20 points)
 	if strings.Contains(strings.ToLower(m.Penilaian.Pengetahuan), "tes tertulis") && len(m.Penilaian.Pengetahuan) < 20 {
-		sb.Penalty(5, FlagAssessmentTooGeneric)
+		sb.Penalty(20, FlagAssessmentTooGeneric)
 	}
 
 	// 4. Curriculum Alignment (15 points)
 	if len(m.ProfilPelajarPancasila) == 0 {
-		sb.Penalty(10, FlagNoPancasilaProfile)
+		sb.Penalty(15, FlagNoPancasilaProfile)
 	}
 
-	// 5. Specificity & Style Safety (20 points)
+	// 5. Specificity (10 points)
 	allText := strings.Join([]string{
 		m.TujuanPembelajaran, m.MateriPembelajaran,
 		m.KegiatanPembelajaran.Inti, m.Penilaian.Pengetahuan,
@@ -61,8 +61,10 @@ func EvaluateSD4(m *curriculum.ModulAjarSD4) QualityResult {
 	if placeholderRegex.MatchString(allText) {
 		sb.Penalty(10, FlagPlaceholderText)
 	}
+
+	// 6. Style Safety (10 points)
 	if aiRefRegex.MatchString(allText) {
-		sb.Penalty(10, FlagStyleAIReference)
+		sb.Penalty(5, FlagStyleAIReference)
 	}
 	if markdownRegex.MatchString(allText) {
 		sb.Penalty(5, FlagMarkdownDetected)

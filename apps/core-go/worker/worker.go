@@ -410,12 +410,6 @@ No markdown formatting. Pure JSON.`,
 				"duration_ms":   resp.DurationMs,
 				"generated_at":  time.Now().Format(time.RFC3339),
 				"template_mode": useSD4Template,
-				"quality": map[string]interface{}{
-					"score":          qualityResult.Score,
-					"verdict":        qualityResult.Verdict,
-					"flags":          qualityResult.Flags,
-					"rubric_version": qualityResult.RubricVersion,
-				},
 			}
 
 			aiReceipt = innerAIReceipt
@@ -424,6 +418,12 @@ No markdown formatting. Pure JSON.`,
 				"ai_receipt": innerAIReceipt,
 				"curriculum": map[string]interface{}{
 					"html_hash": hash,
+				},
+				"quality": map[string]interface{}{
+					"score":          qualityResult.Score,
+					"verdict":        qualityResult.Verdict,
+					"flags":          qualityResult.Flags,
+					"rubric_version": qualityResult.RubricVersion,
 				},
 			}
 
