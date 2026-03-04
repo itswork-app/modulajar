@@ -17,6 +17,7 @@ import (
 	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/adapters/ai/prompts"
 	"modulajar/apps/core-go/curriculum"
+	"modulajar/apps/core-go/curriculum/dataset"
 	"modulajar/apps/core-go/curriculum/qeval"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
@@ -323,6 +324,13 @@ No markdown formatting. Pure JSON.`,
 
 				curriculum.SanitizeModulAjar(&modulAjar)
 				resultSD4 = &modulAjar
+
+				// PR-062: Dataset Collection (Non-blocking)
+				go func(c curriculum.ModulAjarSD4, s int) {
+					if err := dataset.CollectDataset(context.Background(), &c, s); err != nil {
+						slog.Error("failed to collect dataset (SD4)", "error", err)
+					}
+				}(modulAjar, qualityResult.Score)
 			} else {
 				var c curriculum.Curriculum
 				if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
@@ -349,6 +357,13 @@ No markdown formatting. Pure JSON.`,
 
 				c.Sanitize()
 				resultLegacy = &c
+
+				// PR-062: Dataset Collection (Non-blocking)
+				go func(curr curriculum.Curriculum, s int) {
+					if err := dataset.CollectDataset(context.Background(), &curr, s); err != nil {
+						slog.Error("failed to collect dataset (legacy)", "error", err)
+					}
+				}(c, qualityResult.Score)
 			}
 
 			// Success Path
@@ -410,12 +425,6 @@ No markdown formatting. Pure JSON.`,
 				"duration_ms":   resp.DurationMs,
 				"generated_at":  time.Now().Format(time.RFC3339),
 				"template_mode": useSD4Template,
-				"quality": map[string]interface{}{
-					"score":          qualityResult.Score,
-					"verdict":        qualityResult.Verdict,
-					"flags":          qualityResult.Flags,
-					"rubric_version": qualityResult.RubricVersion,
-				},
 			}
 
 			aiReceipt = innerAIReceipt
@@ -424,6 +433,12 @@ No markdown formatting. Pure JSON.`,
 				"ai_receipt": innerAIReceipt,
 				"curriculum": map[string]interface{}{
 					"html_hash": hash,
+				},
+				"quality": map[string]interface{}{
+					"score":          qualityResult.Score,
+					"verdict":        qualityResult.Verdict,
+					"flags":          qualityResult.Flags,
+					"rubric_version": qualityResult.RubricVersion,
 				},
 			}
 

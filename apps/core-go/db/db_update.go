@@ -88,3 +88,26 @@ func UpdateDocumentMetadata(ctx context.Context, publicID string, metadata map[s
 	_, err = pool.Exec(ctx, query, metadataJSON, publicID)
 	return err
 }
+
+// InsertDatasetEntry adds a high-quality curriculum document to the dataset collector.
+// It uses ON CONFLICT (original_hash) DO NOTHING to prevent duplicates.
+// Returns true if inserted, false if skipped as duplicate.
+func InsertDatasetEntry(ctx context.Context, entry DatasetEntry) (bool, error) {
+	if pool == nil {
+		return false, fmt.Errorf("database not initialized")
+	}
+
+	query := `
+		INSERT INTO curriculum_dataset (id, subject, grade, topic, module_json, quality_score, original_hash)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (original_hash) DO NOTHING
+	`
+	cmd, err := pool.Exec(ctx, query,
+		entry.ID, entry.Subject, entry.Grade, entry.Topic,
+		entry.ModuleJSON, entry.QualityScore, entry.OriginalHash,
+	)
+	if err != nil {
+		return false, err
+	}
+	return cmd.RowsAffected() > 0, nil
+}
