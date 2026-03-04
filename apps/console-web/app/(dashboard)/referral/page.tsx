@@ -16,18 +16,18 @@ interface ReferralInfo {
 
 export default function ReferralPage() {
     const { getToken } = useAuth();
-    const { currentWorkspace } = useWorkspace();
+    const { workspace } = useWorkspace();
     const [info, setInfo] = useState<ReferralInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        if (!currentWorkspace) return;
+        if (!workspace) return;
         const fetchReferral = async () => {
             try {
                 const token = await getToken();
-                const res = await fetch(`${API_BASE}/w/${currentWorkspace.id}/referral`, {
+                const res = await fetch(`${API_BASE}/w/${workspace.id}/referral`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error('Failed to load referral info');
@@ -40,7 +40,7 @@ export default function ReferralPage() {
             }
         };
         fetchReferral();
-    }, [currentWorkspace, getToken]);
+    }, [workspace, getToken]);
 
     const handleCopy = async () => {
         if (!info?.referral_link) return;
