@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, AlertCircle, FileText, Download, Link as LinkIcon, Clock, CheckCircle2, XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, FileText, Download, Link as LinkIcon, CheckCircle2, XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
