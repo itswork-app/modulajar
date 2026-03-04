@@ -1,10 +1,9 @@
-package tests
+package qeval
 
 import (
 	"testing"
 
 	"modulajar/apps/core-go/curriculum"
-	"modulajar/apps/core-go/curriculum/qeval"
 )
 
 func TestScoreCompleteness(t *testing.T) {
@@ -20,7 +19,7 @@ func TestScoreCompleteness(t *testing.T) {
 		ProfilPelajarPancasila: []string{"Bernalar Kritis"},
 	}
 
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	if res.Score < 85 {
 		t.Errorf("Expected high score, got %d. Flags: %v", res.Score, res.Flags)
 	}
@@ -32,16 +31,16 @@ func TestScoreMissingObjective(t *testing.T) {
 		MateriPembelajaran: "Penjumlahan",
 	}
 
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	found := false
 	for _, f := range res.Flags {
-		if f == qeval.FlagMissingLearningObjective {
+		if f == FlagMissingLearningObjective {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected flag %s, not found in %v", qeval.FlagMissingLearningObjective, res.Flags)
+		t.Errorf("Expected flag %s, not found in %v", FlagMissingLearningObjective, res.Flags)
 	}
 }
 
@@ -50,14 +49,14 @@ func TestVerdictThresholds(t *testing.T) {
 		score    int
 		expected string
 	}{
-		{90, qeval.VerdictPass},
-		{75, qeval.VerdictPassWarn},
-		{65, qeval.VerdictRetry},
-		{50, qeval.VerdictFail},
+		{90, VerdictPass},
+		{75, VerdictPassWarn},
+		{65, VerdictRetry},
+		{50, VerdictFail},
 	}
 
 	for _, tc := range tests {
-		v := qeval.DetermineVerdict(tc.score)
+		v := DetermineVerdict(tc.score)
 		if v != tc.expected {
 			t.Errorf("Score %d: expected %s, got %s", tc.score, tc.expected, v)
 		}
@@ -70,16 +69,16 @@ func TestMarkdownFlag(t *testing.T) {
 		MateriPembelajaran: "**Bold Text**",
 	}
 
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	found := false
 	for _, f := range res.Flags {
-		if f == qeval.FlagMarkdownDetected {
+		if f == FlagMarkdownDetected {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected flag %s, not found in %v", qeval.FlagMarkdownDetected, res.Flags)
+		t.Errorf("Expected flag %s, not found in %v", FlagMarkdownDetected, res.Flags)
 	}
 }
 
@@ -87,8 +86,8 @@ func TestDeterminism(t *testing.T) {
 	m := &curriculum.ModulAjarSD4{
 		TujuanPembelajaran: "Test",
 	}
-	res1, _ := qeval.Evaluate(m)
-	res2, _ := qeval.Evaluate(m)
+	res1, _ := Evaluate(m)
+	res2, _ := Evaluate(m)
 
 	if res1.Score != res2.Score || len(res1.Flags) != len(res2.Flags) {
 		t.Error("Evaluator is not deterministic")
@@ -104,38 +103,38 @@ func TestFlags(t *testing.T) {
 		{
 			"Missing Materi",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X"},
-			qeval.FlagMissingMateri,
+			FlagMissingMateri,
 		},
 		{
 			"Missing Assessment",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X", MateriPembelajaran: "X"},
-			qeval.FlagMissingAssessment,
+			FlagMissingAssessment,
 		},
 		{
 			"Generic Assessment",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X", MateriPembelajaran: "X", Penilaian: curriculum.PenilaianSD4{Pengetahuan: "Tes Tertulis"}},
-			qeval.FlagAssessmentTooGeneric,
+			FlagAssessmentTooGeneric,
 		},
 		{
 			"Short Content",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X", MateriPembelajaran: "X", KegiatanPembelajaran: curriculum.KegiatanPembelajaranSD4{Inti: "Short"}},
-			qeval.FlagShortContent,
+			FlagShortContent,
 		},
 		{
 			"Placeholder",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X", MateriPembelajaran: "Lorem Ipsum"},
-			qeval.FlagPlaceholderText,
+			FlagPlaceholderText,
 		},
 		{
 			"AI Reference",
 			&curriculum.ModulAjarSD4{TujuanPembelajaran: "X", MateriPembelajaran: "AI generated content"},
-			qeval.FlagStyleAIReference,
+			FlagStyleAIReference,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			res, _ := qeval.Evaluate(tc.input)
+			res, _ := Evaluate(tc.input)
 			found := false
 			for _, f := range res.Flags {
 				if f == tc.wantFlag {
@@ -152,7 +151,7 @@ func TestFlags(t *testing.T) {
 
 func TestScoreCapping(t *testing.T) {
 	m := &curriculum.ModulAjarSD4{} // Will get tons of penalties
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	if res.Score < 0 {
 		t.Errorf("Score should be capped at 0, got %d", res.Score)
 	}
@@ -163,7 +162,7 @@ func TestLegacyEvaluatorDetailed(t *testing.T) {
 		TujuanPembelajaran: []string{},              // Missing
 		MateriInti:         []string{"Lorem Ipsum"}, // Placeholder
 	}
-	res, _ := qeval.Evaluate(c)
+	res, _ := Evaluate(c)
 
 	hasFlag := func(flag string) bool {
 		for _, f := range res.Flags {
@@ -174,10 +173,10 @@ func TestLegacyEvaluatorDetailed(t *testing.T) {
 		return false
 	}
 
-	if !hasFlag(qeval.FlagMissingLearningObjective) {
+	if !hasFlag(FlagMissingLearningObjective) {
 		t.Error("Legacy missing TP flag not found")
 	}
-	if !hasFlag(qeval.FlagPlaceholderText) {
+	if !hasFlag(FlagPlaceholderText) {
 		t.Error("Legacy placeholder flag not found")
 	}
 }
@@ -195,14 +194,14 @@ func TestEvaluateSD4FullRubric(t *testing.T) {
 		},
 		ProfilPelajarPancasila: []string{"Mandiri"},
 	}
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	if res.Score < 85 {
 		t.Errorf("Expected high score for full data, got %d. Flags: %v", res.Score, res.Flags)
 	}
 
 	// Test placeholders in different fields
 	m.MateriPembelajaran = "[Materi di sini]"
-	res, _ = qeval.Evaluate(m)
+	res, _ = Evaluate(m)
 	hasFlag := func(flag string) bool {
 		for _, f := range res.Flags {
 			if f == flag {
@@ -211,7 +210,7 @@ func TestEvaluateSD4FullRubric(t *testing.T) {
 		}
 		return false
 	}
-	if !hasFlag(qeval.FlagPlaceholderText) {
+	if !hasFlag(FlagPlaceholderText) {
 		t.Error("Placeholder flag not caught in Materi")
 	}
 
@@ -223,11 +222,11 @@ func TestEvaluateSD4FullRubric(t *testing.T) {
 			Inti: []string{}, // Empty should trigger
 		},
 	}
-	res, _ = qeval.Evaluate(c)
+	res, _ = Evaluate(c)
 	// Test legacy placeholder
 	c.MateriInti = []string{"TODO: Implement this"}
-	res, _ = qeval.Evaluate(c)
-	if !hasFlag(qeval.FlagPlaceholderText) {
+	res, _ = Evaluate(c)
+	if !hasFlag(FlagPlaceholderText) {
 		t.Error("Legacy placeholder flag not caught")
 	}
 
@@ -235,7 +234,7 @@ func TestEvaluateSD4FullRubric(t *testing.T) {
 	c.TujuanPembelajaran = []string{}
 	c.MateriInti = []string{}
 	c.LangkahPembelajaran.Inti = []string{}
-	res, _ = qeval.Evaluate(c)
+	res, _ = Evaluate(c)
 	if res.Score != 70 {
 		t.Errorf("Expected score 70 for missing items in legacy, got %d", res.Score)
 	}
@@ -244,7 +243,7 @@ func TestEvaluateSD4FullRubric(t *testing.T) {
 	c.TujuanPembelajaran = []string{}
 	c.MateriInti = []string{"AI generated content and Lorem Ipsum placeholder"}
 	c.LangkahPembelajaran.Inti = []string{}
-	res, _ = qeval.Evaluate(c)
+	res, _ = Evaluate(c)
 	if res.Score != 60 {
 		t.Errorf("Expected 60, got %d. Flags: %v", res.Score, res.Flags)
 	}
@@ -262,28 +261,17 @@ func TestScoreCappingSD4(t *testing.T) {
 			Pengetahuan: "placeholder lorem ipsum AI generated",
 		},
 	}
-	// Penalties:
-	// - Missing TP: 10
-	// - Missing Materi: 10
-	// - Missing Assessment: 0 (Pengetahuan is not empty)
-	// - Short Content: 10
-	// - No Pancasila: 10
-	// - Placeholder: 10
-	// - AI Ref: 10
-	// Total: 60. Still 40.
 
-	// I'll just make it super bad.
 	m.Penilaian.Pengetahuan = "" // Missing Assessment: 5
-	// Total: 65. Still 35.
 
-	res, _ := qeval.Evaluate(m)
+	res, _ := Evaluate(m)
 	if res.Score > 60 {
 		t.Errorf("Expected low score, got %d. Flags: %v", res.Score, res.Flags)
 	}
 }
 
 func TestUnknownType(t *testing.T) {
-	_, err := qeval.Evaluate("string")
+	_, err := Evaluate("string")
 	if err == nil {
 		t.Error("Expected error for unknown type, got nil")
 	}
@@ -303,6 +291,6 @@ func BenchmarkEvaluate(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = qeval.Evaluate(m)
+		_, _ = Evaluate(m)
 	}
 }
