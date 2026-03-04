@@ -17,6 +17,7 @@ import (
 	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/adapters/ai/prompts"
 	"modulajar/apps/core-go/curriculum"
+	"modulajar/apps/core-go/curriculum/dataset"
 	"modulajar/apps/core-go/curriculum/qeval"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
@@ -323,6 +324,13 @@ No markdown formatting. Pure JSON.`,
 
 				curriculum.SanitizeModulAjar(&modulAjar)
 				resultSD4 = &modulAjar
+
+				// PR-062: Dataset Collection (Non-blocking)
+				go func(c curriculum.ModulAjarSD4, s int) {
+					if err := dataset.CollectDataset(context.Background(), &c, s); err != nil {
+						slog.Error("failed to collect dataset (SD4)", "error", err)
+					}
+				}(modulAjar, qualityResult.Score)
 			} else {
 				var c curriculum.Curriculum
 				if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
@@ -349,6 +357,13 @@ No markdown formatting. Pure JSON.`,
 
 				c.Sanitize()
 				resultLegacy = &c
+
+				// PR-062: Dataset Collection (Non-blocking)
+				go func(curr curriculum.Curriculum, s int) {
+					if err := dataset.CollectDataset(context.Background(), &curr, s); err != nil {
+						slog.Error("failed to collect dataset (legacy)", "error", err)
+					}
+				}(c, qualityResult.Score)
 			}
 
 			// Success Path

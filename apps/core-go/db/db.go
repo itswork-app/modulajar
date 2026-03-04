@@ -83,6 +83,17 @@ type Document struct {
 	Metadata    map[string]interface{}
 }
 
+// DatasetEntry represents a row in the curriculum_dataset table.
+type DatasetEntry struct {
+	ID           string
+	Subject      string
+	Grade        int
+	Topic        string
+	ModuleJSON   []byte
+	QualityScore int
+	OriginalHash string
+}
+
 // AcquireJob atomically acquires the next available queued job.
 // It uses FOR UPDATE SKIP LOCKED to ensure only one worker processes a job.
 func AcquireJob(ctx context.Context) (*GenerationJob, error) {

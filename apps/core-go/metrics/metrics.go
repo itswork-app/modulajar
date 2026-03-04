@@ -69,6 +69,27 @@ var (
 		Help:    "Distribution of AI quality scores (0-100)",
 		Buckets: []float64{0, 20, 40, 60, 70, 80, 85, 90, 95, 100},
 	})
+
+	// PR-062: Dataset Collector Metrics
+	DatasetCandidateTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dataset_candidate_total",
+		Help: "Total number of successfully generated modules eligible for dataset collection",
+	})
+
+	DatasetInsertTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dataset_insert_total",
+		Help: "Total number of modules successfully inserted into the curriculum dataset",
+	})
+
+	DatasetDuplicateSkipped = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dataset_duplicate_skipped",
+		Help: "Total number of modules skipped due to deduplication",
+	})
+
+	DatasetRejectedQuality = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dataset_rejected_quality",
+		Help: "Total number of modules rejected for dataset collection due to low quality score",
+	})
 )
 
 // DefaultStuckThresholdSeconds is the default threshold for stuck job detection (5 minutes).
