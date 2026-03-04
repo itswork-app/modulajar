@@ -65,6 +65,11 @@ func Bootstrap(args []string) error {
 	// Note: Register might fail if already registered in tests, ignoring for simplicity
 	_ = prometheus.Register(metrics.NewQueueCollector())
 
+	// PR-059: Start heartbeat loop for production safety metrics
+	heartbeatCtx, heartbeatCancel := context.WithCancel(context.Background())
+	defer heartbeatCancel()
+	metrics.StartHeartbeatLoop(heartbeatCtx)
+
 	log.Printf("Worker listening on port %s", port)
 
 	// Skip ListenAndServe in short/test mode if needed,
