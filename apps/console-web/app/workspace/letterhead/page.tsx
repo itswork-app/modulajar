@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { Loader2, AlertCircle, Save, LayoutTemplate, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Loader2, AlertCircle, Save, LayoutTemplate, Trash2, Image as ImageIcon, ShieldCheck, Search } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,8 @@ interface LetterheadConfig {
     letterhead_contact: string;
     logo_file_path?: string | null;
     logo_preview_url?: string | null;
+    school_verified?: boolean;
+    school_npsn?: string | null;
 }
 
 export default function LetterheadSetupPage() {
@@ -39,6 +41,8 @@ export default function LetterheadSetupPage() {
 
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [npsnInput, setNpsnInput] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
 
     useEffect(() => {
         async function fetchLetterhead() {
@@ -64,6 +68,8 @@ export default function LetterheadSetupPage() {
                         letterhead_line4: data.letterhead_line4 || '',
                         letterhead_contact: data.letterhead_contact || '',
                         logo_preview_url: data.logo_preview_url || null,
+                        school_verified: data.school_verified || false,
+                        school_npsn: data.school_npsn || null,
                     });
                     if (data.logo_preview_url) {
                         setPreviewUrl(data.logo_preview_url);
@@ -81,6 +87,11 @@ export default function LetterheadSetupPage() {
     }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken]);
 
     const handleChange = (field: keyof LetterheadConfig, value: string) => {
+        // Prevent manual overrides if verified
+        if (formData.school_verified && ['letterhead_line1', 'letterhead_line2', 'letterhead_contact'].includes(field)) {
+            // For v1, verified fields are strictly read-only. We silently drop changes.
+            return;
+        }
         setFormData(prev => ({ ...prev, [field]: value }));
         setSuccessMsg(null);
     };
@@ -136,6 +147,61 @@ export default function LetterheadSetupPage() {
             setIsSubmitting(false);
         }
     }
+
+    const handleVerifyNpsn = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!workspace?.id) return;
+
+        if (!/^[0-9]{8}$/.test(npsnInput)) {
+            setError('NPSN harus berupa 8 digit angka murni.');
+            return;
+        }
+
+        setIsVerifying(true);
+        setError(null);
+        setSuccessMsg(null);
+
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE}/w/${workspace.id}/verify-school`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ npsn: npsnInput }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || err.message || 'Verifikasi NPSN Gagal');
+            }
+
+            const data = await res.json();
+
+            setFormData(prev => ({
+                ...prev,
+                school_verified: true,
+                school_npsn: npsnInput,
+                letterhead_line1: data.school_display_name || prev.letterhead_line1,
+                letterhead_line2: `${data.kab_kota ? data.kab_kota + ', ' : ''}${data.provinsi || ''}`,
+                letterhead_contact: `${data.school_display_name}, ${data.kab_kota ? data.kab_kota + ', ' : ''}${data.provinsi || ''}`
+            }));
+
+            setSuccessMsg("Verifikasi Institusi Sukses! Kop Surat telah di-update secara otomatis.");
+            setNpsnInput('');
+
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('Verifikasi NPSN Error');
+            }
+        } finally {
+            setIsVerifying(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -247,9 +313,57 @@ export default function LetterheadSetupPage() {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        {formData.school_verified ? (
+                            <div className="mb-8 p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-start gap-4 shadow-sm">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 text-indigo-600 mt-0.5">
+                                    <ShieldCheck className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                        Institusi Terverifikasi
+                                        <span className="bg-indigo-600 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wide">Verified</span>
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mt-1 mb-2">Identitas diisi otomatis by database Kementerian. Beberapa kolom di bawah dikunci untuk menjaga integritas keaslian dokumen ModulAjar.</p>
+                                    <div className="inline-block bg-white border border-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">
+                                        NPSN Tersimpan: {formData.school_npsn}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mb-8 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex items-start gap-4 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0 text-amber-600 mt-0.5 border border-amber-100">
+                                        <Search className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800">Verifikasi NPSN Instansi</h3>
+                                        <p className="text-sm text-slate-500 mt-1">Isi Kop Surat secara otomatis dan verifikasi Workspace ini sebagai lembaga pendidikan asli menggunakan referensi 8-digit NPSN.</p>
+                                    </div>
+                                </div>
 
-                            <div className="space-y-3">
+                                <form onSubmit={handleVerifyNpsn} className="flex gap-2 w-full pt-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Ketik 8 digit NPSN..."
+                                        maxLength={8}
+                                        value={npsnInput}
+                                        onChange={(e) => setNpsnInput(e.target.value)}
+                                        className="flex-1 min-w-0 rounded-xl border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 transition-colors"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={isVerifying || !npsnInput}
+                                        className="shrink-0 px-5 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 disabled:opacity-50 transition-colors flex items-center justify-center min-w-[120px]"
+                                    >
+                                        {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verifikasi"}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-6 pt-2 border-t border-slate-200/60">
+
+                            <div className="space-y-3 mt-4">
                                 <label className="text-sm font-semibold text-slate-900 ml-1">Logo Instansi <span className="text-slate-400 font-normal">(Maks 512KB, JPG/PNG)</span></label>
 
                                 <div className="flex items-center gap-4">
@@ -293,7 +407,11 @@ export default function LetterheadSetupPage() {
                                     type="text"
                                     placeholder="YAYASAN PENDIDIKAN NUSANTARA"
                                     maxLength={120}
-                                    className="w-full rounded-xl border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200"
+                                    disabled={formData.school_verified}
+                                    className={cn(
+                                        "w-full rounded-xl border-slate-200 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200",
+                                        formData.school_verified ? "bg-slate-50 opacity-70 cursor-not-allowed" : "bg-white"
+                                    )}
                                     value={formData.letterhead_line1}
                                     onChange={(e) => handleChange('letterhead_line1', e.target.value)}
                                 />
@@ -305,7 +423,11 @@ export default function LetterheadSetupPage() {
                                     type="text"
                                     placeholder="SD NEGERI 1 MERDEKA"
                                     maxLength={120}
-                                    className="w-full rounded-xl border-slate-200 bg-white px-4 py-3 text-slate-900 text-lg font-bold placeholder-slate-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200"
+                                    disabled={formData.school_verified}
+                                    className={cn(
+                                        "w-full rounded-xl border-slate-200 px-4 py-3 text-slate-900 text-lg font-bold placeholder-slate-300 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200",
+                                        formData.school_verified ? "bg-slate-50 opacity-70 cursor-not-allowed" : "bg-white"
+                                    )}
                                     value={formData.letterhead_line2}
                                     onChange={(e) => handleChange('letterhead_line2', e.target.value)}
                                 />
@@ -341,7 +463,11 @@ export default function LetterheadSetupPage() {
                                     placeholder="Jl. Merdeka No 1, Bandung | Telp: (022) 123456 | Email: sd1@contoh.com"
                                     rows={2}
                                     maxLength={250}
-                                    className="w-full rounded-xl border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200 resize-none text-sm"
+                                    disabled={formData.school_verified}
+                                    className={cn(
+                                        "w-full rounded-xl border-slate-200 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all duration-200 resize-none text-sm",
+                                        formData.school_verified ? "bg-slate-50 opacity-70 cursor-not-allowed" : "bg-white"
+                                    )}
                                     value={formData.letterhead_contact}
                                     onChange={(e) => handleChange('letterhead_contact', e.target.value)}
                                 />
