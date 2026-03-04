@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"modulajar/apps/core-go/curriculum"
 	"modulajar/apps/core-go/planner"
 )
 
@@ -32,6 +33,10 @@ type ComposerInput struct {
 	LetterheadLine4   string
 	LetterheadContact string
 	LogoDataURI       string
+
+	// AI Generated Results (Optional)
+	ModulAjarSD4     *curriculum.ModulAjarSD4
+	LegacyCurriculum *curriculum.Curriculum
 }
 
 // ComposeModulAjarHTML loads the template, builds fragments, replaces all placeholders,
@@ -82,6 +87,54 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 		"{{DID}}":                  input.DID,
 		"{{VERIFY_URL}}":           input.VerifyURL,
 		"{{KOP_SURAT}}":            buildKopSuratHtml(input),
+	}
+
+	// 6. Override with AI Content if present
+	if input.ModulAjarSD4 != nil {
+		m := input.ModulAjarSD4
+		replacements["{{SUBJECT_NAME}}"] = m.Identitas.MataPelajaran
+		replacements["{{KELAS}}"] = fmt.Sprintf("%d", m.Identitas.Kelas)
+		replacements["{{SEMESTER}}"] = m.Identitas.Semester
+
+		// Build Activity Sections from AI
+		var actSb strings.Builder
+		actSb.WriteString(`<div class="activity-unit">`)
+		actSb.WriteString(`<h3 class="activity-unit-title">Tujuan Pembelajaran</h3>`)
+		actSb.WriteString(fmt.Sprintf(`<div class="activity-content"><p>%s</p></div>`, m.TujuanPembelajaran))
+		actSb.WriteString(`<h3 class="activity-unit-title">Materi Pembelajaran</h3>`)
+		actSb.WriteString(fmt.Sprintf(`<div class="activity-content"><p>%s</p></div>`, m.MateriPembelajaran))
+
+		actSb.WriteString(`<h3 class="activity-unit-title">Kegiatan Pembelajaran</h3>`)
+		actSb.WriteString(`<div class="activity-content">`)
+		actSb.WriteString(fmt.Sprintf(`<p><strong>Pendahuluan:</strong><br/>%s</p>`, m.KegiatanPembelajaran.Pendahuluan))
+		actSb.WriteString(fmt.Sprintf(`<p><strong>Inti:</strong><br/>%s</p>`, m.KegiatanPembelajaran.Inti))
+		actSb.WriteString(fmt.Sprintf(`<p><strong>Penutup:</strong><br/>%s</p>`, m.KegiatanPembelajaran.Penutup))
+		actSb.WriteString(`</div>`)
+		actSb.WriteString(`</div>`)
+		replacements["{{ACTIVITY_SECTIONS}}"] = actSb.String()
+
+		// Build Assessment from AI
+		var assSb strings.Builder
+		assSb.WriteString(`<div class="assessment-block">`)
+		assSb.WriteString(`<h3 class="assessment-type">Sikap</h3>`)
+		assSb.WriteString(fmt.Sprintf(`<p>%s</p>`, m.Penilaian.Sikap))
+		assSb.WriteString(`</div>`)
+		assSb.WriteString(`<div class="assessment-block">`)
+		assSb.WriteString(`<h3 class="assessment-type">Pengetahuan</h3>`)
+		assSb.WriteString(fmt.Sprintf(`<p>%s</p>`, m.Penilaian.Pengetahuan))
+		assSb.WriteString(`</div>`)
+		assSb.WriteString(`<div class="assessment-block">`)
+		assSb.WriteString(`<h3 class="assessment-type">Keterampilan</h3>`)
+		assSb.WriteString(fmt.Sprintf(`<p>%s</p>`, m.Penilaian.Keterampilan))
+		assSb.WriteString(`</div>`)
+		replacements["{{ASSESSMENT_SECTION}}"] = assSb.String()
+	} else if input.LegacyCurriculum != nil {
+		c := input.LegacyCurriculum
+		replacements["{{SUBJECT_NAME}}"] = c.Meta.Mapel
+		replacements["{{KELAS}}"] = c.Meta.Kelas
+		replacements["{{SEMESTER}}"] = c.Meta.Semester
+		// Legacy curriculum used arrays, we can join them or use existing logic if it was using fragments.
+		// For now just keep it minimal or use what it had.
 	}
 
 	for placeholder, value := range replacements {

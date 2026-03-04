@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/adapters/ai/prompts"
 	"modulajar/apps/core-go/curriculum"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
@@ -192,10 +193,92 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 
 	// 6. AI INTEGRATION
 	var aiReceipt map[string]interface{}
+	var resultSD4 *curriculum.ModulAjarSD4
+	var resultLegacy *curriculum.Curriculum
 
 	if w.Deps.AI != nil {
-		// 1. Construct Schema-Driven Prompt
-		schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
+		// PR-060: Determine subject and if we have a SD4 template
+		subjectCode := "unknown"
+		if len(planResult.SemesterPlan.SubjectPlans) > 0 {
+			subjectCode = planResult.SemesterPlan.SubjectPlans[0].SubjectCode
+		}
+		subjectForTemplate := subjectName(pack, subjectCode)
+
+		useSD4Template := false
+		var templateJSON []byte
+
+		if curriculum.HasTemplateSD4(subjectCode) {
+			tmplData, err := curriculum.LoadTemplateSD4(subjectCode)
+			if err == nil {
+				templateJSON = tmplData
+				useSD4Template = true
+			}
+		}
+
+		var resp *ai.GenerateResponse
+		var aiErr error
+
+		if useSD4Template {
+			// PR-060: Schema-guided generation with retry
+			const maxRetries = 2
+			var lastErr error
+
+			for attempt := 0; attempt <= maxRetries; attempt++ {
+				if attempt > 0 {
+					logger.Warn("Retrying AI generation", "attempt", attempt+1, "last_error", lastErr)
+				}
+
+				// Build structured prompt
+				schemaPrompt := prompts.BuildFullPrompt(
+					payload.SchoolName,
+					subjectForTemplate,
+					payload.Semester,
+					subjectForTemplate, // topic = subject for now
+					string(templateJSON),
+				)
+
+				req := ai.GenerateRequest{Prompt: schemaPrompt}
+				resp, aiErr = w.Deps.AI.Generate(ctx, req)
+				if aiErr != nil {
+					lastErr = fmt.Errorf("AI call failed: %v", aiErr)
+					continue
+				}
+
+				// Parse JSON into ModulAjarSD4
+				var modulAjar curriculum.ModulAjarSD4
+				if err := json.Unmarshal([]byte(resp.Content), &modulAjar); err != nil {
+					lastErr = fmt.Errorf("invalid JSON: %v", err)
+					continue
+				}
+
+				// Validate required fields
+				if err := curriculum.ValidateModulAjar(&modulAjar); err != nil {
+					lastErr = fmt.Errorf("validation failed: %v", err)
+					continue
+				}
+
+				// Evaluate quality
+				if err := curriculum.EvaluateModulAjar(&modulAjar); err != nil {
+					lastErr = fmt.Errorf("evaluation failed: %v", err)
+					continue
+				}
+
+				// Sanitize
+				curriculum.SanitizeModulAjar(&modulAjar)
+				resultSD4 = &modulAjar
+
+				// Success — build receipt and break
+				lastErr = nil
+				logger.Info("AI generation success (SD4 template)", "model", resp.ModelName, "attempt", attempt+1)
+				break
+			}
+
+			if lastErr != nil {
+				return failResult(fmt.Sprintf("AI generation failed after %d attempts: %v", maxRetries+1, lastErr)), nil
+			}
+		} else {
+			// Legacy flow: inline schema prompt (backward compatibility)
+			schemaPrompt := fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
 Subject: %s
 Class: %s
 Semester: %s
@@ -240,95 +323,94 @@ STRICT RULE: Output must be valid JSON matching this schema:
   }
 }
 No markdown formatting. Pure JSON.`,
-			subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
+				subjectName(pack, "unknown"), payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
 
-		req := ai.GenerateRequest{Prompt: schemaPrompt}
-		resp, err := w.Deps.AI.Generate(ctx, req)
-		if err != nil {
-			logger.Warn("AI generation failed", "error", err)
-			return failResult(fmt.Sprintf("AI generation failed: %v", err)), nil
-		}
-
-		logger.Info("AI generation success", "model", resp.ModelName)
-
-		// 2. Parse & Validate
-		var c curriculum.Curriculum
-		if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
-			logger.Error("Failed to parse AI JSON", "error", err)
-			return failResult(fmt.Sprintf("AI generated invalid JSON: %v", err)), nil
-		}
-
-		if err := c.Validate(); err != nil {
-			return failResult(fmt.Sprintf("AI validation failed: %v", err)), nil
-		}
-
-		// 3. Sanitize
-		c.Sanitize()
-
-		// 4. Render
-		templateDir := resolveTemplateDir(payload.PackPath)
-		tmplBytes, err := os.ReadFile(filepath.Join(templateDir, "modul-ajar.html"))
-		if err != nil {
-			// Try to handle missing template gracefully if possible, or warn
-			logger.Warn("Template not found", "error", err)
-		}
-
-		var html, hash string
-		if len(tmplBytes) > 0 {
-			// Construct data for template to avoid "function not defined" errors
-			// The template expects uppercase keys like SUBJECT_NAME, KELAS, etc.
-			// We provide a minimal map here for the receipt hash.
-			// Construct FuncMap to satisfy template requirements (uppercase keys used as functions/vars w/o dot)
-			funcs := template.FuncMap{
-				"SUBJECT_NAME":       func() string { return c.Meta.Mapel },
-				"KELAS":              func() string { return c.Meta.Kelas },
-				"SEMESTER":           func() string { return c.Meta.Semester },
-				"TAHUN_AJARAN":       func() string { return c.Meta.TahunAjaran },
-				"TITLE":              func() string { return "Modul Ajar " + c.Meta.Mapel },
-				"TEACHER_NAME":       func() string { return c.Identitas.Guru },
-				"SCHOOL_NAME":        func() string { return c.Identitas.Sekolah },
-				"PID":                func() string { return payload.PID },
-				"DID":                func() string { return "PREVIEW" },
-				"VERIFY_URL":         func() string { return "#" },
-				"STYLES":             func() string { return "" },
-				"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
-				"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
-				"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
-				"KOP_SURAT":          func() string { return "" },
+			req := ai.GenerateRequest{Prompt: schemaPrompt}
+			resp, aiErr = w.Deps.AI.Generate(ctx, req)
+			if aiErr != nil {
+				logger.Warn("AI generation failed", "error", aiErr)
+				return failResult(fmt.Sprintf("AI generation failed: %v", aiErr)), nil
 			}
 
-			html, hash, err = curriculum.RenderHTML(nil, string(tmplBytes), funcs)
+			logger.Info("AI generation success", "model", resp.ModelName)
+
+			// 2. Parse & Validate
+			var c curriculum.Curriculum
+			if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
+				logger.Error("Failed to parse AI JSON", "error", err)
+				return failResult(fmt.Sprintf("AI generated invalid JSON: %v", err)), nil
+			}
+
+			if err := c.Validate(); err != nil {
+				return failResult(fmt.Sprintf("AI validation failed: %v", err)), nil
+			}
+
+			// 3. Sanitize
+			c.Sanitize()
+			resultLegacy = &c
+		}
+
+		if resp != nil {
+			// 4. Render (for legacy flow)
+			templateDir := resolveTemplateDir(payload.PackPath)
+			tmplBytes, err := os.ReadFile(filepath.Join(templateDir, "modul-ajar.html"))
 			if err != nil {
-				return failResult(fmt.Sprintf("Render failed: %v", err)), nil
+				logger.Warn("Template not found", "error", err)
 			}
-		}
 
-		// 5. Persist
-		innerAIReceipt := map[string]interface{}{
-			"model":         resp.ModelName,
-			"input_tokens":  resp.TokenInput,
-			"output_tokens": resp.TokenOutput,
-			"prompt_hash":   resp.PromptHash,
-			"output_hash":   resp.OutputHash,
-			"duration_ms":   resp.DurationMs,
-			"generated_at":  time.Now().Format(time.RFC3339),
-		}
+			var html, hash string
+			if len(tmplBytes) > 0 {
+				funcs := template.FuncMap{
+					"SUBJECT_NAME":       func() string { return subjectForTemplate },
+					"KELAS":              func() string { return payload.Kelas },
+					"SEMESTER":           func() string { return payload.Semester },
+					"TAHUN_AJARAN":       func() string { return payload.TahunAjaran },
+					"TITLE":              func() string { return "Modul Ajar " + subjectForTemplate },
+					"TEACHER_NAME":       func() string { return payload.TeacherName },
+					"SCHOOL_NAME":        func() string { return payload.SchoolName },
+					"PID":                func() string { return payload.PID },
+					"DID":                func() string { return "PREVIEW" },
+					"VERIFY_URL":         func() string { return "#" },
+					"STYLES":             func() string { return "" },
+					"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
+					"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
+					"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+					"KOP_SURAT":          func() string { return "" },
+				}
 
-		aiReceipt = innerAIReceipt
+				html, hash, err = curriculum.RenderHTML(nil, string(tmplBytes), funcs)
+				if err != nil {
+					return failResult(fmt.Sprintf("Render failed: %v", err)), nil
+				}
+			}
 
-		receipt := map[string]interface{}{
-			"ai_receipt": innerAIReceipt,
-			"curriculum": map[string]interface{}{
-				"json":      c,
-				"html_hash": hash,
-			},
-		}
+			// 5. Persist receipt
+			innerAIReceipt := map[string]interface{}{
+				"model":         resp.ModelName,
+				"input_tokens":  resp.TokenInput,
+				"output_tokens": resp.TokenOutput,
+				"prompt_hash":   resp.PromptHash,
+				"output_hash":   resp.OutputHash,
+				"duration_ms":   resp.DurationMs,
+				"generated_at":  time.Now().Format(time.RFC3339),
+				"template_mode": useSD4Template,
+			}
 
-		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
-			logger.Error("Failed to persist AI receipt", "error", err)
-			return failResult(fmt.Sprintf("failed to persist AI receipt: %v", err)), nil
+			aiReceipt = innerAIReceipt
+
+			receipt := map[string]interface{}{
+				"ai_receipt": innerAIReceipt,
+				"curriculum": map[string]interface{}{
+					"html_hash": hash,
+				},
+			}
+
+			if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
+				logger.Error("Failed to persist AI receipt", "error", err)
+				return failResult(fmt.Sprintf("failed to persist AI receipt: %v", err)), nil
+			}
+			_ = html
 		}
-		_ = html
 	}
 
 	// 7. Persist Documents to DB (Generating)
@@ -404,6 +486,9 @@ No markdown formatting. Pure JSON.`,
 			LetterheadLine4:   payload.LetterheadLine4,
 			LetterheadContact: payload.LetterheadContact,
 			LogoDataURI:       logoDataURI,
+
+			ModulAjarSD4:     resultSD4,
+			LegacyCurriculum: resultLegacy,
 		})
 		if err != nil {
 			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
