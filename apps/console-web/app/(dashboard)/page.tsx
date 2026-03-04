@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, PlusCircle, AlertCircle, Wallet, FileText, XCircle, FileOutput, Clock, Eye, Download, Search } from 'lucide-react';
+import { Loader2, PlusCircle, AlertCircle, Wallet, FileText, XCircle, FileOutput, Clock, Eye, Download } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -28,7 +27,6 @@ interface UsageSummary {
 }
 
 export default function DashboardPage() {
-    const router = useRouter();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();
 
@@ -61,10 +59,10 @@ export default function DashboardPage() {
                     setSummary(data);
                     setError(null);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (isMounted) {
                     console.error('Failed to fetch usage summary:', err);
-                    setError(err.message || 'Terjadi kesalahan tidak terduga.');
+                    setError(err instanceof Error ? err.message : 'Terjadi kesalahan tidak terduga.');
                 }
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -220,7 +218,7 @@ export default function DashboardPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {summary.recent_jobs.map((job) => (
+                                        {summary.recent_jobs.map((job: RecentJob) => (
                                             <tr key={job.generation_id} className="hover:bg-slate-50/80 transition-colors group">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center">

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { Loader2, AlertCircle, FileText, Download, Eye, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;

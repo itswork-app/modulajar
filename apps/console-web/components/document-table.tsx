@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import {
     Download, ShieldCheck, Loader2, FileText, Calendar,
-    Calculator, FlaskConical, Languages, BookOpen, Search
+    Calculator, FlaskConical, Languages, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
