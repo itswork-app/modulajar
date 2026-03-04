@@ -201,6 +201,23 @@ func setupSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			letterhead_contact TEXT,
 			logo_file_path TEXT
 		)`,
+		`CREATE TABLE wallet_ledger (
+			id CHAR(26) PRIMARY KEY,
+			workspace_id CHAR(26) NOT NULL REFERENCES workspaces(id),
+			type VARCHAR(50) NOT NULL,
+			amount INT NOT NULL,
+			reference_id VARCHAR(255),
+			created_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE TABLE referrals (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			referrer_workspace CHAR(26) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			referred_workspace CHAR(26) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			reward_granted BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP DEFAULT NOW(),
+			CONSTRAINT referrals_referrer_referred_unique UNIQUE (referrer_workspace, referred_workspace),
+			CONSTRAINT referrals_no_self_referral CHECK (referrer_workspace != referred_workspace)
+		)`,
 		// Uniqueness
 		`CREATE UNIQUE INDEX uniq_generation_workspace ON generation_jobs (workspace_id, generation_id)`,
 		`CREATE UNIQUE INDEX idx_documents_workspace_public ON documents(workspace_id, public_id)`,

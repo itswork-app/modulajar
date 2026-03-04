@@ -1,5 +1,16 @@
 import { FastifyInstance } from 'fastify';
 import { ulid } from 'ulid';
+import crypto from 'crypto';
+
+function generateReferralCode(): string {
+    // Generate 5 random bytes and conver to base32-like string (uppercase alphanumeric)
+    // 5 bytes = 40 bits = 8 base32 chars
+    return crypto.randomBytes(5)
+        .toString('base64')
+        .replace(/[^A-Za-z0-9]/g, '')
+        .toUpperCase()
+        .substring(0, 8);
+}
 
 export default async function authRoutes(fastify: FastifyInstance) {
     // GET /me
@@ -50,11 +61,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
         try {
             await client.query('BEGIN');
 
+            // Generate unique referral code
+            const refCode = generateReferralCode();
+
             // Insert Workspace
             await client.query(
-                `INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3)
+                `INSERT INTO workspaces (id, clerk_org_id, name, referral_code) VALUES ($1, $2, $3, $4)
          ON CONFLICT (clerk_org_id) DO NOTHING`, // Handle race condition or re-run
-                [workspaceId, clerkOrgId, workspaceName]
+                [workspaceId, clerkOrgId, workspaceName, refCode]
             );
 
             // Get actual workspace ID in case of conflict (if we want to join existing org)
