@@ -1,6 +1,4 @@
--- Migration: 013_dataset_collector.sql
--- PR-062: Collect high-quality Modul Ajar outputs edited by teachers
-
+-- +goose Up
 CREATE TABLE curriculum_dataset (
     id UUID PRIMARY KEY,
     subject TEXT NOT NULL,
@@ -22,4 +20,5 @@ CREATE INDEX idx_dataset_score ON curriculum_dataset(quality_score DESC);
 -- Index for deduplication (redundant because of UNIQUE constraint but good for clarity)
 CREATE INDEX idx_dataset_hash ON curriculum_dataset(original_hash);
 
--- Trigger to update updated_at if needed, but the spec doesn't require it for now.
+-- +goose Down
+DROP TABLE curriculum_dataset;
