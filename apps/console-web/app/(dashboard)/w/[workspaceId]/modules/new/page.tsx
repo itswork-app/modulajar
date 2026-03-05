@@ -12,7 +12,7 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export default function NewModulePage({ params }: { params: { workspaceId: string } }) {
     const router = useRouter();
-    const { user, isLoaded } = useUser();
+    const { isLoaded } = useUser();
     const [state, setState] = useState<WizardState>({ step: 'mode' });
 
     const workspaceId = params.workspaceId;
@@ -68,10 +68,11 @@ export default function NewModulePage({ params }: { params: { workspaceId: strin
             const data = await res.json();
             setState({ step: 'generating', jobId: data.job_id, moduleId: data.module_id, mode });
 
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred';
             setState({
                 step: 'failed',
-                error: error.message,
+                error: message,
                 canRetry: true,
                 lastMode: mode
             });

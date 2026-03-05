@@ -32,8 +32,12 @@ export function TemplatePickerStep({ inputs, onSelect, onBack }: TemplatePickerS
 
                 const data = await res.json();
                 setTemplates(data.templates || []);
-            } catch (err: any) {
-                setError(err.message || 'Failed to load templates');
+            } catch (err: unknown) {
+                if (err instanceof Error) {
+                    setError(err.message);
+                } else {
+                    setError('An unknown error occurred');
+                }
             } finally {
                 setLoading(false);
             }

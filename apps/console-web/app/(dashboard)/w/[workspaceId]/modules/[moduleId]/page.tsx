@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { ModuleDetailResponse } from 'shared-types';
-import { motion } from 'framer-motion';
 import { Loader2, Download, ExternalLink, FileText, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -19,8 +18,12 @@ export default function ModuleDetailPage({ params }: { params: { workspaceId: st
                 if (!res.ok) throw new Error('Failed to load module details');
                 const data = await res.json();
                 setModule(data);
-            } catch (err: any) {
-                setError(err.message);
+            } catch (err: unknown) {
+                if (err instanceof Error) {
+                    setError(err.message);
+                } else {
+                    setError('An unknown error occurred');
+                }
             } finally {
                 setLoading(false);
             }

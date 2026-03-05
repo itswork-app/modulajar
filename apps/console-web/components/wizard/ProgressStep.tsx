@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { JobStatusResponse } from 'shared-types';
 import { motion } from 'framer-motion';
-import { Loader2, Zap, LayoutTemplate, FileCheck, AlertTriangle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Loader2, Zap, LayoutTemplate, FileCheck } from 'lucide-react';
 
 interface ProgressStepProps {
     jobId: string;
@@ -17,10 +16,8 @@ export function ProgressStep({ jobId, workspaceId, onDone, onError }: ProgressSt
     const [status, setStatus] = useState<JobStatusResponse | null>(null);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const router = useRouter();
 
     useEffect(() => {
-        let attempts = 0;
         let isActive = true;
         let currentDelay = 1000;
 
@@ -43,12 +40,11 @@ export function ProgressStep({ jobId, workspaceId, onDone, onError }: ProgressSt
                     return; // Stop polling
                 }
 
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error("Polling error:", err);
             }
 
             // Exponential backoff capped at 8s
-            attempts++;
             currentDelay = Math.min(currentDelay * 2, 8000);
             pollingRef.current = setTimeout(() => poll(), currentDelay);
         };
@@ -72,7 +68,6 @@ export function ProgressStep({ jobId, workspaceId, onDone, onError }: ProgressSt
 
     const getPhaseContent = () => {
         const phase = status?.progress?.phase || 'queued';
-        const pct = status?.progress?.pct || 0;
 
         switch (phase) {
             case 'queued':
