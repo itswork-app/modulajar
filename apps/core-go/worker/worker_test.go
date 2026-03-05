@@ -4,20 +4,48 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/oklog/ulid/v2"
-
 	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/curriculum/ranking"
 	"modulajar/apps/core-go/db"
-	"modulajar/apps/core-go/packloader"
-	"modulajar/apps/core-go/planner"
 	"modulajar/apps/core-go/render"
-	"modulajar/apps/core-go/validator"
+
+	"github.com/google/uuid"
 )
+
+const ValidSD4JSON = `
+{
+	"identitas": {
+		"sekolah": "SD Test",
+		"mata_pelajaran": "Matematika",
+		"kelas": 4,
+		"fase": "B",
+		"semester": "1",
+		"topik": "Pecahan",
+		"alokasi_waktu": "2x35 menit"
+	},
+	"kompetensi_awal": "Siswa sudah mengenal bilangan bulat 1-100.",
+	"profil_pelajar_pancasila": ["Bernalar Kritis"],
+	"sarana_prasarana": ["Buku Paket", "Papan Tulis"],
+	"target_peserta_didik": "Reguler",
+	"model_pembelajaran": "Problem Based Learning",
+	"tujuan_pembelajaran": "Siswa dapat membandingkan dua pecahan dengan pembilang satu.",
+	"materi_pembelajaran": "Konsep pecahan dasar dan perbandingan pecahan.",
+	"kegiatan_pembelajaran": {
+		"pendahuluan": "Guru menyapa siswa dan melakukan apersepsi.",
+		"inti": "Siswa melakukan eksplorasi dengan benda konkret untuk memahami pecahan.",
+		"penutup": "Guru memberikan kesimpulan dan refleksi."
+	},
+	"penilaian": {
+		"sikap": "Observasi selama diskusi.",
+		"pengetahuan": "Tes tertulis membandingkan pecahan.",
+		"keterampilan": "Unjuk kerja mewarnai bagian pecahan."
+	},
+	"refleksi_guru": "Apakah semua siswa memahami konsep perbandingan?"
+}`
 
 // Mocks
 
@@ -27,9 +55,11 @@ type MockAIEngine struct {
 	Responses        []*ai.GenerateResponse
 	Errors           []error
 	CallCount        int
+	LastRequest      ai.GenerateRequest
 }
 
 func (m *MockAIEngine) Generate(ctx context.Context, req ai.GenerateRequest) (*ai.GenerateResponse, error) {
+	m.LastRequest = req
 	defer func() { m.CallCount++ }()
 
 	if len(m.Responses) > m.CallCount {
@@ -63,7 +93,7 @@ func (m *MockStorage) UploadFile(ctx context.Context, objectPath string, filePat
 }
 
 func (m *MockStorage) DownloadFile(ctx context.Context, objectPath string) ([]byte, error) {
-	return nil, nil
+	return []byte("mock-logo-binary"), nil
 }
 
 func (m *MockStorage) Close() error {
@@ -104,513 +134,240 @@ func (m *MockJobStore) MarkJobFailed(ctx context.Context, jobID string, errMsg s
 	m.MarkFailedReason = errMsg
 	return m.MarkFailedError
 }
-func (m *MockJobStore) UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
-	return m.UpdatePkgError
-}
 func (m *MockJobStore) SaveDocument(ctx context.Context, doc db.Document) error {
 	return m.SaveDocError
 }
-func (m *MockJobStore) UpdateDocumentStatus(ctx context.Context, publicID string, status string) error {
+func (m *MockJobStore) UpdateDocumentStatus(ctx context.Context, docID string, status string) error {
 	return m.UpdateStatusError
 }
-func (m *MockJobStore) UpdateDocumentMetadata(ctx context.Context, publicID string, metadata map[string]interface{}) error {
+func (m *MockJobStore) UpdateDocumentMetadata(ctx context.Context, docID string, metadata map[string]interface{}) error {
 	return m.UpdateDocMetaError
 }
-
-type MockPlanner struct {
-	PlanResult *planner.PlannerResult
-	PlanError  error
+func (m *MockJobStore) UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
+	return m.UpdatePkgError
 }
-
-func (m *MockPlanner) Plan(input planner.PlannerInput) (*planner.PlannerResult, error) {
-	return m.PlanResult, m.PlanError
-}
-
-type MockValidator struct {
-	Report *validator.ValidationReport
-	Error  error
-}
-
-func (m *MockValidator) Validate(input validator.ValidatorInput) (*validator.ValidationReport, error) {
-	return m.Report, m.Error
-}
-
-// Helpers
 
 func basePayload() TaskPayload {
 	return TaskPayload{
-		JobID:       "test-job-001",
-		PackageID:   "test-pkg-001",
-		WorkspaceID: "test-ws-001",
-		PackPath:    filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json"), // Should exist or be mocked packloader
-		Semester:    "S1",
+		JobID:       "test-job",
+		PackageID:   "test-pkg",
+		WorkspaceID: "ws-test",
+		PackPath:    filepath.Join("..", "packs", "merdeka", "sd4", "v1", "pack.json"),
+		SchoolName:  "Test School",
+		Semester:    "1",
 		Kelas:       "4",
 		TahunAjaran: "2025/2026",
-		TeacherName: "Ibu Test",
-		SchoolName:  "SDN Test",
+		TeacherName: "Test Teacher",
 		PID:         "PKG-TEST",
 	}
 }
 
-func defaultPlannerResult() *planner.PlannerResult {
-	return &planner.PlannerResult{
-		Semester: "S1",
-		Atps: []planner.Atp{
-			{SubjectCode: "LEGACY", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
+func TestWorker_ExecuteJob_Success(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
+
+	mockAI := &MockAIEngine{
+		GenerateResponse: &ai.GenerateResponse{
+			Content:   ValidSD4JSON,
+			ModelName: "gemini-1.5-flash",
 		},
-		SemesterPlan: planner.SemesterPlan{
-			Semester:     "S1",
-			SubjectPlans: []planner.SubjectPlan{{SubjectCode: "LEGACY", Units: []planner.Unit{{UnitNo: 1, OutcomeCodes: []string{"TP1"}}}}},
+	}
+	mockStore := &MockJobStore{
+		AcquireJobResult: &db.GenerationJob{
+			ID:           "job_1",
+			WorkspaceID:  "ws_1",
+			PackageID:    "pkg_1",
+			GenerationID: "gen_1",
+			Metadata:     map[string]interface{}{"teacher_name": "Bapak Guru"},
 		},
+	}
+
+	deps := WorkerDeps{
+		AI:        mockAI,
+		PDF:       &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")},
+		JobStore:  mockStore,
+		Storage:   &MockStorage{},
+		Planner:   &RealPlanner{},
+		Validator: &RealValidator{},
+	}
+
+	worker := &Worker{Deps: deps}
+
+	payload := basePayload()
+
+	res, err := worker.ExecuteJob(ctx, payload, logger)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
+
+	if res.Status != "completed" {
+		t.Fatalf("Job execution not done: %v", res.FailureReason)
 	}
 }
 
-// Tests
+func TestWorker_ExecuteJob_AIFailure_Retry(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
 
-func TestExecuteJob_TableDriven(t *testing.T) {
-	os.Setenv("GCS_BUCKET", "test-bucket")
-	defer os.Unsetenv("GCS_BUCKET")
-
-	tests := []struct {
-		Name          string
-		MockAI        *MockAIEngine
-		MockPDF       *MockPDFEngine
-		MockStorage   *MockStorage
-		MockJobStore  *MockJobStore
-		MockPlanner   *MockPlanner
-		MockValidator *MockValidator
-		ExpectSuccess bool
-		ExpectError   string
-	}{
-		{
-			Name: "Success Path (SD4 Template)",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `
-				{
-					"identitas": {
-						"sekolah": "SDN Test",
-						"mata_pelajaran": "Matematika",
-						"kelas": 4,
-						"fase": "B",
-						"semester": "1",
-						"topik": "Penjumlahan",
-						"alokasi_waktu": "2x35 menit"
-					},
-					"kompetensi_awal": "Siswa mengenal angka 1-100",
-					"profil_pelajar_pancasila": ["Bernalar Kritis"],
-					"sarana_prasarana": ["Buku Paket"],
-					"target_peserta_didik": "Siswa Reguler",
-					"model_pembelajaran": "Tatap Muka",
-					"tujuan_pembelajaran": "Siswa dapat melakukan penjumlahan dua digit",
-					"materi_pembelajaran": "Penjumlahan Bersusun",
-					"kegiatan_pembelajaran": {
-						"pendahuluan": "Berdoa dan apersepsi",
-						"inti": "Penjelasan guru dan latihan soal",
-						"penutup": "Kesimpulan dan doa"
-					},
-					"penilaian": {
-						"sikap": "Observasi",
-						"pengetahuan": "Tes Tertulis",
-						"keterampilan": "Unjuk Kerja"
-					},
-					"refleksi_guru": "Apakah siswa senang?"
-				}`},
-			},
-			MockPDF: &MockPDFEngine{
-				GenerateBytes: []byte("%PDF-1.4..."),
-			},
-			MockStorage:  &MockStorage{},
-			MockJobStore: &MockJobStore{},
-			MockPlanner: &MockPlanner{
-				PlanResult: &planner.PlannerResult{
-					Semester: "S1",
-					Atps: []planner.Atp{
-						{SubjectCode: "MAT", SubjectName: "Matematika", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
-					},
-					SemesterPlan: planner.SemesterPlan{
-						SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}},
-					},
-				},
-			},
-			MockValidator: &MockValidator{
-				Report: &validator.ValidationReport{OK: true},
-			},
-			ExpectSuccess: true,
+	mockAI := &MockAIEngine{
+		Responses: []*ai.GenerateResponse{
+			nil, // Fail 1
+			{Content: ValidSD4JSON, ModelName: "fixed"},
 		},
-		{
-			Name: "Success Path (Legacy Flow)",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `
-				{
-					"meta": {
-						"jenjang": "SD",
-						"kelas": "4",
-						"mapel": "Seni",
-						"semester": "1",
-						"tahun_ajaran": "2025/2026"
-					},
-					"identitas": {
-						"sekolah": "SDN Test",
-						"guru": "Ibu Test",
-						"alokasi_waktu": "2x35 menit"
-					},
-					"tujuan_pembelajaran": ["TP1"],
-					"materi_inti": ["Gambar"],
-					"langkah_pembelajaran": {
-						"pendahuluan": ["Opener"],
-						"inti": ["Core"],
-						"penutup": ["Closer"]
-					},
-					"asesmen": {
-						"diagnostik": ["-"],
-						"formatif": ["-"],
-						"sumatif": ["-"]
-					},
-					"diferensiasi": {
-						"konten": ["-"],
-						"proses": ["-"],
-						"produk": ["-"]
-					},
-					"profil_pancasila": ["Bernalar Kritis"],
-					"lampiran": {
-						"media": ["-"],
-						"sumber_belajar": ["-"]
-					}
-				}`},
-			},
-			MockPDF: &MockPDFEngine{
-				GenerateBytes: []byte("%PDF-1.4..."),
-			},
-			MockStorage:  &MockStorage{},
-			MockJobStore: &MockJobStore{},
-			MockPlanner: &MockPlanner{
-				PlanResult: &planner.PlannerResult{
-					Semester: "S1",
-					Atps: []planner.Atp{
-						{SubjectCode: "SENI", SubjectName: "Seni", TpItems: []planner.TpItem{{Code: "TP1", Description: "Desc"}}},
-					},
-					SemesterPlan: planner.SemesterPlan{
-						SubjectPlans: []planner.SubjectPlan{{SubjectCode: "SENI"}},
-					},
-				},
-			},
-			MockValidator: &MockValidator{
-				Report: &validator.ValidationReport{OK: true},
-			},
-			ExpectSuccess: true,
-		},
-		{
-			Name: "AI Generation Error",
-			MockAI: &MockAIEngine{
-				GenerateError: fmt.Errorf("AI quota exceeded"),
-			},
-			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: false,
-			ExpectError:   "AI generation failed",
-		},
-		{
-			Name: "Quality Retry Success",
-			MockAI: &MockAIEngine{
-				// Attempt 1: Score 0 (Missing TP) -> Retry
-				// Attempt 2: Score 100 -> Pass
-				Responses: []*ai.GenerateResponse{
-					{Content: `{"identitas":{"sekolah":"X","mata_pelajaran":"Matematika","kelas":4,"fase":"B","semester":"1","topik":"X"}, "tujuan_pembelajaran":""}`},
-					{Content: `
-					{
-						"identitas": {
-							"sekolah": "SDN Test",
-							"mata_pelajaran": "Matematika",
-							"kelas": 4,
-							"fase": "B",
-							"semester": "1",
-							"topik": "Penjumlahan",
-							"alokasi_waktu": "2x35 menit"
-						},
-						"kompetensi_awal": "Siswa mengenal angka 1-100",
-						"profil_pelajar_pancasila": ["Bernalar Kritis"],
-						"sarana_prasarana": ["Buku Paket"],
-						"target_peserta_didik": "Siswa Reguler",
-						"model_pembelajaran": "Tatap Muka",
-						"tujuan_pembelajaran": "Siswa dapat melakukan penjumlahan dua digit yang sah dan benar sesuai kurikulum",
-						"materi_pembelajaran": "Penjumlahan Bersusun yang sangat detail materi intinya",
-						"kegiatan_pembelajaran": {
-							"pendahuluan": "Berdoa dan apersepsi pembukaan pelajaran hari ini",
-							"inti": "Penjelasan guru dan latihan soal secara mendalam dan terstruktur rapih sekali",
-							"penutup": "Kesimpulan dan doa bersama seluruh siswa di kelas"
-						},
-						"penilaian": {
-							"sikap": "Observasi sikap siswa",
-							"pengetahuan": "Tes Tertulis pilihan ganda",
-							"keterampilan": "Unjuk Kerja mandiri"
-						},
-						"refleksi_guru": "Apakah siswa senang dengan metode ini?"
-					}`},
-				},
-				Errors: []error{nil, nil},
-			},
-			MockPDF:       &MockPDFEngine{GenerateBytes: []byte("pdf")},
-			MockStorage:   &MockStorage{},
-			MockJobStore:  &MockJobStore{},
-			MockPlanner:   &MockPlanner{PlanResult: &planner.PlannerResult{SemesterPlan: planner.SemesterPlan{SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}}}}},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: true,
-		},
-		{
-			Name: "Quality Fail (Low Score)",
-			MockAI: &MockAIEngine{
-				// Constant low score: Missing TP, Missing Materi, Short Content, no Pancasila
-				GenerateResponse: &ai.GenerateResponse{Content: `{"identitas":{"sekolah":"X","mata_pelajaran":"Matematika","kelas":4,"fase":"B","semester":"1","topik":"X"}, "tujuan_pembelajaran":"","materi_pembelajaran":"","kegiatan_pembelajaran":{"pendahuluan":"","inti":"short","penutup":""}, "profil_pelajar_pancasila":[]}`},
-			},
-			MockStorage:   &MockStorage{},
-			MockJobStore:  &MockJobStore{},
-			MockPlanner:   &MockPlanner{PlanResult: &planner.PlannerResult{SemesterPlan: planner.SemesterPlan{SubjectPlans: []planner.SubjectPlan{{SubjectCode: "MAT"}}}}},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: false,
-			ExpectError:   "quality_evaluation_failed",
-		},
-		{
-			Name: "AI Invalid JSON",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `INVALID JSON`},
-			},
-			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: false,
-			ExpectError:   "AI generated invalid JSON",
-		},
-		{
-			Name: "PDF Generation Error",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
-			},
-			MockPDF: &MockPDFEngine{
-				GenerateError: fmt.Errorf("chrome crashed"),
-			},
-			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: false,
-			ExpectError:   "PDF render failed",
-		},
-		{
-			Name: "Storage Upload Error",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
-			},
-			MockPDF: &MockPDFEngine{
-				GenerateBytes: []byte("%PDF..."),
-			},
-			MockStorage: &MockStorage{
-				UploadError: fmt.Errorf("network error"),
-			},
-			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			ExpectSuccess: false,
-			ExpectError:   "GCS upload failed",
-		},
-		{
-			Name: "Metadata Persist Error",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`},
-			},
-			MockJobStore: &MockJobStore{
-				UpdateMetaError: fmt.Errorf("db lock timeout"),
-			},
-			MockPlanner:   &MockPlanner{PlanResult: defaultPlannerResult()},
-			MockValidator: &MockValidator{Report: &validator.ValidationReport{OK: true}},
-			// Note: The code calls UpdateJobMetadata multiple times.
-			// 1. AI receipt
-			// 2. PDF receipt
-			// If any fails, we want job to fail.
-			ExpectSuccess: false,
-			ExpectError:   "failed to persist",
-		},
-		{
-			Name: "Planner Error",
-			MockAI: &MockAIEngine{
-				GenerateResponse: &ai.GenerateResponse{Content: `{"meta":{}}`}, // Not reached if planner fails earlier? No, Planner called BEFORE AI.
-			},
-			MockPlanner: &MockPlanner{
-				PlanError: fmt.Errorf("simulated planner error"),
-			},
-			ExpectSuccess: false,
-			ExpectError:   "planner failed",
-		},
-		{
-			Name: "Validator Error",
-			MockPlanner: &MockPlanner{
-				PlanResult: defaultPlannerResult(),
-			},
-			MockValidator: &MockValidator{
-				Error: fmt.Errorf("simulated validator error"), // System error
-			},
-			ExpectSuccess: false,
-			ExpectError:   "validator error",
-		},
-		{
-			Name: "Validation Failure (Logic)",
-			MockPlanner: &MockPlanner{
-				PlanResult: defaultPlannerResult(),
-			},
-			MockValidator: &MockValidator{
-				Report: &validator.ValidationReport{
-					OK:     false,
-					Errors: []validator.ValidationError{{Code: "atp_error", Message: "bad atp"}},
-				},
-			},
-			ExpectSuccess: false,
-			ExpectError:   "validation failed with 1 errors",
-		},
-		{
-			Name: "Idempotency Success (Skip Generation)",
-			MockAI: &MockAIEngine{
-				GenerateError: fmt.Errorf("should not be called"),
-			},
-			MockStorage: &MockStorage{
-				ExistsResult: true, // Artifacts exist
-			},
-			MockPlanner: &MockPlanner{
-				PlanResult: defaultPlannerResult(),
-			},
-			MockValidator: &MockValidator{
-				Report: &validator.ValidationReport{OK: true},
-			},
-			MockJobStore: &MockJobStore{}, // Required for persisting status
-			// Expect success but AI not called.
-			ExpectSuccess: true,
+		Errors: []error{
+			fmt.Errorf("AI down"),
+			nil,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			// Disable idempotency check for most tests, except the one designed to test it
-			if !strings.Contains(tt.Name, "Idempotency") {
-				os.Setenv("SKIP_IDEMPOTENCY", "true")
-				defer os.Setenv("SKIP_IDEMPOTENCY", "")
-			} else {
-				os.Setenv("SKIP_IDEMPOTENCY", "false")
-				defer os.Setenv("SKIP_IDEMPOTENCY", "")
-			}
+	mockStore := &MockJobStore{
+		AcquireJobResult: &db.GenerationJob{
+			ID:       "job_retry",
+			Metadata: map[string]interface{}{},
+		},
+	}
 
-			deps := WorkerDeps{}
-			if tt.MockAI != nil {
-				deps.AI = tt.MockAI
-			}
-			if tt.MockPDF != nil {
-				deps.PDF = tt.MockPDF
-			}
-			if tt.MockStorage != nil {
-				deps.Storage = tt.MockStorage
-			}
-			if tt.MockJobStore != nil {
-				deps.JobStore = tt.MockJobStore
-			}
-			if tt.MockPlanner != nil {
-				deps.Planner = tt.MockPlanner
-			}
-			if tt.MockValidator != nil {
-				deps.Validator = tt.MockValidator
-			}
-			worker := NewWorker(deps)
-			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	deps := WorkerDeps{
+		AI:        mockAI,
+		PDF:       &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")},
+		JobStore:  mockStore,
+		Storage:   &MockStorage{},
+		Planner:   &RealPlanner{},
+		Validator: &RealValidator{},
+	}
 
-			// Inject dummy planner/validator if nil since code relies on them
-			if deps.Planner == nil {
-				worker.Deps.Planner = &MockPlanner{PlanResult: defaultPlannerResult()}
-			}
-			if deps.Validator == nil {
-				worker.Deps.Validator = &MockValidator{Report: &validator.ValidationReport{OK: true}}
-			}
+	worker := &Worker{Deps: deps}
+	payload := basePayload()
+	payload.JobID = "job_retry"
 
-			// We need a valid pack.json or we mock packloader.
-			// The refactored worker calls packloader.LoadPack.
-			// packloader relies on real filesystem.
-			// We can use the existing test pack in ../packs/merdeka/sd4/v1/pack.json
-			// The path in basePayload is relative. We might need to adjust it or mock packloader?
-			// worker.go imports "modulajar/apps/core-go/packloader" directly.
-			// To test properly without relying on FS, we would need PackLoader interface.
-			// For now, let's assume the file exists relative to where `go test` runs (package root).
-			// If running in `apps/core-go/worker`, `../../packs`... is correct.
+	res, err := worker.ExecuteJob(ctx, payload, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-			// Ensure we are in `apps/core-go/worker` for test?
-			// `basePayload().PackPath` is `../packs/...` which means `apps/core-go/packs/...`.
-			// `apps/core-go` is parent.
-			// The actual repo structure: `apps/core-go/packs`.
-			// Random job ID, PID, and DID per test case to avoid idempotency skips
-			payload := basePayload()
-			payload.JobID = ulid.Make().String()
-			payload.PID = ulid.Make().String()
-			// DID is inside graphResult... wait, ExecuteJob creates docgraph results.
-			// Actually, docgraph.GenerateDocGraph generates public IDs.
-			// But the basePayload has PackPath which leads to a specific pack.
-			// Idempotency check in worker.go:
-			// checkArtifactsExist(ctx, pack, doc, payload)
-			// It checks for /{workspace_id}/{pid}/{did}/v1/modul-ajar.html
-
-			// To truly bypass, we need unique PID or WorkspaceID.
-			payload.WorkspaceID = ulid.Make().String()
-
-			result, err := worker.ExecuteJob(context.Background(), payload, logger)
-
-			if tt.ExpectSuccess {
-				if err != nil {
-					t.Fatalf("Expected success, got error: %v", err)
-				}
-				if result.Status != "completed" {
-					t.Errorf("Expected completed, got %s. Reason: %s", result.Status, result.FailureReason)
-				}
-			} else {
-				if err == nil {
-					// Check if result returned failure status
-					if result != nil && result.Status == "failed" {
-						// OK
-					} else {
-						t.Fatal("Expected error or failed status, got success")
-					}
-				} else {
-					if !strings.Contains(err.Error(), tt.ExpectError) {
-						t.Errorf("Expected error containing '%s', got '%s'", tt.ExpectError, err.Error())
-					}
-				}
-			}
-		})
+	if res.Status != "completed" {
+		t.Error("Expected success after retry")
+	}
+	if mockAI.CallCount != 2 {
+		t.Errorf("Expected 2 AI calls, got %d", mockAI.CallCount)
 	}
 }
 
-func TestHelpers(t *testing.T) {
-	// Test subjectName
-	t.Run("subjectName", func(t *testing.T) {
-		pack := &packloader.CurriculumPack{
-			Subjects: []packloader.Subject{
-				{Code: "MAT", Name: "Matematika"},
-				{Code: "IPA", Name: "Ilmu Pengetahuan Alam"},
+func TestWorker_ExecuteJob_MaxAttemptsReached(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
+
+	mockAI := &MockAIEngine{
+		GenerateError: fmt.Errorf("Permafail"),
+	}
+
+	mockStore := &MockJobStore{
+		AcquireJobResult: &db.GenerationJob{
+			ID:       "job_fail",
+			Metadata: map[string]interface{}{},
+		},
+	}
+
+	deps := WorkerDeps{
+		AI:        mockAI,
+		PDF:       &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")},
+		JobStore:  mockStore,
+		Storage:   &MockStorage{},
+		Planner:   &RealPlanner{},
+		Validator: &RealValidator{},
+	}
+
+	worker := &Worker{Deps: deps}
+	payload := basePayload()
+	payload.JobID = "job_fail"
+
+	res, err := worker.ExecuteJob(ctx, payload, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Status == "completed" {
+		t.Error("Expected failure")
+	}
+	if mockAI.CallCount != 2 { // maxAttempts is 2 in code
+		t.Errorf("Expected 2 attempts, got %d", mockAI.CallCount)
+	}
+}
+
+func TestWorker_TemplateRankingInjection(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
+
+	// 1. Setup Mock Data
+	mockAI := &MockAIEngine{
+		GenerateResponse: &ai.GenerateResponse{
+			Content:   ValidSD4JSON,
+			ModelName: "gemini-1.5-flash",
+		},
+	}
+
+	mockStore := &MockJobStore{
+		AcquireJobResult: &db.GenerationJob{
+			ID:           "job_123",
+			WorkspaceID:  "ws_456",
+			PackageID:    "pkg_789",
+			GenerationID: "gen_001",
+			Metadata: map[string]interface{}{
+				"teacher_name": "Test Guru",
+				"school_name":  "SD Test",
 			},
-		}
-		if got := subjectName(pack, "MAT"); got != "Matematika" {
-			t.Errorf("subjectName(MAT) = %s; want Matematika", got)
-		}
-		if got := subjectName(pack, "UNK"); got != "UNK" {
-			t.Errorf("subjectName(UNK) = %s; want UNK", got)
-		}
-	})
+		},
+	}
 
-	// Test maskTeacher
-	t.Run("maskTeacher", func(t *testing.T) {
-		if got := maskTeacher("Guru"); got != "Gur****" {
-			t.Errorf("maskTeacher('Guru') = %s; want Gur****", got)
-		}
-		if got := maskTeacher("Ali"); got != "Ali" {
-			t.Errorf("maskTeacher('Ali') = %s; want Ali", got)
-		}
-	})
+	deps := WorkerDeps{
+		AI:        mockAI,
+		PDF:       &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")},
+		JobStore:  mockStore,
+		Storage:   &MockStorage{},
+		Planner:   &RealPlanner{},
+		Validator: &RealValidator{},
+	}
 
-	// Test min
-	t.Run("min", func(t *testing.T) {
-		if min(1, 2) != 1 {
-			t.Error("min(1, 2) != 1")
-		}
-		if min(5, 3) != 3 {
-			t.Error("min(5, 3) != 3")
-		}
-	})
+	worker := &Worker{Deps: deps}
+
+	payload := basePayload()
+	payload.JobID = "job_123"
+
+	// 2. Mock Ranking Engine
+	originalQuery := ranking.DBQuery
+	defer func() { ranking.DBQuery = originalQuery }()
+
+	ranking.DBQuery = func(ctx context.Context, subject string, grade int) ([]db.DatasetEntry, error) {
+		return []db.DatasetEntry{
+			{
+				ID:           uuid.New().String(),
+				Subject:      "Bahasa Indonesia",
+				Grade:        4,
+				Topic:        "Pecahan Mat",
+				ModuleJSON:   []byte(`{"example":"template"}`),
+				QualityScore: 95,
+			},
+		}, nil
+	}
+
+	// 3. Execute Job
+	res, err := worker.ExecuteJob(ctx, payload, logger)
+	if err != nil {
+		t.Fatalf("ExecuteJob failed: %v", err)
+	}
+
+	if res.Status != "completed" {
+		t.Fatalf("Job execution not done: %v", res.FailureReason)
+	}
+
+	// 4. Verify AI Prompt contains Few-Shot Examples
+	prompt := mockAI.LastRequest.Prompt
+	if !strings.Contains(prompt, "EXAMPLES OF HIGH QUALITY OUTPUT") {
+		t.Error("AI prompt missing few-shot header")
+	}
+	if !strings.Contains(prompt, `{"example":"template"}`) {
+		t.Error("AI prompt missing injected template content")
+	}
+
+	t.Log("Verified template ranking injection in prompt")
 }

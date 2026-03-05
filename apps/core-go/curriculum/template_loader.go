@@ -12,7 +12,9 @@ import (
 // subjectFileMap maps subject codes to template filenames.
 var subjectFileMap = map[string]string{
 	"MAT":  "matematika.json",
+	"MTK":  "matematika.json",
 	"BIN":  "bahasa_indonesia.json",
+	"BI":   "bahasa_indonesia.json",
 	"IPAS": "ipas.json",
 	"PPKN": "ppkn.json",
 }

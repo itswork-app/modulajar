@@ -91,6 +91,7 @@ type DatasetEntry struct {
 	Topic        string
 	ModuleJSON   []byte
 	QualityScore int
+	UsageCount   int
 	OriginalHash string
 }
 

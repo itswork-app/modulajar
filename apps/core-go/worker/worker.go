@@ -19,6 +19,7 @@ import (
 	"modulajar/apps/core-go/curriculum"
 	"modulajar/apps/core-go/curriculum/dataset"
 	"modulajar/apps/core-go/curriculum/qeval"
+	"modulajar/apps/core-go/curriculum/ranking"
 	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
 	"modulajar/apps/core-go/gcs"
@@ -27,6 +28,8 @@ import (
 	"modulajar/apps/core-go/planner"
 	"modulajar/apps/core-go/render"
 	"modulajar/apps/core-go/validator"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // TaskPayload is the internal payload used by ExecuteJob.
@@ -218,6 +221,37 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 			}
 		}
 
+		var rankedTemplates []ranking.RankedTemplate
+		var templateExamples []string
+		{
+			timer := prometheus.NewTimer(metrics.TemplateRankLatencyMs)
+			metrics.TemplateRankRequestsTotal.Inc()
+
+			candidates, err := ranking.GetTemplateCandidates(ctx, subjectForTemplate, 4) // SD4 is grade 4
+			if err != nil {
+				logger.Warn("failed to fetch ranking candidates", "error", err)
+			} else {
+				rankedTemplates = ranking.SelectTopTemplates(candidates, subjectForTemplate)
+				for _, rt := range rankedTemplates {
+					templateExamples = append(templateExamples, string(rt.Candidate.ModuleJSON))
+				}
+			}
+			timer.ObserveDuration()
+			metrics.TemplateSelectedTotal.WithLabelValues(fmt.Sprintf("%d", len(templateExamples))).Inc()
+
+			if len(rankedTemplates) > 0 {
+				ids := make([]string, len(rankedTemplates))
+				for i, rt := range rankedTemplates {
+					ids[i] = rt.Candidate.ID.String()
+				}
+				logger.Info("template_rank_selected",
+					"subject", subjectForTemplate,
+					"grade", 4,
+					"topic", subjectForTemplate,
+					"templates", ids)
+			}
+		}
+
 		var resp *ai.GenerateResponse
 		var aiErr error
 		var qualityResult qeval.QualityResult
@@ -240,6 +274,7 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 					payload.Semester,
 					subjectForTemplate, // topic = subject for now
 					string(templateJSON),
+					templateExamples,
 				)
 			} else {
 				schemaPrompt = fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
@@ -374,6 +409,16 @@ No markdown formatting. Pure JSON.`,
 				"score", qualityResult.Score,
 				"verdict", qualityResult.Verdict,
 				"flags", qualityResult.Flags)
+
+			// PR-063: Update Usage Counts for selected templates (Async)
+			for _, rt := range rankedTemplates {
+				go func(id string) {
+					if err := db.IncrementDatasetUsage(context.Background(), id); err != nil {
+						slog.Warn("failed to increment template usage", "id", id, "error", err)
+					}
+				}(rt.Candidate.ID.String())
+			}
+
 			break
 		}
 

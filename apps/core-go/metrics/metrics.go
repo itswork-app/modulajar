@@ -90,6 +90,23 @@ var (
 		Name: "dataset_rejected_quality",
 		Help: "Total number of modules rejected for dataset collection due to low quality score",
 	})
+
+	// PR-063: Template Ranking Metrics
+	TemplateRankRequestsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "template_rank_requests_total",
+		Help: "Total number of requests to the template ranking engine",
+	})
+
+	TemplateRankLatencyMs = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "template_rank_latency_ms",
+		Help:    "Latency of the template ranking selection in ms",
+		Buckets: []float64{1, 2, 5, 10, 20, 50, 100},
+	})
+
+	TemplateSelectedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "template_selected_total",
+		Help: "Total number of templates selected for injection",
+	}, []string{"count"}) // "0", "1", "2", "3"
 )
 
 // DefaultStuckThresholdSeconds is the default threshold for stuck job detection (5 minutes).

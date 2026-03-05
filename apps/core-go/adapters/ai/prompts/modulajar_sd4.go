@@ -41,15 +41,36 @@ Pastikan semua field terisi.
 %s`, templateJSON)
 }
 
-// BuildFullPrompt combines system, instruction, and schema prompts into one.
-func BuildFullPrompt(school, subject, semester, topic, templateJSON string) string {
+// BuildFewShotPrompt creates a prompt section containing high-quality examples.
+func BuildFewShotPrompt(examples []string) string {
+	if len(examples) == 0 {
+		return ""
+	}
+
+	prompt := "--- EXAMPLES OF HIGH QUALITY OUTPUT ---\n"
+	prompt += "Use the following examples for style, tone, and formatting inspiration:\n\n"
+
+	for i, ex := range examples {
+		prompt += fmt.Sprintf("EXAMPLE %d:\n%s\n\n", i+1, ex)
+	}
+
+	prompt += "--- END OF EXAMPLES ---\n"
+	return prompt
+}
+
+// BuildFullPrompt combines system, instruction, schema, and optional few-shot examples.
+func BuildFullPrompt(school, subject, semester, topic, templateJSON string, examples []string) string {
+	fewShot := BuildFewShotPrompt(examples)
+
 	return fmt.Sprintf(`%s
 
 ---
 
 %s
 
+%s
+
 ---
 
-%s`, BuildSystemPrompt(), BuildInstructionPrompt(school, subject, semester, topic), BuildSchemaPrompt(templateJSON))
+%s`, BuildSystemPrompt(), BuildInstructionPrompt(school, subject, semester, topic), fewShot, BuildSchemaPrompt(templateJSON))
 }
