@@ -293,7 +293,7 @@ func TestRetryBehavior(t *testing.T) {
 	}
 
 	// Test MarkJobFailed
-	err = MarkJobFailed(ctx, jobID, "simulated error", 1) // 1st attempt failed
+	err = MarkJobFailed(ctx, workspaceID, jobID, "simulated error", 1) // 1st attempt failed
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestRetryBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = MarkJobFailed(ctx, jobID2, "max error", 5)
+	err = MarkJobFailed(ctx, workspaceID, jobID2, "max error", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestOtherDBFunctions(t *testing.T) {
 	_, _ = pool.Exec(ctx, `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata) VALUES ($1, $2, $3, 'running', $4, '{}')`, jobID, workspaceID, packageID, generationID)
 
 	// Test MarkJobDone
-	if err := MarkJobDone(ctx, jobID); err != nil {
+	if err := MarkJobDone(ctx, workspaceID, jobID); err != nil {
 		t.Errorf("MarkJobDone failed: %v", err)
 	}
 	var status string
@@ -405,7 +405,7 @@ func TestOtherDBFunctions(t *testing.T) {
 
 	// Test UpdateJobMetadata
 	metaUpdate := map[string]interface{}{"foo": "bar"}
-	if err := UpdateJobMetadata(ctx, jobID, metaUpdate); err != nil {
+	if err := UpdateJobMetadata(ctx, workspaceID, jobID, metaUpdate); err != nil {
 		t.Errorf("UpdateJobMetadata failed: %v", err)
 	}
 	var metaJSON []byte
@@ -415,7 +415,7 @@ func TestOtherDBFunctions(t *testing.T) {
 	}
 
 	// Test UpdatePackageStatus
-	if err := UpdatePackageStatus(ctx, packageID, "generating"); err != nil {
+	if err := UpdatePackageStatus(ctx, workspaceID, packageID, "generating"); err != nil {
 		t.Errorf("UpdatePackageStatus failed: %v", err)
 	}
 
@@ -451,7 +451,7 @@ func TestOtherDBFunctions(t *testing.T) {
 	}
 
 	// Test UpdateDocumentStatus
-	if err := UpdateDocumentStatus(ctx, doc.PublicID, "published"); err != nil {
+	if err := UpdateDocumentStatus(ctx, workspaceID, doc.PublicID, "published"); err != nil {
 		t.Errorf("UpdateDocumentStatus failed: %v", err)
 	}
 	var docStatus string
@@ -461,7 +461,7 @@ func TestOtherDBFunctions(t *testing.T) {
 	}
 
 	// Test UpdateDocumentMetadata
-	if err := UpdateDocumentMetadata(ctx, doc.PublicID, map[string]interface{}{"new": "val"}); err != nil {
+	if err := UpdateDocumentMetadata(ctx, workspaceID, doc.PublicID, map[string]interface{}{"new": "val"}); err != nil {
 		t.Errorf("UpdateDocumentMetadata failed: %v", err)
 	}
 }
@@ -512,28 +512,28 @@ func TestUninitializedDB(t *testing.T) {
 	if _, err := AcquireJob(ctx); err == nil {
 		t.Error("Expected error for AcquireJob")
 	}
-	if err := MarkJobDone(ctx, "id"); err == nil {
+	if err := MarkJobDone(ctx, "ws", "id"); err == nil {
 		t.Error("Expected error for MarkJobDone")
 	}
-	if err := MarkJobFailed(ctx, "id", "err", 1); err == nil {
+	if err := MarkJobFailed(ctx, "ws", "id", "err", 1); err == nil {
 		t.Error("Expected error for MarkJobFailed")
 	}
-	if err := UpdatePackageStatus(ctx, "id", "s"); err == nil {
+	if err := UpdatePackageStatus(ctx, "ws", "id", "s"); err == nil {
 		t.Error("Expected error for UpdatePackageStatus")
 	}
 	if _, err := GetQueueStats(ctx); err == nil {
 		t.Error("Expected error for GetQueueStats")
 	}
-	if err := UpdateJobMetadata(ctx, "id", nil); err == nil {
+	if err := UpdateJobMetadata(ctx, "ws", "id", nil); err == nil {
 		t.Error("Expected error for UpdateJobMetadata")
 	}
 	if err := SaveDocument(ctx, Document{}); err == nil {
 		t.Error("Expected error for SaveDocument")
 	}
-	if err := UpdateDocumentStatus(ctx, "id", "s"); err == nil {
+	if err := UpdateDocumentStatus(ctx, "ws", "id", "s"); err == nil {
 		t.Error("Expected error for UpdateDocumentStatus")
 	}
-	if err := UpdateDocumentMetadata(ctx, "id", nil); err == nil {
+	if err := UpdateDocumentMetadata(ctx, "ws", "id", nil); err == nil {
 		t.Error("Expected error for UpdateDocumentMetadata")
 	}
 	if err := Ping(ctx); err == nil {

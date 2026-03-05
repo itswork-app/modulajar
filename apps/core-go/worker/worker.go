@@ -182,7 +182,7 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 					Metadata:    map[string]interface{}{},
 				}
 				_ = w.Deps.JobStore.SaveDocument(ctx, dbDoc)
-				_ = w.Deps.JobStore.UpdateDocumentStatus(ctx, doc.PublicID, "ready")
+				_ = w.Deps.JobStore.UpdateDocumentStatus(ctx, doc.WorkspaceID, doc.PublicID, "ready")
 			}
 
 			// Return success, handler will mark job done.
@@ -487,7 +487,7 @@ No markdown formatting. Pure JSON.`,
 				},
 			}
 
-			if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, receipt); err != nil {
+			if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.WorkspaceID, payload.JobID, receipt); err != nil {
 				logger.Error("Failed to persist AI receipt", "error", err)
 				return failResult(fmt.Sprintf("failed to persist AI receipt: %v", err)), nil
 			}
@@ -579,7 +579,7 @@ No markdown formatting. Pure JSON.`,
 		htmlHash := sha256.Sum256([]byte(html))
 		htmlHashStr := hex.EncodeToString(htmlHash[:])
 
-		w.Deps.JobStore.UpdateDocumentMetadata(ctx, doc.PublicID, map[string]interface{}{
+		w.Deps.JobStore.UpdateDocumentMetadata(ctx, doc.WorkspaceID, doc.PublicID, map[string]interface{}{
 			"html_sha256": htmlHashStr,
 		})
 
@@ -604,7 +604,7 @@ No markdown formatting. Pure JSON.`,
 				VerifyURL:   fmt.Sprintf("verify.modulajar.app/verify/%s", rd.DID),
 			}
 
-			w.Deps.JobStore.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+			w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, map[string]interface{}{
 				"watermark_summary": map[string]string{
 					"teacher_masked": maskedTeacher,
 					"school_name":    payload.SchoolName,
@@ -670,13 +670,13 @@ No markdown formatting. Pure JSON.`,
 						"generated_at":   time.Now().Format(time.RFC3339),
 					}
 
-					w.Deps.JobStore.UpdateDocumentMetadata(ctx, rd.DID, map[string]interface{}{
+					w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, map[string]interface{}{
 						"pdf_sha256":   rd.PDFHash,
 						"pdf_path":     rd.FilePath,
 						"generated_at": time.Now().Format(time.RFC3339),
 					})
 
-					w.Deps.JobStore.UpdateDocumentStatus(ctx, rd.DID, "done")
+					w.Deps.JobStore.UpdateDocumentStatus(ctx, payload.WorkspaceID, rd.DID, "done")
 				}
 				break
 			}
@@ -688,7 +688,7 @@ No markdown formatting. Pure JSON.`,
 		update := map[string]interface{}{
 			"pdf_receipts": pdfMetadata,
 		}
-		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.JobID, update); err != nil {
+		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.WorkspaceID, payload.JobID, update); err != nil {
 			return failResult(fmt.Sprintf("failed to persist PDF receipts: %v", err)), nil
 		}
 	}

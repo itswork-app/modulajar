@@ -127,15 +127,15 @@ type MockJobStore struct {
 func (m *MockJobStore) AcquireJob(ctx context.Context) (*db.GenerationJob, error) {
 	return m.AcquireJobResult, m.AcquireJobError
 }
-func (m *MockJobStore) UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error {
+func (m *MockJobStore) UpdateJobMetadata(ctx context.Context, workspaceID string, jobID string, metadata map[string]interface{}) error {
 	m.PersistedMetadata = append(m.PersistedMetadata, metadata)
 	return m.UpdateMetaError
 }
-func (m *MockJobStore) MarkJobDone(ctx context.Context, jobID string) error {
+func (m *MockJobStore) MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 	m.MarkDoneCalled = true
 	return m.MarkDoneError
 }
-func (m *MockJobStore) MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCount int) error {
+func (m *MockJobStore) MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg string, attemptCount int) error {
 	m.MarkFailedCalled = true
 	m.MarkFailedReason = errMsg
 	return m.MarkFailedError
@@ -143,13 +143,13 @@ func (m *MockJobStore) MarkJobFailed(ctx context.Context, jobID string, errMsg s
 func (m *MockJobStore) SaveDocument(ctx context.Context, doc db.Document) error {
 	return m.SaveDocError
 }
-func (m *MockJobStore) UpdateDocumentStatus(ctx context.Context, docID string, status string) error {
+func (m *MockJobStore) UpdateDocumentStatus(ctx context.Context, workspaceID string, docID string, status string) error {
 	return m.UpdateStatusError
 }
-func (m *MockJobStore) UpdateDocumentMetadata(ctx context.Context, docID string, metadata map[string]interface{}) error {
+func (m *MockJobStore) UpdateDocumentMetadata(ctx context.Context, workspaceID string, docID string, metadata map[string]interface{}) error {
 	return m.UpdateDocMetaError
 }
-func (m *MockJobStore) UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
+func (m *MockJobStore) UpdatePackageStatus(ctx context.Context, workspaceID string, packageID string, status string) error {
 	return m.UpdatePkgError
 }
 

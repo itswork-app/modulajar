@@ -103,8 +103,8 @@ export default async function onboardingRoutes(fastify: FastifyInstance) {
             // Update teacher primary fields + mark onboarding completed
             await fastify.db.query(
                 `UPDATE teachers SET primary_subject = $1, primary_grade = $2, onboarding_completed = TRUE, updated_at = NOW()
-                 WHERE id = $3`,
-                [subject, grade, teacherId]
+                 WHERE id = $3 AND workspace_id = $4`,
+                [subject, grade, teacherId, workspaceId]
             );
 
             onboardingCompletedTotal.inc();

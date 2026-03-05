@@ -49,7 +49,7 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		payload, err := jobToPayload(job)
 		if err != nil {
 			baseLogger.Error("Invalid metadata", "job_id", job.ID, "error", err)
-			w.Deps.JobStore.MarkJobFailed(ctx, job.ID, "invalid metadata", job.AttemptCount)
+			w.Deps.JobStore.MarkJobFailed(ctx, payload.WorkspaceID, job.ID, "invalid metadata", job.AttemptCount)
 			metrics.JobFailuresTotal.Inc()
 			rw.WriteHeader(http.StatusOK) // Don't retry invalid metadata
 			return
@@ -69,7 +69,7 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		start := time.Now()
 
 		// 2. Mark package as generating
-		w.Deps.JobStore.UpdatePackageStatus(ctx, job.PackageID, "generating")
+		w.Deps.JobStore.UpdatePackageStatus(ctx, job.WorkspaceID, job.PackageID, "generating")
 
 		// 3. Exec
 		result, err := w.ExecuteJob(ctx, payload, logger)
@@ -92,10 +92,10 @@ func NewHandler(w *Worker) http.HandlerFunc {
 
 			// Retry logic handled by MarkJobFailed
 			// Note: We need to pass attemptCount. JobStore.MarkJobFailed expects it.
-			w.Deps.JobStore.MarkJobFailed(ctx, job.ID, reason, job.AttemptCount)
+			w.Deps.JobStore.MarkJobFailed(ctx, job.WorkspaceID, job.ID, reason, job.AttemptCount)
 
 			// Also update package
-			w.Deps.JobStore.UpdatePackageStatus(ctx, job.PackageID, "failed")
+			w.Deps.JobStore.UpdatePackageStatus(ctx, job.WorkspaceID, job.PackageID, "failed")
 
 			rw.WriteHeader(http.StatusOK)
 			return
@@ -111,8 +111,8 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		// So it is safe to call MarkJobDone here.
 		// Wait, did ExecuteJob return result? Yes.
 
-		w.Deps.JobStore.MarkJobDone(ctx, job.ID)
-		w.Deps.JobStore.UpdatePackageStatus(ctx, job.PackageID, "ready")
+		w.Deps.JobStore.MarkJobDone(ctx, job.WorkspaceID, job.ID)
+		w.Deps.JobStore.UpdatePackageStatus(ctx, job.WorkspaceID, job.PackageID, "ready")
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)

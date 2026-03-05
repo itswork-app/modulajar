@@ -28,6 +28,10 @@ function buildApp(opts: {
         },
     } as any);
 
+    fastify.decorate('storage', {
+        generateSignedUrl: async () => 'https://signed.url/test'
+    });
+
     fastify.register(mockAuthPlugin);
     fastify.register(workspaceGuardPlugin);
     fastify.register(modulesRoutes);
@@ -69,7 +73,7 @@ test('GET /w/:workspaceId/modules/:moduleId', async (t) => {
         t.equal(body.module_id, 'mod_1');
         t.equal(body.topic, 'Tata Surya');
         t.equal(body.pdf?.sha256, 'abcdef123');
-        t.match(body.pdf?.download_url, /https:\/\/storage.googleapis.com/);
+        t.match(body.pdf?.download_url, /https:\/\/signed\.url/);
         t.ok(body.verify?.url);
 
         await fastify.close();
