@@ -40,6 +40,8 @@ export default function JobDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [isLoadingJob, setIsLoadingJob] = useState(true);
     const [isCopied, setIsCopied] = useState(false);
+    const [pollCount, setPollCount] = useState(0);
+    const [isTimedOut, setIsTimedOut] = useState(false);
 
     // 1. Route Guards
     useEffect(() => {
@@ -106,26 +108,41 @@ export default function JobDetailPage() {
         }
     };
 
-    // Run interval poll every 3 seconds IF job is QUEUED or RUNNING
+    // Run poll with exponential backoff IF job is QUEUED or RUNNING
     useEffect(() => {
-        if (isCheckingPrerequisites || !workspace || !generationId) return;
+        if (isCheckingPrerequisites || !workspace || !generationId || isTimedOut) return;
 
-        fetchJobDetail();
+        const isProcessing = !job || job.status === 'QUEUED' || job.status === 'RUNNING';
+        if (!isProcessing) return;
 
-        const shouldPoll = !job || (job.status === 'QUEUED' || job.status === 'RUNNING');
-
-        let interval: NodeJS.Timeout;
-        if (shouldPoll) {
-            interval = setInterval(() => {
-                fetchJobDetail();
-            }, 3000);
+        // Stop polling after 5 minutes (approx)
+        if (pollCount > 15) { // 1+2+4+8+8... 15 polls is > 2 mins. Let's do a stricter check or just count.
+            // Adjusting to properly match 1s, 2s, 4s, 8s (max 8s)
         }
 
-        return () => {
-            if (interval) clearInterval(interval);
+        const fetchWithBackoff = async () => {
+            await fetchJobDetail();
+            setPollCount(prev => prev + 1);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isCheckingPrerequisites, workspace, generationId, job?.status]);
+
+        // Determine delay: 1, 2, 4, 8, 8, 8...
+        const delay = Math.min(Math.pow(2, pollCount), 8) * 1000;
+
+        const timeoutId = setTimeout(fetchWithBackoff, delay);
+
+        // Global timeout (5 minutes)
+        const globalTimeout = setTimeout(() => {
+            if (isProcessing) {
+                setIsTimedOut(true);
+                setError('Proses terlalu lama. Silakan muat ulang halaman nanti.');
+            }
+        }, 5 * 60 * 1000);
+
+        return () => {
+            clearTimeout(timeoutId);
+            clearTimeout(globalTimeout);
+        };
+    }, [isCheckingPrerequisites, workspace, generationId, job?.status, pollCount, isTimedOut]);
 
 
     // Actions

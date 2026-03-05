@@ -56,32 +56,32 @@ func (r *RealJobStore) AcquireJob(ctx context.Context) (*db.GenerationJob, error
 	return db.AcquireJob(ctx)
 }
 
-func (r *RealJobStore) UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error {
-	return db.UpdateJobMetadata(ctx, jobID, metadata)
+func (r *RealJobStore) UpdateJobMetadata(ctx context.Context, workspaceID string, jobID string, metadata map[string]interface{}) error {
+	return db.UpdateJobMetadata(ctx, workspaceID, jobID, metadata)
 }
 
-func (r *RealJobStore) MarkJobDone(ctx context.Context, jobID string) error {
-	return db.MarkJobDone(ctx, jobID)
+func (r *RealJobStore) MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
+	return db.MarkJobDone(ctx, workspaceID, jobID)
 }
 
-func (r *RealJobStore) MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCount int) error {
-	return db.MarkJobFailed(ctx, jobID, errMsg, attemptCount)
+func (r *RealJobStore) MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg string, attemptCount int) error {
+	return db.MarkJobFailed(ctx, workspaceID, jobID, errMsg, attemptCount)
 }
 
-func (r *RealJobStore) UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
-	return db.UpdatePackageStatus(ctx, packageID, status)
+func (r *RealJobStore) UpdatePackageStatus(ctx context.Context, workspaceID string, packageID string, status string) error {
+	return db.UpdatePackageStatus(ctx, workspaceID, packageID, status)
 }
 
 func (r *RealJobStore) SaveDocument(ctx context.Context, doc db.Document) error {
 	return db.SaveDocument(ctx, doc)
 }
 
-func (r *RealJobStore) UpdateDocumentStatus(ctx context.Context, publicID string, status string) error {
-	return db.UpdateDocumentStatus(ctx, publicID, status)
+func (r *RealJobStore) UpdateDocumentStatus(ctx context.Context, workspaceID string, publicID string, status string) error {
+	return db.UpdateDocumentStatus(ctx, workspaceID, publicID, status)
 }
 
-func (r *RealJobStore) UpdateDocumentMetadata(ctx context.Context, publicID string, metadata map[string]interface{}) error {
-	return db.UpdateDocumentMetadata(ctx, publicID, metadata)
+func (r *RealJobStore) UpdateDocumentMetadata(ctx context.Context, workspaceID string, publicID string, metadata map[string]interface{}) error {
+	return db.UpdateDocumentMetadata(ctx, workspaceID, publicID, metadata)
 }
 
 // RealPlanner wraps planner package

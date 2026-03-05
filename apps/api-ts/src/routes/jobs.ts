@@ -46,8 +46,8 @@ export default async function jobsRoutes(fastify: FastifyInstance) {
             // Also check documents table for precise rendering status if 'running'
             if (job.status === 'running' && job.package_id) {
                 const docsResult = await fastify.db.query(
-                    `SELECT status FROM documents WHERE package_id = $1`,
-                    [job.package_id]
+                    `SELECT status FROM documents WHERE package_id = $1 AND workspace_id = $2`,
+                    [job.package_id, workspaceId]
                 );
                 if (docsResult.rowCount && docsResult.rowCount > 0) {
                     const docStatus = docsResult.rows[0].status;

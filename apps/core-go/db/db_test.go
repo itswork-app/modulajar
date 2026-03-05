@@ -178,7 +178,7 @@ func TestUpdatePackageStatus(t *testing.T) {
 	pkgID := "test-pkg-status"
 	p.Exec(ctx, "INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status) VALUES ($1, $2, $3, '1', '1', '2025', 'T', 'S', 'draft') ON CONFLICT (id) DO NOTHING", pkgID, wsID, "PKG-STATUS")
 
-	if err := UpdatePackageStatus(ctx, pkgID, "generating"); err != nil {
+	if err := UpdatePackageStatus(ctx, wsID, pkgID, "generating"); err != nil {
 		t.Errorf("UpdatePackageStatus failed: %v", err)
 	}
 }
@@ -197,7 +197,7 @@ func TestMarkJobDone(t *testing.T) {
 	jobID := "job-done"
 	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-done', $2, $3, 'running', '{}')", jobID, wsID, pkgID)
 
-	if err := MarkJobDone(ctx, jobID); err != nil {
+	if err := MarkJobDone(ctx, wsID, jobID); err != nil {
 		t.Errorf("MarkJobDone failed: %v", err)
 	}
 
@@ -223,7 +223,7 @@ func TestMarkJobFailed(t *testing.T) {
 	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-fail', $2, $3, 'running', '{}')", jobID, wsID, pkgID)
 
 	// Attempt 1 -> Queued with backoff
-	if err := MarkJobFailed(ctx, jobID, "error 1", 1); err != nil {
+	if err := MarkJobFailed(ctx, wsID, jobID, "error 1", 1); err != nil {
 		t.Errorf("MarkJobFailed 1 failed: %v", err)
 	}
 	var status string
@@ -233,7 +233,7 @@ func TestMarkJobFailed(t *testing.T) {
 	}
 
 	// Attempt 5 -> Failed
-	if err := MarkJobFailed(ctx, jobID, "error 5", 5); err != nil {
+	if err := MarkJobFailed(ctx, wsID, jobID, "error 5", 5); err != nil {
 		t.Errorf("MarkJobFailed 5 failed: %v", err)
 	}
 	p.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id=$1", jobID).Scan(&status)
@@ -256,7 +256,7 @@ func TestUpdateJobMetadata(t *testing.T) {
 	p.Exec(ctx, "INSERT INTO generation_jobs (id, generation_id, workspace_id, package_id, status, metadata) VALUES ($1, 'gen-meta', $2, $3, 'queued', '{}')", jobID, wsID, pkgID)
 
 	meta := map[string]interface{}{"foo": "bar"}
-	if err := UpdateJobMetadata(ctx, jobID, meta); err != nil {
+	if err := UpdateJobMetadata(ctx, wsID, jobID, meta); err != nil {
 		t.Errorf("UpdateJobMetadata failed: %v", err)
 	}
 
@@ -305,7 +305,7 @@ func TestDocumentLifecycle(t *testing.T) {
 	}
 
 	// 2. UpdateDocumentStatus
-	if err := UpdateDocumentStatus(ctx, doc.PublicID, "ready"); err != nil {
+	if err := UpdateDocumentStatus(ctx, wsID, doc.PublicID, "ready"); err != nil {
 		t.Errorf("UpdateDocumentStatus failed: %v", err)
 	}
 	p.QueryRow(ctx, "SELECT status FROM documents WHERE id=$1", doc.ID).Scan(&status)
@@ -315,7 +315,7 @@ func TestDocumentLifecycle(t *testing.T) {
 
 	// 3. UpdateDocumentMetadata
 	meta := map[string]interface{}{"done": true}
-	if err := UpdateDocumentMetadata(ctx, doc.PublicID, meta); err != nil {
+	if err := UpdateDocumentMetadata(ctx, wsID, doc.PublicID, meta); err != nil {
 		t.Errorf("UpdateDocumentMetadata failed: %v", err)
 	}
 
@@ -374,28 +374,28 @@ func TestUninitialized(t *testing.T) {
 	if _, err := AcquireJob(ctx); err == nil {
 		t.Error("expected error for uninitialized AcquireJob")
 	}
-	if err := MarkJobDone(ctx, "id"); err == nil {
+	if err := MarkJobDone(ctx, "ws", "id"); err == nil {
 		t.Error("expected error for uninitialized MarkJobDone")
 	}
-	if err := MarkJobFailed(ctx, "id", "err", 1); err == nil {
+	if err := MarkJobFailed(ctx, "ws", "id", "err", 1); err == nil {
 		t.Error("expected error for uninitialized MarkJobFailed")
 	}
-	if err := UpdatePackageStatus(ctx, "id", "status"); err == nil {
+	if err := UpdatePackageStatus(ctx, "ws", "id", "status"); err == nil {
 		t.Error("expected error for uninitialized UpdatePackageStatus")
 	}
 	if _, err := GetQueueStats(ctx); err == nil {
 		t.Error("expected error for uninitialized GetQueueStats")
 	}
-	if err := UpdateJobMetadata(ctx, "id", nil); err == nil {
+	if err := UpdateJobMetadata(ctx, "ws", "id", nil); err == nil {
 		t.Error("expected error for uninitialized UpdateJobMetadata")
 	}
 	if err := SaveDocument(ctx, Document{}); err == nil {
 		t.Error("expected error for uninitialized SaveDocument")
 	}
-	if err := UpdateDocumentStatus(ctx, "id", "status"); err == nil {
+	if err := UpdateDocumentStatus(ctx, "ws", "id", "status"); err == nil {
 		t.Error("expected error for uninitialized UpdateDocumentStatus")
 	}
-	if err := UpdateDocumentMetadata(ctx, "id", nil); err == nil {
+	if err := UpdateDocumentMetadata(ctx, "ws", "id", nil); err == nil {
 		t.Error("expected error for uninitialized UpdateDocumentMetadata")
 	}
 }
@@ -427,7 +427,7 @@ func TestClosedPool(t *testing.T) {
 	}
 
 	// Test a few functions that use pool.Exec/QueryRow
-	if err := MarkJobDone(ctx, "any"); err == nil {
+	if err := MarkJobDone(ctx, "any", "any"); err == nil {
 		t.Error("expected error on closed pool MarkJobDone")
 	}
 	if _, err := GetQueueStats(ctx); err == nil {
@@ -447,7 +447,7 @@ func TestSerializationErrors(t *testing.T) {
 	// Non-serializable type (channel)
 	badMeta := map[string]interface{}{"ch": make(chan int)}
 
-	if err := UpdateJobMetadata(ctx, "id", badMeta); err == nil {
+	if err := UpdateJobMetadata(ctx, "ws", "id", badMeta); err == nil {
 		t.Error("expected marshal error in UpdateJobMetadata")
 	}
 
@@ -455,7 +455,7 @@ func TestSerializationErrors(t *testing.T) {
 		t.Error("expected marshal error in SaveDocument")
 	}
 
-	if err := UpdateDocumentMetadata(ctx, "id", badMeta); err == nil {
+	if err := UpdateDocumentMetadata(ctx, "ws", "id", badMeta); err == nil {
 		t.Error("expected marshal error in UpdateDocumentMetadata")
 	}
 }
@@ -547,13 +547,13 @@ func TestMarkJobFailed_EdgeCases(t *testing.T) {
 	defer cancel()
 
 	// Test attemptCount = 0 for backoffSeconds < 5 path
-	err := MarkJobFailed(ctx, "any", "err", 0)
+	err := MarkJobFailed(ctx, "any", "any", "err", 0)
 	if err == nil {
 		// It might succeed if it just updates the DB row, but we want to cover the logic
 	}
 
 	// Test max attempts reached
-	err = MarkJobFailed(ctx, "any", "err", 5)
+	err = MarkJobFailed(ctx, "any", "any", "err", 5)
 }
 
 func TestInit_Errors(t *testing.T) {

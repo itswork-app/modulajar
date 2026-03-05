@@ -31,15 +31,15 @@ type Storage interface {
 // JobStore abstracts database operations for jobs and documents.
 type JobStore interface {
 	AcquireJob(ctx context.Context) (*db.GenerationJob, error)
-	UpdateJobMetadata(ctx context.Context, jobID string, metadata map[string]interface{}) error
-	MarkJobDone(ctx context.Context, jobID string) error
-	MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCount int) error
+	UpdateJobMetadata(ctx context.Context, workspaceID string, jobID string, metadata map[string]interface{}) error
+	MarkJobDone(ctx context.Context, workspaceID string, jobID string) error
+	MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg string, attemptCount int) error
 
-	UpdatePackageStatus(ctx context.Context, packageID string, status string) error
+	UpdatePackageStatus(ctx context.Context, workspaceID string, packageID string, status string) error
 
 	SaveDocument(ctx context.Context, doc db.Document) error
-	UpdateDocumentStatus(ctx context.Context, publicID string, status string) error
-	UpdateDocumentMetadata(ctx context.Context, publicID string, metadata map[string]interface{}) error
+	UpdateDocumentStatus(ctx context.Context, workspaceID string, publicID string, status string) error
+	UpdateDocumentMetadata(ctx context.Context, workspaceID string, publicID string, metadata map[string]interface{}) error
 }
 
 // Planner abstracts the planning logic

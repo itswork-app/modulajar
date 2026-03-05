@@ -35,6 +35,9 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                 return reply.code(400).send({ error: 'Missing required fields: mode, subject, grade, topic' });
             }
 
+            if (grade < 1 || grade > 12) {
+                return reply.code(400).send({ error: 'Invalid grade. Must be between 1 and 12.' });
+            }
             if (mode === 'template' || mode === 'edit_template') {
                 if (!template_id) {
                     return reply.code(400).send({ error: 'template_id is required for template and edit_template modes' });
@@ -176,7 +179,16 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                     // For safety, generate signed URL if needed, but for now we format it
                     pdfDownloadUrl = firstReceipt.pdf_path;
                     if (pdfDownloadUrl.startsWith('gcs://')) {
-                        pdfDownloadUrl = pdfDownloadUrl.replace('gcs://modulajar-assets-dev', 'https://storage.googleapis.com/modulajar-assets-dev');
+                        const path = pdfDownloadUrl.replace('gcs://' + (process.env.GCS_BUCKET || 'modulajar-assets-dev') + '/', '');
+                        try {
+                            pdfDownloadUrl = await fastify.storage.generateSignedUrl(
+                                process.env.GCS_BUCKET || 'modulajar-assets-dev',
+                                path
+                            );
+                        } catch (err) {
+                            fastify.log.error(err, 'Failed to generate signed URL');
+                            pdfDownloadUrl = null; // Fallback or handle error
+                        }
                     }
                     pdfSha256 = firstReceipt.pdf_sha256 || '';
                 }

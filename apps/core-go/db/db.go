@@ -205,7 +205,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 }
 
 // MarkJobDone updates the job status to 'done', and atomically evaluates referral rewards.
-func MarkJobDone(ctx context.Context, jobID string) error {
+func MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 	if pool == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -220,7 +220,7 @@ func MarkJobDone(ctx context.Context, jobID string) error {
 		WITH updated_job AS (
 			UPDATE generation_jobs
 			SET status = 'done', locked_at = NULL
-			WHERE id = $1
+			WHERE id = $1 AND workspace_id = $2
 			RETURNING workspace_id
 		),
 		updated_referral AS (
@@ -235,7 +235,7 @@ func MarkJobDone(ctx context.Context, jobID string) error {
 		SELECT REPLACE(gen_random_uuid()::text, '-', '')::CHAR(26), referrer_workspace, 'credit', 5, 'referral_reward'
 		FROM updated_referral;
 	`
-	_, err := pool.Exec(ctx, query, jobID)
+	_, err := pool.Exec(ctx, query, jobID, workspaceID)
 
 	// If the CTE doesn't update a referral, no wallet_ledger entry is inserted.
 	// The job status is always updated to 'done'.
@@ -243,7 +243,7 @@ func MarkJobDone(ctx context.Context, jobID string) error {
 }
 
 // MarkJobFailed updates the job status to 'queued' (retry) or 'failed' (max attempts).
-func MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCount int) error {
+func MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg string, attemptCount int) error {
 	if pool == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -279,21 +279,21 @@ func MarkJobFailed(ctx context.Context, jobID string, errMsg string, attemptCoun
 			last_error = $2,
 			next_run_at = NOW() + $3::INTERVAL,
 			locked_at = NULL
-		WHERE id = $4
+		WHERE id = $4 AND workspace_id = $5
 	`
 	// Status updates logic
-	_, err := pool.Exec(ctx, query, status, errMsg, intervalStr, jobID)
+	_, err := pool.Exec(ctx, query, status, errMsg, intervalStr, jobID, workspaceID)
 	return err
 }
 
 // UpdatePackageStatus updates the status of a package.
-func UpdatePackageStatus(ctx context.Context, packageID string, status string) error {
+func UpdatePackageStatus(ctx context.Context, workspaceID string, packageID string, status string) error {
 	if pool == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	query := `UPDATE packages SET status = $1 WHERE id = $2`
-	_, err := pool.Exec(ctx, query, status, packageID)
+	query := `UPDATE packages SET status = $1 WHERE workspace_id = $2 AND id = $3`
+	_, err := pool.Exec(ctx, query, status, workspaceID, packageID)
 	return err
 }
 

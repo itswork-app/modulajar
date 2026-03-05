@@ -8,8 +8,12 @@ import (
 	"time"
 
 	"modulajar/apps/core-go/db"
+	"modulajar/apps/core-go/metrics"
 	"modulajar/apps/core-go/render"
 	"modulajar/apps/core-go/worker"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -29,6 +33,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// 1. Register Metrics Collectors
+	prometheus.MustRegister(metrics.NewQueueCollector())
+
+	// 2. Start Heartbeat / Stuck Job Loop
+	metrics.StartHeartbeatLoop(context.Background())
+
 	// Initialize Worker with Real Dependencies
 	setupCtx, setupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer setupCancel()
@@ -43,6 +53,7 @@ func main() {
 
 	// Register Handlers
 	http.Handle("/tasks/generate", worker.NewHandler(realWorker))
+	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
