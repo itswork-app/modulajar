@@ -171,6 +171,127 @@ func TestGetTemplateCandidates_InvalidUUID(t *testing.T) {
 	}
 }
 
+// === Preview Builder Tests ===
+
+func TestBuildPreview_FullModule(t *testing.T) {
+	moduleJSON := []byte(`{
+		"tujuan_pembelajaran": "Siswa dapat membandingkan pecahan.",
+		"kegiatan_pembelajaran": {"inti": "Eksplorasi dengan benda konkret."},
+		"penilaian": {"pengetahuan": "Tes tertulis membandingkan pecahan."}
+	}`)
+
+	p := BuildPreview(moduleJSON)
+	if p.TujuanPembelajaran != "Siswa dapat membandingkan pecahan." {
+		t.Errorf("tujuan mismatch: %s", p.TujuanPembelajaran)
+	}
+	if p.RingkasanKegiatan != "Eksplorasi dengan benda konkret." {
+		t.Errorf("kegiatan mismatch: %s", p.RingkasanKegiatan)
+	}
+	if p.AssessmentSummary != "Tes tertulis membandingkan pecahan." {
+		t.Errorf("assessment mismatch: %s", p.AssessmentSummary)
+	}
+}
+
+func TestBuildPreview_InvalidJSON(t *testing.T) {
+	p := BuildPreview([]byte("not json"))
+	if p.TujuanPembelajaran != "" || p.RingkasanKegiatan != "" || p.AssessmentSummary != "" {
+		t.Error("Expected empty preview for invalid JSON")
+	}
+}
+
+func TestBuildPreview_Empty(t *testing.T) {
+	p := BuildPreview([]byte(`{}`))
+	if p.TujuanPembelajaran != "" || p.RingkasanKegiatan != "" || p.AssessmentSummary != "" {
+		t.Error("Expected empty preview for empty module")
+	}
+}
+
+func TestBuildPreview_ArrayTujuan(t *testing.T) {
+	moduleJSON := []byte(`{
+		"tujuan_pembelajaran": ["Goal A", "Goal B"]
+	}`)
+	p := BuildPreview(moduleJSON)
+	if p.TujuanPembelajaran != "Goal A; Goal B" {
+		t.Errorf("array tujuan mismatch: %s", p.TujuanPembelajaran)
+	}
+}
+
+func TestBuildPreview_StringKegiatan(t *testing.T) {
+	moduleJSON := []byte(`{
+		"kegiatan_pembelajaran": "Aktivitas langsung"
+	}`)
+	p := BuildPreview(moduleJSON)
+	if p.RingkasanKegiatan != "Aktivitas langsung" {
+		t.Errorf("string kegiatan mismatch: %s", p.RingkasanKegiatan)
+	}
+}
+
+func TestBuildPreview_StringPenilaian(t *testing.T) {
+	moduleJSON := []byte(`{
+		"penilaian": "Tes tertulis dan praktik"
+	}`)
+	p := BuildPreview(moduleJSON)
+	if p.AssessmentSummary != "Tes tertulis dan praktik" {
+		t.Errorf("string penilaian mismatch: %s", p.AssessmentSummary)
+	}
+}
+
+func TestTruncateStr(t *testing.T) {
+	// Short string — no truncation
+	if truncateStr("hello", 200) != "hello" {
+		t.Error("short string should not be truncated")
+	}
+	// Exact length
+	if truncateStr("abc", 3) != "abc" {
+		t.Error("exact length should not be truncated")
+	}
+	// Long string — truncated with ...
+	long := ""
+	for i := 0; i < 250; i++ {
+		long += "A"
+	}
+	result := truncateStr(long, 200)
+	if len(result) != 200 {
+		t.Errorf("expected 200 chars, got %d", len(result))
+	}
+	if result[197:200] != "..." {
+		t.Error("expected ... at end")
+	}
+	// maxLen <= 3
+	if truncateStr("hello world", 2) != "he" {
+		t.Errorf("maxLen=2: %s", truncateStr("hello world", 2))
+	}
+}
+
+func TestExtractString_NonStringNonArray(t *testing.T) {
+	m := map[string]interface{}{
+		"tujuan_pembelajaran": 42,
+	}
+	if extractString(m, "tujuan_pembelajaran") != "" {
+		t.Error("expected empty for non-string non-array")
+	}
+}
+
+func TestExtractNestedString_NonMapNonString(t *testing.T) {
+	m := map[string]interface{}{
+		"penilaian": 42,
+	}
+	if extractNestedString(m, "penilaian", "pengetahuan") != "" {
+		t.Error("expected empty for non-map non-string")
+	}
+}
+
+func TestExtractNestedString_MapWithNonStringChild(t *testing.T) {
+	m := map[string]interface{}{
+		"penilaian": map[string]interface{}{
+			"pengetahuan": 999,
+		},
+	}
+	if extractNestedString(m, "penilaian", "pengetahuan") != "" {
+		t.Error("expected empty for non-string child")
+	}
+}
+
 func BenchmarkSelectTopTemplates(b *testing.B) {
 	candidates := make([]TemplateCandidate, 100)
 	for i := 0; i < 100; i++ {

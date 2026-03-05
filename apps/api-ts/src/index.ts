@@ -13,6 +13,7 @@ import documentsRoutes from './routes/documents';
 import verifyRoutes from './routes/verify';
 import letterheadRoutes from './routes/letterhead';
 import referralRoutes from './routes/referral';
+import templateRoutes from './routes/templates';
 import dotenv from 'dotenv';
 import multipart from '@fastify/multipart';
 
@@ -126,6 +127,7 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(documentsRoutes);
     fastify.register(letterheadRoutes);
     fastify.register(referralRoutes, { prefix: '/w' });
+    fastify.register(templateRoutes);
 }
 
 const start = async () => {
