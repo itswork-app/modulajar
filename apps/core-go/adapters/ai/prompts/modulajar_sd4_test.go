@@ -31,14 +31,14 @@ func TestSchemaInjected(t *testing.T) {
 }
 
 func TestBuildFullPrompt(t *testing.T) {
-	full := BuildFullPrompt("SD Negeri 1", "IPAS", "1", "Energi", `{"identitas":{}}`)
+	full := BuildFullPrompt("SD Test", "Math", "1", "Algebra", `{"identitas":1}`, nil)
 	if !strings.Contains(full, "guru profesional") {
 		t.Error("expected system prompt in full prompt")
 	}
-	if !strings.Contains(full, "SD Negeri 1") {
+	if !strings.Contains(full, "SD Test") {
 		t.Error("expected school in full prompt")
 	}
-	if !strings.Contains(full, "IPAS") {
+	if !strings.Contains(full, "Math") {
 		t.Error("expected subject in full prompt")
 	}
 	if !strings.Contains(full, `"identitas"`) {

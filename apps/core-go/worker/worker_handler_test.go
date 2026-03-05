@@ -40,46 +40,10 @@ func TestHandler_Success(t *testing.T) {
 	// 2. Setup Worker with Mocks
 	mockAI := &MockAIEngine{
 		GenerateResponse: &ai.GenerateResponse{
-			Content: `
-				{
-					"meta": {
-						"jenjang": "SD",
-						"kelas": "4",
-						"mapel": "Matematika",
-						"semester": "1",
-						"tahun_ajaran": "2025/2026"
-					},
-					"identitas": {
-						"sekolah": "SDN Test",
-						"guru": "Ibu Test",
-						"alokasi_waktu": "2x35 menit"
-					},
-					"tujuan_pembelajaran": ["TP1"],
-					"materi_inti": ["Bilangan"],
-					"langkah_pembelajaran": {
-						"pendahuluan": ["Opener"],
-						"inti": ["Core"],
-						"penutup": ["Closer"]
-					},
-					"asesmen": {
-						"diagnostik": ["-"],
-						"formatif": ["-"],
-						"sumatif": ["-"]
-					},
-					"diferensiasi": {
-						"konten": ["-"],
-						"proses": ["-"],
-						"produk": ["-"]
-					},
-					"profil_pancasila": ["Bernalar Kritis"],
-					"lampiran": {
-						"media": ["-"],
-						"sumber_belajar": ["-"]
-					}
-				}`,
+			Content: ValidSD4JSON,
 		},
 	}
-	mockPDF := &MockPDFEngine{GenerateBytes: []byte("%PDF...")}
+	mockPDF := &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")}
 	mockStorage := &MockStorage{ExistsResult: false}
 
 	deps := WorkerDeps{
@@ -87,7 +51,7 @@ func TestHandler_Success(t *testing.T) {
 		PDF:       mockPDF,
 		Storage:   mockStorage,
 		JobStore:  mockJobStore,
-		Planner:   &RealPlanner{}, // Needs pack file
+		Planner:   &RealPlanner{},
 		Validator: &RealValidator{},
 	}
 
@@ -118,7 +82,6 @@ func TestHandler_Success(t *testing.T) {
 }
 
 func TestHandler_NoJob(t *testing.T) {
-	// Mock JobStore returns nil (no job)
 	mockJobStore := &MockJobStore{
 		AcquireJobResult: nil,
 	}
@@ -133,22 +96,16 @@ func TestHandler_NoJob(t *testing.T) {
 	if w.Result().StatusCode != http.StatusOK {
 		t.Errorf("Expected 200, got %d", w.Result().StatusCode)
 	}
-	// Verify body is {"status":"idle"}?
 }
 
 func TestHandler_InvalidMetadata(t *testing.T) {
-	// Mock Job with invalid metadata (that causes unmarshal or logic error?)
-	// jobToPayload unmarshals map to struct.
-	// If fields are missing in map, they are empty in struct.
-	// Logic fails inside ExecuteJob (e.g. Planner fails due to missing pack path).
-
 	mockJob := &db.GenerationJob{
 		ID:           "job-bad",
 		PackageID:    "pkg-bad",
 		AttemptCount: 0,
 		Metadata: map[string]interface{}{
 			"job_id":    "job-bad",
-			"pack_path": "/bad/path.json", // Will cause Planner failure
+			"pack_path": "/bad/path.json",
 		},
 	}
 	mockJobStore := &MockJobStore{AcquireJobResult: mockJob}
@@ -169,7 +126,6 @@ func TestHandler_InvalidMetadata(t *testing.T) {
 		t.Errorf("Expected 200, got %d", w.Result().StatusCode)
 	}
 
-	// Expect MarkJobFailed to be called
 	if !mockJobStore.MarkFailedCalled {
 		t.Error("Expected MarkJobFailed to be called for invalid job execution")
 	}
