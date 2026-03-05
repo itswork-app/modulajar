@@ -33,3 +33,25 @@ export const generateRequestsTotal = new client.Counter({
     labelNames: ['result'], // success, failed
     registers: [register],
 });
+
+// PR-064: Template Library API Metrics
+export const templateApiRequestsTotal = new client.Counter({
+    name: 'template_api_requests_total',
+    help: 'Total number of template API requests',
+    labelNames: ['result'], // success, error
+    registers: [register],
+});
+
+export const templateApiLatencyMs = new client.Histogram({
+    name: 'template_api_latency_ms',
+    help: 'Latency of template API requests in ms',
+    registers: [register],
+    buckets: [5, 10, 25, 50, 100, 250, 500],
+});
+
+export const templateApiErrorsTotal = new client.Counter({
+    name: 'template_api_errors_total',
+    help: 'Total number of template API errors',
+    labelNames: ['reason'], // validation, rate_limited, internal
+    registers: [register],
+});
