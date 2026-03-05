@@ -55,3 +55,16 @@ export const templateApiErrorsTotal = new client.Counter({
     labelNames: ['reason'], // validation, rate_limited, internal
     registers: [register],
 });
+
+// PR-065: Onboarding Metrics
+export const onboardingStartedTotal = new client.Counter({
+    name: 'onboarding_started_total',
+    help: 'Total onboarding flows started',
+    registers: [register],
+});
+
+export const onboardingCompletedTotal = new client.Counter({
+    name: 'onboarding_completed_total',
+    help: 'Total onboarding flows completed',
+    registers: [register],
+});
