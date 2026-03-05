@@ -31,7 +31,6 @@ function buildApp(opts: {
     fastify.decorate('storage', {
         generateSignedUrl: async () => 'https://signed.url/test'
     });
-
     fastify.register(mockAuthPlugin);
     fastify.register(workspaceGuardPlugin);
     fastify.register(modulesRoutes);

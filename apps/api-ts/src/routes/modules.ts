@@ -38,7 +38,6 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             if (grade < 1 || grade > 12) {
                 return reply.code(400).send({ error: 'Invalid grade. Must be between 1 and 12.' });
             }
-
             if (mode === 'template' || mode === 'edit_template') {
                 if (!template_id) {
                     return reply.code(400).send({ error: 'template_id is required for template and edit_template modes' });
