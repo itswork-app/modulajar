@@ -17,6 +17,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "swr": "^2.4.0",
+    "shared-types": "file:../../packages/shared-types",
     "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {

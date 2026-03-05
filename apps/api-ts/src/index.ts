@@ -15,6 +15,8 @@ import letterheadRoutes from './routes/letterhead';
 import referralRoutes from './routes/referral';
 import templateRoutes from './routes/templates';
 import onboardingRoutes from './routes/onboarding';
+import modulesRoutes from './routes/modules';
+import jobsRoutes from './routes/jobs';
 import dotenv from 'dotenv';
 import multipart from '@fastify/multipart';
 
@@ -130,6 +132,8 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(referralRoutes, { prefix: '/w' });
     fastify.register(templateRoutes);
     fastify.register(onboardingRoutes);
+    fastify.register(modulesRoutes);
+    fastify.register(jobsRoutes);
 }
 
 const start = async () => {
