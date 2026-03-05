@@ -16,6 +16,10 @@ const definedRoutes = new Set();
 const requiredBackendEndpoints = [
     '/w/:workspaceId/modules/generate',
     '/w/:workspaceId/modules/:moduleId',
+    '/w/:workspaceId/modules/:moduleId/editor',
+    '/w/:workspaceId/modules/:moduleId/preview',
+    '/w/:workspaceId/modules/:moduleId/versions',
+    '/w/:workspaceId/modules/:moduleId/ai-assist',
     '/w/:workspaceId/jobs/:jobId',
     '/api/templates/recommended'
 ];

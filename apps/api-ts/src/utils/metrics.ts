@@ -68,3 +68,18 @@ export const onboardingCompletedTotal = new client.Counter({
     help: 'Total onboarding flows completed',
     registers: [register],
 });
+
+// PR-067: Module Editor Metrics
+export const moduleUpdateTotal = new client.Counter({
+    name: 'module_update_total',
+    help: 'Total number of module updates (autosave/manual)',
+    labelNames: ['result'], // success, error
+    registers: [register],
+});
+
+export const aiAssistTotal = new client.Counter({
+    name: 'ai_assist_total',
+    help: 'Total number of AI assist requests from editor',
+    labelNames: ['section', 'action', 'result'],
+    registers: [register],
+});

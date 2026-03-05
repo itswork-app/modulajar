@@ -786,3 +786,26 @@ func ReadinessHandler(dbCheck CheckFunc, chromeCheck CheckFunc) http.HandlerFunc
 		w.Write([]byte("ok"))
 	}
 }
+
+// AssistSection provides AI suggestions for a specific module section.
+func (w *Worker) AssistSection(ctx context.Context, section, action, content string) (string, *ai.GenerateResponse, error) {
+	if w.Deps.AI == nil {
+		return "", nil, fmt.Errorf("AI engine unavailable")
+	}
+
+	prompt := fmt.Sprintf(`You are a curriculum expert. Improve this section of a "Modul Ajar" (Lesson Plan).
+Section: %s
+Action: %s
+Current Content: %s
+
+STRICT RULE: Your response must ONLY contain the improved content for this section. No conversational filler, no markdown formatting (unless it was already in the content).`,
+		section, action, content)
+
+	req := ai.GenerateRequest{Prompt: prompt}
+	resp, err := w.Deps.AI.Generate(ctx, req)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return resp.Content, resp, nil
+}

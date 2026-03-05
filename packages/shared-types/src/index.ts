@@ -55,3 +55,42 @@ export interface TemplatePreview {
 export interface TemplateRecommendedResponse {
     templates: TemplatePreview[];
 }
+
+export interface ModuleEditorResponse {
+    module_id: string;
+    version: number;
+    module_json: any;
+    html_preview: string;
+}
+
+export interface ModulePatchRequest {
+    workspace_id?: string;
+    patch: any;
+}
+
+export interface ModulePatchResponse {
+    version: number;
+    saved: true;
+}
+
+export interface AISuggestRequest {
+    workspace_id?: string;
+    section: string;
+    action: 'improve' | 'shorten' | 'expand';
+    content: string;
+}
+
+export interface AISuggestResponse {
+    suggestion: string;
+    ai_receipt: {
+        model: string;
+        input_hash: string;
+        output_hash: string;
+    };
+}
+
+export interface ModuleVersion {
+    version: number;
+    created_at: string;
+    created_by?: string;
+}
