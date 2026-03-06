@@ -23,14 +23,25 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 interface UsageSummary {
     credits_remaining: number;
     documents_generated: number;
+    month_usage: number;
     jobs_failed: number;
 }
+
+interface Transaction {
+    date: string;
+    type: string;
+    amount: number;
+    status: string;
+    note: string;
+}
+
 
 export default function BillingPage() {
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();
 
     const [summary, setSummary] = useState<UsageSummary | null>(null);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -50,17 +61,25 @@ export default function BillingPage() {
 
             try {
                 const token = await getToken();
-                const res = await fetch(`${API_BASE}/w/${workspace.id}/usage-summary`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const [summaryRes, trxRes] = await Promise.all([
+                    fetch(`${API_BASE}/w/${workspace.id}/wallet/summary`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    fetch(`${API_BASE}/w/${workspace.id}/wallet/transactions`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
+                ]);
 
-                if (!res.ok) {
+                if (!summaryRes.ok || !trxRes.ok) {
                     throw new Error('Gagal memuat data billing.');
                 }
 
-                const data = await res.json();
+                const summaryData = await summaryRes.json();
+                const trxData = await trxRes.json();
+
                 if (isMounted) {
-                    setSummary(data);
+                    setSummary(summaryData);
+                    setTransactions(trxData);
                     setError(null);
                 }
             } catch (err: unknown) {
@@ -180,10 +199,11 @@ export default function BillingPage() {
                                 <Clock className="w-5 h-5" />
                             </div>
                             <div>
-                                <div className="text-sm font-bold text-slate-700">Periode Tagihan Aktif</div>
-                                <div className="text-xs font-medium text-slate-400 mt-0.5">Berlaku selamanya (Pay-as-you-go)</div>
+                                <div className="text-sm font-bold text-slate-700">Pemakaian Bulan Ini</div>
+                                <div className="text-xs font-medium text-slate-500 mt-0.5 whitespace-pre">Total Debet Token</div>
                             </div>
                         </div>
+                        <div className="text-2xl font-bold text-slate-900">{summary?.month_usage ?? 0} <span className="text-sm font-normal text-slate-500">Token</span></div>
                     </div>
                 </div>
             </div>
@@ -215,7 +235,7 @@ export default function BillingPage() {
                 </div>
             </div>
 
-            {/* Riwayat Transaksi Placeholder */}
+            {/* Riwayat Transaksi Panel */}
             <div className="mt-12 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <h3 className="font-bold text-slate-900 text-lg flex items-center">
@@ -224,21 +244,58 @@ export default function BillingPage() {
                     </h3>
                 </div>
 
-                <div className="p-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-5 border-4 border-white shadow-sm">
-                        <Receipt className="w-8 h-8 text-slate-300" />
+                {transactions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4">Tanggal</th>
+                                    <th className="px-6 py-4">Tipe</th>
+                                    <th className="px-6 py-4">Catatan</th>
+                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4 text-right">Nominal</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-sm bg-white">
+                                {transactions.map((trx, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="px-6 py-4 text-slate-600 font-medium">{trx.date}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                                {trx.type.replace('_', ' ').toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">{trx.note || '-'}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="inline-flex items-center text-emerald-600 font-bold text-xs uppercase tracking-wider">
+                                                {trx.status}
+                                            </span>
+                                        </td>
+                                        <td className={`px-6 py-4 text-right font-bold ${trx.amount < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
+                                            {trx.amount > 0 ? '+' : ''}{trx.amount} Token
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                    <h4 className="text-lg font-bold text-slate-900 mb-2">Belum ada transaksi</h4>
-                    <p className="text-slate-500 max-w-sm mb-6">
-                        Riwayat pembelian paket, penukaran voucher, dan penggunaan kredit akan muncul di sini.
-                    </p>
-                    <button
-                        onClick={() => setIsTopUpOpen(true)}
-                        className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline"
-                    >
-                        Top up kredit sekarang
-                    </button>
-                </div>
+                ) : (
+                    <div className="p-16 flex flex-col items-center justify-center text-center">
+                        <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-5 border-4 border-white shadow-sm">
+                            <Receipt className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <h4 className="text-lg font-bold text-slate-900 mb-2">Belum ada transaksi</h4>
+                        <p className="text-slate-500 max-w-sm mb-6">
+                            Riwayat pembelian paket, penukaran voucher, dan penggunaan kredit akan muncul di sini.
+                        </p>
+                        <button
+                            onClick={() => setIsTopUpOpen(true)}
+                            className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline"
+                        >
+                            Top up kredit sekarang
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Modals */}

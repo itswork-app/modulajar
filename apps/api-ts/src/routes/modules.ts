@@ -15,8 +15,9 @@ import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
 import { logger } from '../utils/logger';
 import { generateRequestsTotal, moduleUpdateTotal, aiAssistTotal } from '../utils/metrics';
-import { renderModuleHtml, computeHtmlSha256 } from '../services/renderService';
+import { computeHtmlSha256, renderModuleHtml } from '../services/renderService';
 import { ulid } from 'ulid';
+import { debit } from '../lib/wallet';
 
 /**
  * Compute ID for deduplication/idempotency.
@@ -131,6 +132,24 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                 pid: pid,
                 trace_id: traceId
             };
+
+            const debitRef = `GENERATE:${jobId}`;
+            try {
+                await debit(fastify.db, workspaceId, 1, debitRef, {
+                    transaction_type: 'generate_module',
+                    note: `${subject} - ${topic}`,
+                    job_id: jobId
+                });
+            } catch (err: any) {
+                if (err.message === 'Insufficient balance') {
+                    return reply.code(402).send({
+                        error: 'insufficient_credits',
+                        message: 'Saldo kredit tidak cukup. Silakan top up untuk melanjutkan.'
+                    });
+                }
+                generateRequestsTotal.inc({ result: 'failed_wizard_debit' });
+                throw err;
+            }
 
             try {
                 await fastify.db.query(

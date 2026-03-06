@@ -20,10 +20,29 @@ export const httpRequestDuration = new client.Histogram({
     buckets: [50, 100, 300, 500, 1000, 2000, 5000, 10000],
 });
 
+export const walletBalanceChecksTotal = new client.Counter({
+    name: 'wallet_balance_checks_total',
+    help: 'Total number of wallet balance checks',
+    registers: [register],
+});
+
 export const walletDebitTotal = new client.Counter({
     name: 'wallet_debit_total',
-    help: 'Total number of wallet debit attempts',
-    labelNames: ['result'], // success, failed
+    help: 'Total number of successful wallet debits',
+    registers: [register],
+});
+
+export const walletDebitFailedTotal = new client.Counter({
+    name: 'wallet_debit_failed_total',
+    help: 'Total number of failed wallet debits',
+    labelNames: ['reason'],
+    registers: [register],
+});
+
+export const walletTransactionsTotal = new client.Counter({
+    name: 'wallet_transactions_total',
+    help: 'Total number of wallet transactions (credits and debits)',
+    labelNames: ['type'],
     registers: [register],
 });
 

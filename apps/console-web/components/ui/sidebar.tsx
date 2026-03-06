@@ -19,10 +19,10 @@ const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Buat Modul', href: '/wizard', icon: PlusCircle },
     { name: 'Riwayat Modul', href: '/modules', icon: FileStack },
-    { name: 'Template', href: '/templates', icon: LayoutTemplate },
+    { name: 'Template Library', href: '/templates', icon: LayoutTemplate },
     { name: 'Dataset AI', href: '/dataset', icon: Database },
     { name: 'Billing', href: '/billing', icon: CreditCard },
-    { name: 'Referral', href: '/referral', icon: Users },
+    { name: 'Referral Program', href: '/referral', icon: Users },
     { name: 'Workspace', href: '/workspace', icon: Building },
     { name: 'Pengaturan', href: '/settings', icon: Settings },
 ];

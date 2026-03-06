@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { getBalance } from '../lib/wallet';
 
 export default async function workspaceRoutes(fastify: FastifyInstance) {
 
@@ -208,16 +209,8 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
 
-            // 1. Compute credits_remaining
-            const creditsResult = await fastify.db.query(
-                `SELECT 
-                    COALESCE(SUM(CASE WHEN type='credit' THEN amount END), 0) - 
-                    COALESCE(SUM(CASE WHEN type='debit' THEN amount END), 0) AS balance
-                 FROM wallet_ledger 
-                 WHERE workspace_id = $1`,
-                [workspaceId]
-            );
-            const creditsRemaining = parseInt(creditsResult.rows[0]?.balance || '0', 10);
+            // 1. Compute credits_remaining (via internal wallet service)
+            const creditsRemaining = await getBalance(fastify.db, workspaceId);
 
             // 2. documents_generated (Using generation_jobs status = 'done')
             const generatedResult = await fastify.db.query(
