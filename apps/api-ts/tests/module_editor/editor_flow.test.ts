@@ -130,11 +130,15 @@ test('Module Editor Integration Flow', async (t) => {
         const fastify = buildApp({
             dbQuery: async (sql, values) => {
                 if (sql.includes('SELECT 1 FROM workspace_members')) return { rowCount: 1, rows: [] };
-                if (sql.includes('SELECT dv.module_json, p.kelas')) {
+                if (sql.includes('document_versions dv') && sql.includes('JOIN packages p')) {
                     return {
                         rowCount: 1,
                         rows: [{
-                            module_json: { topic: 'Preview Topic' },
+                            module_json: {
+                                subject: 'IPA',
+                                topic: 'Energi',
+                                tujuan_pembelajaran: 'Siswa dapat menjelaskan energi'
+                            },
                             kelas: '4', semester: '1', tahun_ajaran: '2025',
                             teacher_name: 'Guru', school_name: 'SD', public_id: 'PID'
                         }]
@@ -151,9 +155,10 @@ test('Module Editor Integration Flow', async (t) => {
             headers: { Authorization: `Bearer ${USER_ID}` }
         });
 
-        t.equal(res.statusCode, 200);
+        t.equal(res.statusCode, 200, res.payload);
         // t.ok(res.headers['content-type']?.toString().includes('text/html'), 'should be HTML');
-        t.ok(res.body.includes('Preview Topic'));
+        t.ok(res.body.includes('Siswa dapat menjelaskan energi'));
+        t.ok(res.body.includes('Guru'));
 
         await fastify.close();
     });
@@ -187,6 +192,54 @@ test('Module Editor Integration Flow', async (t) => {
         t.equal(res.json().suggestion, 'AI Improved Content');
 
         global.fetch = originalFetch;
+        await fastify.close();
+    });
+
+    await t.test('GET /versions — returns history', async (t) => {
+        const fastify = buildApp({
+            dbQuery: async (sql, values) => {
+                if (sql.includes('SELECT 1 FROM workspace_members')) return { rowCount: 1, rows: [] };
+                if (sql.includes('FROM document_versions dv') && sql.includes('JOIN documents d')) {
+                    return {
+                        rowCount: 2,
+                        rows: [
+                            { version: 2, created_at: new Date(), created_by: USER_ID },
+                            { version: 1, created_at: new Date(), created_by: USER_ID }
+                        ]
+                    };
+                }
+                return { rowCount: 0, rows: [] };
+            }
+        });
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/modules/${MODULE_ID}/versions`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 200);
+        t.equal(res.json().length, 2);
+        await fastify.close();
+    });
+
+    await t.test('GET /preview — returns 404 if not found', async (t) => {
+        const fastify = buildApp({
+            dbQuery: async (sql, values) => {
+                if (sql.includes('SELECT 1 FROM workspace_members')) return { rowCount: 1, rows: [] };
+                return { rowCount: 0, rows: [] };
+            }
+        });
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/modules/${MODULE_ID}/preview`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 404);
         await fastify.close();
     });
 });
