@@ -55,10 +55,12 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
             }
             // In the refactored code, the list page calls /documents
             if (url.includes('/documents')) return Promise.resolve({
-                status: 200, ok: true, json: () => Promise.resolve([
-                    { id: '1', status: 'QUEUED', payload: { mapel: 'Matematika' }, created_at: new Date().toISOString() },
-                    { id: '2', status: 'FAILED', payload: { mapel: 'IPAS' }, created_at: new Date().toISOString() }
-                ])
+                status: 200, ok: true, json: () => Promise.resolve({
+                    documents: [
+                        { id: '1', status: 'QUEUED', payload: { mapel: 'Matematika' }, created_at: new Date().toISOString() },
+                        { id: '2', status: 'FAILED', payload: { mapel: 'IPAS' }, created_at: new Date().toISOString() }
+                    ]
+                })
             });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
         });
@@ -89,6 +91,14 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
                     updated_at: new Date().toISOString()
                 })
             });
+            if (url.includes('/modules/')) return Promise.resolve({
+                status: 200, ok: true, json: () => Promise.resolve({
+                    id: 'doc-done',
+                    pdf: { download_url: 'https://storage/doc.pdf' },
+                    public_id: 'public-uri',
+                    verify: { public_id: 'public-uri' }
+                })
+            });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
         });
 
@@ -112,6 +122,12 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
                     last_error: 'AI hallucinated metadata format',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
+                })
+            });
+            if (url.includes('/modules/')) return Promise.resolve({
+                status: 200, ok: true, json: () => Promise.resolve({
+                    id: 'doc-err',
+                    status: 'FAILED'
                 })
             });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
