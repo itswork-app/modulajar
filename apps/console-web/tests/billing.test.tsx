@@ -1,0 +1,110 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import BillingPage from '../app/(dashboard)/billing/page';
+
+// Mock Dependencies
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ push: mockPush, replace: mockReplace })
+}));
+
+vi.mock('@clerk/nextjs', () => ({
+    useAuth: () => ({ getToken: vi.fn(() => Promise.resolve('mock-token')), isLoaded: true }),
+    useUser: () => ({ user: { fullName: 'Test Teacher' } })
+}));
+
+vi.mock('@/hooks/use-workspace', () => ({
+    useWorkspace: () => ({ workspace: { id: 'test-workspace-id' }, isLoading: false })
+}));
+
+describe('Billing UX v1 - Integration Tests', () => {
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        global.fetch = vi.fn();
+    });
+
+    const mockUsageSummarySuccess = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/usage-summary')) return Promise.resolve({
+                status: 200, ok: true, json: () => Promise.resolve({
+                    credits_remaining: 125,
+                    documents_generated: 42,
+                    jobs_failed: 1,
+                    recent_jobs: []
+                })
+            });
+            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+        });
+    };
+
+    it('billing page renders summary cards with correct token balance', async () => {
+        mockUsageSummarySuccess();
+        render(<BillingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByText('125')).toBeDefined(); // Token balance
+            expect(screen.getByText('42')).toBeDefined(); // Documents generated
+            expect(screen.getByText('Saldo Kredit Saat Ini')).toBeDefined();
+        });
+    });
+
+    it('billing page renders empty transaction history cleanly', async () => {
+        mockUsageSummarySuccess();
+        render(<BillingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Belum ada transaksi')).toBeDefined();
+            expect(screen.getByText('Riwayat pembelian paket, penukaran voucher, dan penggunaan kredit akan muncul di sini.')).toBeDefined();
+        });
+    });
+
+    it('top up modal opens and interacts correctly', async () => {
+        mockUsageSummarySuccess();
+        render(<BillingPage />);
+
+        // Wait for page load
+        await waitFor(() => {
+            expect(screen.getByText('Top Up Kredit')).toBeDefined();
+        });
+
+        // Open Modal
+        fireEvent.click(screen.getByText('Top Up Kredit'));
+
+        // Check modal content
+        expect(screen.getByText('Pilih paket yang sesuai kebutuhan Anda')).toBeDefined();
+        expect(screen.getByText('Lanjutkan Pembayaran').hasAttribute('disabled')).toBe(true); // Disabled until package selected
+
+        // Select a package (the second '50 Token' belongs to the Modal in DOM order)
+        const tokenElements = screen.getAllByText('50 Token');
+        fireEvent.click(tokenElements[1]);
+        expect(screen.getByText('Lanjutkan Pembayaran').hasAttribute('disabled')).toBe(false);
+    });
+
+    it('voucher modal opens and interacts correctly', async () => {
+        mockUsageSummarySuccess();
+        render(<BillingPage />);
+
+        // Wait for page load
+        await waitFor(() => {
+            expect(screen.getByText('Redeem Voucher')).toBeDefined();
+        });
+
+        // Open Modal
+        fireEvent.click(screen.getByText('Redeem Voucher'));
+
+        // Check modal content & disabled button state
+        expect(screen.getByText('Masukkan Kode Voucher')).toBeDefined();
+        const klaimButton = screen.getByText('Klaim Kredit');
+        expect(klaimButton.hasAttribute('disabled')).toBe(true);
+
+        // Type in input enabling the button
+        const input = screen.getByPlaceholderText('M-AJAR-ABC');
+        fireEvent.change(input, { target: { value: 'TESTVOUCHER' } });
+
+        expect(klaimButton.hasAttribute('disabled')).toBe(false);
+    });
+});
