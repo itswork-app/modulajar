@@ -1,25 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 
 interface SectionEditorProps {
     section: string;
-    content: any;
-    onUpdate: (content: any) => void;
+    content: string | Record<string, unknown>;
+    onUpdate: (content: string | Record<string, unknown>) => void;
     onAI: (content: string) => void;
 }
 
 export function SectionEditor({ section, content, onUpdate, onAI }: SectionEditorProps) {
-    const [localContent, setLocalContent] = useState('');
-
-    useEffect(() => {
-        if (typeof content === 'string') {
-            setLocalContent(content);
-        } else if (content && typeof content === 'object') {
-            setLocalContent(JSON.stringify(content, null, 2));
-        }
-    }, [content]);
+    const [localContent, setLocalContent] = useState(() => {
+        if (typeof content === 'string') return content;
+        if (content && typeof content === 'object') return JSON.stringify(content, null, 2);
+        return '';
+    });
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -84,7 +84,7 @@ export default function JobDetailPage() {
 
 
     // 2. Fetch Detail & Polling
-    const fetchJobDetail = async () => {
+    const fetchJobDetail = useCallback(async () => {
         if (!workspace?.id || !generationId) return;
         try {
             const token = await getToken();
@@ -106,7 +106,7 @@ export default function JobDetailPage() {
         } finally {
             setIsLoadingJob(false);
         }
-    };
+    }, [workspace?.id, generationId, getToken]);
 
     // Run poll with exponential backoff IF job is QUEUED or RUNNING
     useEffect(() => {
@@ -142,7 +142,7 @@ export default function JobDetailPage() {
             clearTimeout(timeoutId);
             clearTimeout(globalTimeout);
         };
-    }, [isCheckingPrerequisites, workspace, generationId, job?.status, pollCount, isTimedOut]);
+    }, [isCheckingPrerequisites, workspace, generationId, job, pollCount, isTimedOut, fetchJobDetail]);
 
 
     // Actions

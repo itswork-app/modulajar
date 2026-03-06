@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ModuleEditorResponse } from 'shared-types';
-import { Loader2, Save, ChevronLeft, Sparkles, Eye, Code } from 'lucide-react';
+import { Loader2, Save, ChevronLeft, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { SectionNav } from '@/components/editor/SectionNav';
 import { SectionEditor } from '@/components/editor/SectionEditor';
@@ -22,18 +22,7 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
     const [showAISuggestion, setShowAISuggestion] = useState(false);
     const [aiRequest, setAIRequest] = useState<{ section: string; content: string } | null>(null);
 
-    // Debounced Autosave Logic
-    useEffect(() => {
-        if (!data || loading) return;
-
-        const timer = setTimeout(() => {
-            handleSave();
-        }, 800);
-
-        return () => clearTimeout(timer);
-    }, [data?.module_json]);
-
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!data || saving) return;
         setSaving(true);
         try {
@@ -51,7 +40,18 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
         } finally {
             setSaving(false);
         }
-    };
+    }, [data, saving, workspaceId, moduleId]);
+
+    // Debounced Autosave Logic
+    useEffect(() => {
+        if (!data || loading) return;
+
+        const timer = setTimeout(() => {
+            handleSave();
+        }, 800);
+
+        return () => clearTimeout(timer);
+    }, [data, handleSave, loading]);
 
     const fetchEditorData = useCallback(async () => {
         try {
@@ -105,9 +105,10 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
             <div className="flex-1 overflow-y-auto bg-white shadow-inner">
                 <div className="max-w-2xl mx-auto py-12 px-8">
                     <SectionEditor
+                        key={activeSection}
                         section={activeSection}
                         content={data.module_json[activeSection] || ''}
-                        onUpdate={(newContent: string) => {
+                        onUpdate={(newContent: string | Record<string, unknown>) => {
                             setData(prev => prev ? {
                                 ...prev,
                                 module_json: {

@@ -158,7 +158,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
 
     it('submits the generation successfully and redirects to /jobs', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string, _opts: any) => {
+        (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
             if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
             if (url.includes('/generate-semester')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true }) });
