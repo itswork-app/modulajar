@@ -80,7 +80,7 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
             {/* Left Sidebar: Navigation */}
             <div className="w-64 border-r border-slate-200 bg-white flex flex-col">
                 <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-                    <Link href={`/w/${workspaceId}/modules/${moduleId}`} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <Link href={`/modules/${moduleId}`} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                         <ChevronLeft className="w-4 h-4 text-slate-500" />
                     </Link>
                     <span className="font-bold text-slate-900 truncate flex-1">Editor Modul</span>
