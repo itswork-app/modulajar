@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import dbPlugin from './plugins/db';
 import authPlugin from './plugins/auth';
+import mockAuthPlugin from './plugins/mock_auth';
 import storagePlugin from './plugins/storage';
 import workspaceGuardPlugin from './plugins/workspace-guard';
 import authRoutes from './routes/auth';
@@ -117,7 +118,11 @@ if (SERVICE_MODE === 'verify') {
     // API MODE: Full authenticated backend
     // ---------------------------------------------------------
     console.log('[STARTUP] Registering API mode plugins and routes...');
-    fastify.register(authPlugin);
+    if (process.env.USE_MOCK_AUTH === 'true') {
+        fastify.register(mockAuthPlugin);
+    } else {
+        fastify.register(authPlugin);
+    }
     fastify.register(workspaceGuardPlugin);
     fastify.register(storagePlugin);
     fastify.register(multipart, { limits: { fileSize: 512 * 1024 } });
