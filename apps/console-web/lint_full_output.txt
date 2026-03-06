@@ -1,0 +1,38 @@
+
+> console-web@0.1.0 lint
+> eslint
+
+
+/home/kangza/workspace/modulajar/apps/console-web/app/(dashboard)/jobs/[generation_id]/page.tsx
+  145:8  warning  React Hook useEffect has missing dependencies: 'fetchJobDetail' and 'job'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/kangza/workspace/modulajar/apps/console-web/components/editor/ModuleEditor.tsx
+   5:38  warning  'Sparkles' is defined but never used                                                                                                    @typescript-eslint/no-unused-vars
+   5:53  warning  'Code' is defined but never used                                                                                                        @typescript-eslint/no-unused-vars
+  34:8   warning  React Hook useEffect has missing dependencies: 'data', 'handleSave', and 'loading'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/kangza/workspace/modulajar/apps/console-web/components/editor/SectionEditor.tsx
+   8:14  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-explicit-any
+   9:25  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-explicit-any
+  18:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/kangza/workspace/modulajar/apps/console-web/components/editor/SectionEditor.tsx:18:13
+  16 |     useEffect(() => {
+  17 |         if (typeof content === 'string') {
+> 18 |             setLocalContent(content);
+     |             ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  19 |         } else if (content && typeof content === 'object') {
+  20 |             setLocalContent(JSON.stringify(content, null, 2));
+  21 |         }  react-hooks/set-state-in-effect
+
+/home/kangza/workspace/modulajar/apps/console-web/tests/onboarding.test.tsx
+  161:64  warning  '_opts' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 8 problems (3 errors, 5 warnings)
+

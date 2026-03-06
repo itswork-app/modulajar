@@ -115,11 +115,11 @@ export default function DashboardPage() {
                 </div>
                 {!isCompletelyEmpty && (
                     <Link
-                        href="/onboarding"
+                        href="/wizard"
                         className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:-translate-y-0.5 transition-all font-semibold shadow-lg shadow-emerald-200 group"
                     >
                         <PlusCircle className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
-                        Generate Baru
+                        Generate Modul Baru
                     </Link>
                 )}
             </div>
@@ -136,12 +136,12 @@ export default function DashboardPage() {
                     <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6 border-8 border-emerald-50/50">
                         <FileOutput className="w-10 h-10 text-emerald-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Belum ada dokumen dibuat</h2>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Belum ada modul dibuat</h2>
                     <p className="text-slate-500 max-w-md mx-auto mb-8 text-lg">
-                        Mulai pengalaman revolusioner membuat Modul Ajar dan RPP modern pertama Anda dalam hitungan menit saja.
+                        Mulai pengalaman revolusioner membuat Modul Ajar modern pertama Anda dalam hitungan menit saja.
                     </p>
                     <Link
-                        href="/onboarding"
+                        href="/wizard"
                         className="inline-flex items-center justify-center px-8 py-4 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 hover:shadow-xl hover:-translate-y-1 transition-all font-bold text-lg shadow-lg shadow-emerald-600/30 group"
                     >
                         <PlusCircle className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" />
@@ -203,7 +203,7 @@ export default function DashboardPage() {
                                     <Clock className="w-5 h-5 mr-2 text-slate-400" />
                                     Aktivitas Terbaru
                                 </h3>
-                                <Link href="/jobs" className="text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
+                                <Link href="/modules" className="text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
                                     Lihat Semua &rarr;
                                 </Link>
                             </div>
@@ -246,7 +246,7 @@ export default function DashboardPage() {
                                                 <td className="px-6 py-4 text-right whitespace-nowrap">
                                                     {job.status === 'DONE' ? (
                                                         <Link
-                                                            href={`/jobs/${job.generation_id}`}
+                                                            href={`/modules/${job.generation_id}`}
                                                             className="inline-flex items-center text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/50 px-4 py-2 rounded-xl font-bold transition-all hover:shadow-sm"
                                                         >
                                                             <Download className="w-4 h-4 mr-2" />
@@ -254,7 +254,7 @@ export default function DashboardPage() {
                                                         </Link>
                                                     ) : (
                                                         <Link
-                                                            href={`/jobs/${job.generation_id}`}
+                                                            href={`/modules/${job.generation_id}`}
                                                             className="inline-flex items-center text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl font-bold transition-all hover:shadow-sm"
                                                         >
                                                             <Eye className="w-4 h-4 mr-2" />

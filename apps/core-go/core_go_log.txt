@@ -1,0 +1,100 @@
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.2720393Z ok  	modulajar/apps/core-go/worker	0.369s	coverage: 74.9% of statements
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4906966Z Worker coverage: 74.9%
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4936651Z ❌ GATE FAIL: worker coverage 74.9% is below the 80% threshold.
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4949013Z ##[error]Process completed with exit code 1.
+core-go	Post Run actions/checkout@v4	﻿2026-03-06T04:21:03.5034058Z Post job cleanup.
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.5981536Z [command]/usr/bin/git version
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6018547Z git version 2.53.0
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6067044Z Temporarily overriding HOME='/home/runner/work/_temp/95f8d16a-5f71-4513-8e08-ee744b6ecbf6' before making global git config changes
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6068507Z Adding repository directory to the temporary git global config as a safe directory
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6072045Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/modulajar/modulajar
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6106315Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6139149Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6378618Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6400811Z http.https://github.com/.extraheader
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6413743Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6446255Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6677753Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+core-go	Post Run actions/checkout@v4	2026-03-06T04:21:03.6709564Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+core-go	Stop containers	﻿2026-03-06T04:21:03.7038209Z Print service container logs: dc3092fed3a54827be5421f07064ec6f_postgres16_0a7811
+core-go	Stop containers	2026-03-06T04:21:03.7042437Z ##[command]/usr/bin/docker logs --details 0f43ad20aff38593eba244c18ef3d5a875fe586c3ad432ba59fa2de6afd72adb
+core-go	Stop containers	2026-03-06T04:21:03.7170604Z  The files belonging to this database system will be owned by user "postgres".
+core-go	Stop containers	2026-03-06T04:21:03.7182045Z  initdb: warning: enabling "trust" authentication for local connections
+core-go	Stop containers	2026-03-06T04:21:03.7182766Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+core-go	Stop containers	2026-03-06T04:21:03.7183753Z  2026-03-06 04:18:24.012 UTC [1] LOG:  starting PostgreSQL 16.13 (Debian 16.13-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+core-go	Stop containers	2026-03-06T04:21:03.7184767Z  2026-03-06 04:18:24.012 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+core-go	Stop containers	2026-03-06T04:21:03.7185251Z  2026-03-06 04:18:24.012 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+core-go	Stop containers	2026-03-06T04:21:03.7185800Z  2026-03-06 04:18:24.013 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+core-go	Stop containers	2026-03-06T04:21:03.7186337Z  2026-03-06 04:18:24.016 UTC [64] LOG:  database system was shut down at 2026-03-06 04:18:23 UTC
+core-go	Stop containers	2026-03-06T04:21:03.7186818Z  2026-03-06 04:18:24.020 UTC [1] LOG:  database system is ready to accept connections
+core-go	Stop containers	2026-03-06T04:21:03.7187236Z  2026-03-06 04:18:33.130 UTC [75] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7187991Z  2026-03-06 04:18:43.196 UTC [83] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7188648Z  2026-03-06 04:18:53.271 UTC [91] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7189267Z  2026-03-06 04:19:03.380 UTC [100] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7189910Z  2026-03-06 04:19:13.475 UTC [108] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7190417Z  2026-03-06 04:19:23.580 UTC [115] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7190777Z  2026-03-06 04:19:33.677 UTC [124] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7191132Z  2026-03-06 04:19:43.746 UTC [132] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7191575Z  2026-03-06 04:19:46.216 UTC [133] ERROR:  relation "goose_db_version" does not exist at character 36
+core-go	Stop containers	2026-03-06T04:21:03.7192185Z  2026-03-06 04:19:46.216 UTC [133] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+core-go	Stop containers	2026-03-06T04:21:03.7192699Z  2026-03-06 04:19:53.865 UTC [141] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7193269Z  2026-03-06 04:20:03.935 UTC [150] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7193629Z  2026-03-06 04:20:14.076 UTC [160] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7193985Z  2026-03-06 04:20:24.179 UTC [168] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7194557Z  2026-03-06 04:20:34.277 UTC [177] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7194975Z  2026-03-06 04:20:44.382 UTC [188] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7195346Z  2026-03-06 04:20:54.479 UTC [201] FATAL:  role "root" does not exist
+core-go	Stop containers	2026-03-06T04:21:03.7195674Z  This user must also own the server process.
+core-go	Stop containers	2026-03-06T04:21:03.7195933Z  
+core-go	Stop containers	2026-03-06T04:21:03.7196193Z  The database cluster will be initialized with locale "en_US.utf8".
+core-go	Stop containers	2026-03-06T04:21:03.7196616Z  The default database encoding has accordingly been set to "UTF8".
+core-go	Stop containers	2026-03-06T04:21:03.7197014Z  The default text search configuration will be set to "english".
+core-go	Stop containers	2026-03-06T04:21:03.7197321Z  
+core-go	Stop containers	2026-03-06T04:21:03.7197489Z  Data page checksums are disabled.
+core-go	Stop containers	2026-03-06T04:21:03.7197716Z  
+core-go	Stop containers	2026-03-06T04:21:03.7197978Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7198348Z  creating subdirectories ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7198643Z  selecting dynamic shared memory implementation ... posix
+core-go	Stop containers	2026-03-06T04:21:03.7198964Z  selecting default max_connections ... 100
+core-go	Stop containers	2026-03-06T04:21:03.7199233Z  selecting default shared_buffers ... 128MB
+core-go	Stop containers	2026-03-06T04:21:03.7199493Z  selecting default time zone ... Etc/UTC
+core-go	Stop containers	2026-03-06T04:21:03.7199969Z  creating configuration files ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7200217Z  running bootstrap script ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7200484Z  performing post-bootstrap initialization ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7200769Z  syncing data to disk ... ok
+core-go	Stop containers	2026-03-06T04:21:03.7200970Z  
+core-go	Stop containers	2026-03-06T04:21:03.7201112Z  
+core-go	Stop containers	2026-03-06T04:21:03.7201310Z  Success. You can now start the database server using:
+core-go	Stop containers	2026-03-06T04:21:03.7201584Z  
+core-go	Stop containers	2026-03-06T04:21:03.7201793Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+core-go	Stop containers	2026-03-06T04:21:03.7202068Z  
+core-go	Stop containers	2026-03-06T04:21:03.7202682Z  waiting for server to start....2026-03-06 04:18:23.704 UTC [48] LOG:  starting PostgreSQL 16.13 (Debian 16.13-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+core-go	Stop containers	2026-03-06T04:21:03.7203545Z  2026-03-06 04:18:23.704 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+core-go	Stop containers	2026-03-06T04:21:03.7204089Z  2026-03-06 04:18:23.707 UTC [51] LOG:  database system was shut down at 2026-03-06 04:18:23 UTC
+core-go	Stop containers	2026-03-06T04:21:03.7204694Z  2026-03-06 04:18:23.711 UTC [48] LOG:  database system is ready to accept connections
+core-go	Stop containers	2026-03-06T04:21:03.7205047Z   done
+core-go	Stop containers	2026-03-06T04:21:03.7205201Z  server started
+core-go	Stop containers	2026-03-06T04:21:03.7205377Z  CREATE DATABASE
+core-go	Stop containers	2026-03-06T04:21:03.7205543Z  
+core-go	Stop containers	2026-03-06T04:21:03.7205677Z  
+core-go	Stop containers	2026-03-06T04:21:03.7205962Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+core-go	Stop containers	2026-03-06T04:21:03.7206332Z  
+core-go	Stop containers	2026-03-06T04:21:03.7206593Z  2026-03-06 04:18:23.891 UTC [48] LOG:  received fast shutdown request
+core-go	Stop containers	2026-03-06T04:21:03.7207096Z  waiting for server to shut down....2026-03-06 04:18:23.892 UTC [48] LOG:  aborting any active transactions
+core-go	Stop containers	2026-03-06T04:21:03.7207752Z  2026-03-06 04:18:23.894 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+core-go	Stop containers	2026-03-06T04:21:03.7208266Z  2026-03-06 04:18:23.894 UTC [49] LOG:  shutting down
+core-go	Stop containers	2026-03-06T04:21:03.7208625Z  2026-03-06 04:18:23.895 UTC [49] LOG:  checkpoint starting: shutdown immediate
+core-go	Stop containers	2026-03-06T04:21:03.7209685Z  2026-03-06 04:18:23.910 UTC [49] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.013 s, sync=0.002 s, total=0.016 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4273 kB, estimate=4273 kB; lsn=0/191F0E8, redo lsn=0/191F0E8
+core-go	Stop containers	2026-03-06T04:21:03.7210721Z  2026-03-06 04:18:23.917 UTC [48] LOG:  database system is shut down
+core-go	Stop containers	2026-03-06T04:21:03.7211012Z   done
+core-go	Stop containers	2026-03-06T04:21:03.7211289Z  server stopped
+core-go	Stop containers	2026-03-06T04:21:03.7211458Z  
+core-go	Stop containers	2026-03-06T04:21:03.7211668Z  PostgreSQL init process complete; ready for start up.
+core-go	Stop containers	2026-03-06T04:21:03.7211937Z  
+core-go	Stop containers	2026-03-06T04:21:03.7217048Z Stop and remove container: dc3092fed3a54827be5421f07064ec6f_postgres16_0a7811
+core-go	Stop containers	2026-03-06T04:21:03.7221452Z ##[command]/usr/bin/docker rm --force 0f43ad20aff38593eba244c18ef3d5a875fe586c3ad432ba59fa2de6afd72adb
+core-go	Stop containers	2026-03-06T04:21:03.8725822Z 0f43ad20aff38593eba244c18ef3d5a875fe586c3ad432ba59fa2de6afd72adb
+core-go	Stop containers	2026-03-06T04:21:03.8752409Z Remove container network: github_network_a676fdc17e5549949350597953db7ae2
+core-go	Stop containers	2026-03-06T04:21:03.8756935Z ##[command]/usr/bin/docker network rm github_network_a676fdc17e5549949350597953db7ae2
+core-go	Stop containers	2026-03-06T04:21:03.9821224Z github_network_a676fdc17e5549949350597953db7ae2
+core-go	Complete job	﻿2026-03-06T04:21:03.9881724Z Cleaning up orphan processes

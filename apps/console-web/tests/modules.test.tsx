@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import JobsListPage from '../app/(dashboard)/jobs/page';
-import JobDetailPage from '../app/(dashboard)/jobs/[generation_id]/page';
+import JobsListPage from '../app/(dashboard)/modules/page';
+import JobDetailPage from '../app/(dashboard)/modules/[generation_id]/page';
 
 // Mock Dependencies
 const mockPush = vi.fn();
@@ -48,7 +48,6 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
     });
 
     it('jobs list renders chips correctly with queued payload rows', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/jobs')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve([
@@ -92,7 +91,7 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Unduh Dokumen (PDF)')).toBeDefined();
-            expect(screen.getByText('Bagikan Tautan Uji')).toBeDefined();
+            expect(screen.getByText('Copy Verify Link')).toBeDefined();
             // Secure SHA-256 slice masking constraint 
             expect(screen.getByText('deadbeef...')).toBeDefined();
         });

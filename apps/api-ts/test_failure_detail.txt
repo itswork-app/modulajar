@@ -1,0 +1,26 @@
+Could not load "spec" reporter. Displaying raw TAP.
+TAP version 14
+1..1
+# Subtest: tests/remediation_final_coverage.test.ts
+    ok 1 - Final Coverage Remediation — Branch Focus # SKIP filter: only
+    1..1
+ok 1 - tests/remediation_final_coverage.test.ts # time=2061.769ms
+
+----------------|---------|----------|---------|---------|------------------------------------------
+File            | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+----------------|---------|----------|---------|---------|------------------------------------------
+All files       |   23.69 |    31.57 |   21.05 |   23.69 |                                          
+ lib            |   46.34 |    16.66 |       0 |   46.34 |                                          
+  pricing.ts    |   84.21 |      100 |       0 |   84.21 | 29-31,35-37                              
+  wallet.ts     |   34.92 |    16.66 |       0 |   34.92 | ...,24,26,30-35,38-42,53-64,70-81,89-125 
+ plugins        |   37.93 |       50 |     100 |   37.93 |                                          
+  mock_auth.ts  |   37.93 |       50 |     100 |   37.93 | 9-26                                     
+ routes         |    8.88 |       25 |   14.28 |    8.88 |                                          
+  billing.ts    |   10.91 |    16.66 |       0 |   10.91 | 3-8,10-11,14,16,20-25,28-32,46-228       
+  letterhead.ts |    6.25 |       50 |      50 |    6.25 | 11-175                                   
+ utils          |   77.14 |    66.66 |   66.66 |   77.14 |                                          
+  crypto.ts     |   52.94 |      100 |       0 |   52.94 | 9-16                                     
+  logger.ts     |     100 |    66.66 |     100 |     100 | 3                                        
+----------------|---------|----------|---------|---------|------------------------------------------
+# { total: 1, pass: 0, skip: 1 }
+# time=2192.873ms

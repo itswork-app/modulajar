@@ -1,0 +1,115 @@
+Could not load "spec" reporter. Displaying raw TAP.
+TAP version 14
+1..1
+# Subtest: tests/remediation_final_coverage.test.ts
+    # Subtest: Final Coverage Remediation — Branch Focus
+        # Subtest: Letterhead Edge Cases
+            ok 1 - GET 404
+            ok 2 - Clear 404
+            ok 3 - Invalid type
+            ok 4 - Size limit
+            ok 5 - Length limit
+            1..5
+        ok 1 - Letterhead Edge Cases # time=133.269ms
+        
+        # Subtest: Wallet & Billing Edge Cases
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            not ok 5 - Invalid tier
+              ---
+              compare: ===
+              at:
+                fileName: tests/remediation_final_coverage.test.ts
+                lineNumber: 149
+                columnNumber: 11
+                typeName: Test
+              stack: |
+                Test.<anonymous> (tests/remediation_final_coverage.test.ts:149:11)
+              source: |2
+                        const app = buildApp(db);
+                        await app.ready();
+                        const resTopup = await app.inject({
+                ----------^
+                            method: 'POST',
+                            url: `/w/${WS_ID}/billing/topup-intent`,
+              diff: |
+                --- expected
+                +++ actual
+                @@ -1,1 +1,1 @@
+                -400
+                +404
+              ...
+            
+            1..5
+        not ok 2 - Wallet & Billing Edge Cases # time=47.765ms
+          ---
+          at:
+            fileName: tests/remediation_final_coverage.test.ts
+            lineNumber: 101
+            columnNumber: 13
+            typeName: Test
+          source: >2
+                        url: `/w/${WS_ID}/letterhead`,
+                        headers: { Authorization: `Bearer ${U_ID}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+                        body: body3
+            ------------^
+                    });
+                    t.equal(res3.statusCode, 400, 'Length limit');
+          ...
+        
+        1..2
+    not ok 1 - Final Coverage Remediation — Branch Focus # time=209.459ms
+      ---
+      at:
+        fileName: tests/remediation_final_coverage.test.ts
+        lineNumber: 44
+        columnNumber: 1
+        typeName: Object
+      source: |
+      
+        test('Final Coverage Remediation — Branch Focus', async (t) => {
+      
+            await t.test('Letterhead Edge Cases', async (t) => {
+                // Mock DB for 404
+      ...
+    
+    1..1
+not ok 1 - tests/remediation_final_coverage.test.ts # time=2437.116ms
+  ---
+  stdio: inherit
+  cwd: /home/kangza/workspace/modulajar/apps/api-ts
+  externalID: tests/remediation_final_coverage.test.ts
+  command: /home/kangza/.nvm/versions/node/v24.11.1/bin/node
+  args:
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs
+    - --enable-source-maps
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs
+    - -r
+    - ts-node/register
+    - /home/kangza/workspace/modulajar/apps/api-ts/tests/remediation_final_coverage.test.ts
+  exitCode: 1
+  signal: null
+  ...
+
+---------------------|---------|----------|---------|---------|-------------------------------------
+File                 | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                   
+---------------------|---------|----------|---------|---------|-------------------------------------
+All files            |   55.05 |    42.52 |      64 |   55.05 |                                     
+ lib                 |   87.19 |    43.24 |      60 |   87.19 |                                     
+  pricing.ts         |   84.21 |      100 |       0 |   84.21 | 29-31,35-37                         
+  wallet.ts          |   88.09 |    43.24 |      75 |   88.09 | ...1,26,31-33,74-77,118-120,124-125 
+ plugins             |   79.74 |       40 |     100 |   79.74 |                                     
+  mock_auth.ts       |   79.31 |    42.85 |     100 |   79.31 | 14-15,18-19,21-22                   
+  workspace-guard.ts |      80 |     37.5 |     100 |      80 | 31-35,40-44                         
+ routes              |    35.3 |    40.62 |      60 |    35.3 |                                     
+  billing.ts         |   21.83 |    44.44 |   42.85 |   21.83 | ...28-32,46-48,58-92,98-110,119-225 
+  letterhead.ts      |   52.84 |    39.13 |     100 |   52.84 | ...-102,104-105,109-124,138-155,172 
+ utils               |   77.14 |    66.66 |   66.66 |   77.14 |                                     
+  crypto.ts          |   52.94 |      100 |       0 |   52.94 | 9-16                                
+  logger.ts          |     100 |    66.66 |     100 |     100 | 3                                   
+---------------------|---------|----------|---------|---------|-------------------------------------
+# { total: 10, pass: 9, fail: 1 }
+# time=2586.287ms

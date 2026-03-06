@@ -177,14 +177,14 @@ export default function JobDetailPage() {
     if (error || !job) {
         return (
             <div className="max-w-3xl mx-auto py-8">
-                <Link href="/jobs" className="text-sm font-semibold text-slate-400 hover:text-slate-700 mb-6 inline-flex items-center">
+                <Link href="/modules" className="text-sm font-semibold text-slate-400 hover:text-slate-700 mb-6 inline-flex items-center">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Kembali ke Riwayat
                 </Link>
                 <div className="p-6 bg-red-50 text-red-600 rounded-2xl flex flex-col items-center text-center border border-red-100 mt-4 shadow-sm">
                     <AlertCircle className="w-12 h-12 mb-4 text-red-500 opacity-80" />
                     <h3 className="text-lg font-bold mb-2">Terjadi Kesalahan</h3>
                     <p className="opacity-90 max-w-sm mb-6">{error || 'Job tidak ditemukan'}</p>
-                    <Link href="/jobs" className="bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-red-700 transition">Kembali</Link>
+                    <Link href="/modules" className="bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-red-700 transition">Kembali</Link>
                 </div>
             </div>
         );
@@ -198,7 +198,7 @@ export default function JobDetailPage() {
     return (
         <div className="max-w-3xl mx-auto py-8 relative">
 
-            <Link href="/jobs" className="text-sm font-semibold text-slate-400 hover:text-slate-700 mb-6 inline-flex items-center transition-colors">
+            <Link href="/modules" className="text-sm font-semibold text-slate-400 hover:text-slate-700 mb-6 inline-flex items-center transition-colors">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Katalog Riwayat
             </Link>
 
@@ -311,9 +311,9 @@ export default function JobDetailPage() {
                                 </button>
                             )}
 
-                            {job.module_id && (
+                            {isDone && ( // Ensure there is an edit link if module generation is practically done
                                 <Link
-                                    href={`/w/${workspace?.id}/modules/${job.module_id}/edit`}
+                                    href={`/modules/${job.id}/edit`}
                                     className="flex-1 flex items-center justify-center bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-indigo-700 hover:-translate-y-0.5 shadow-xl shadow-indigo-200 transition-all text-sm sm:text-base"
                                 >
                                     <FileText className="w-5 h-5 mr-2" /> Edit Modul
@@ -332,7 +332,7 @@ export default function JobDetailPage() {
                                     {isCopied ? (
                                         <><CheckCircle2 className="w-5 h-5 mr-2" /> Disalin!</>
                                     ) : (
-                                        <><LinkIcon className="w-5 h-5 mr-2" /> Bagikan Tautan Uji</>
+                                        <><LinkIcon className="w-5 h-5 mr-2" /> Copy Verify Link</>
                                     )}
                                 </button>
                             )}
