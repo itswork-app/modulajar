@@ -65,7 +65,7 @@ export default function ProfileSetupPage() {
 
                 if (res.ok) {
                     // Profile exists, redirect out
-                    router.replace('/generate');
+                    router.replace('/wizard');
                     return;
                 }
 
@@ -132,7 +132,7 @@ export default function ProfileSetupPage() {
 
             // Clear draft and proceed
             localStorage.removeItem('teacher_profile_draft');
-            router.push('/generate');
+            router.push('/wizard');
         } catch (err: unknown) {
             if (err instanceof Error) {
                 setError(err.message);

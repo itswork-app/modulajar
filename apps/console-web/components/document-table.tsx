@@ -81,7 +81,7 @@ export function DocumentTable() {
                     Mulai buat modul ajar pertama Anda dengan mudah. Pilih jenjang dan mata pelajaran.
                 </p>
                 <Link
-                    href="/generate"
+                    href="/wizard"
                     className="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:-translate-y-0.5 transition-all font-semibold shadow-lg shadow-emerald-200"
                 >
                     Buat Modul Sekarang

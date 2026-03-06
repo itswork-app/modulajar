@@ -50,6 +50,9 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
     it('jobs list renders chips correctly with queued payload rows', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/profile') || url.includes('/school')) {
+                return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+            }
             if (url.includes('/jobs')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve([
                     { id: '1', status: 'QUEUED', payload: { mapel: 'Matematika' }, created_at: new Date().toISOString() },

@@ -153,7 +153,7 @@ export default function JobsListPage() {
                     <p className="text-slate-500 mt-1">Lacak dan unduh kurikulum AI yang telah dibuat oleh sekolah Anda.</p>
                 </div>
                 <Link
-                    href="/onboarding"
+                    href="/wizard"
                     className="inline-flex items-center justify-center bg-slate-900 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors"
                 >
                     + Buat Baru
@@ -181,7 +181,7 @@ export default function JobsListPage() {
                         <h3 className="text-lg font-bold text-slate-900 mb-1">Belum ada dokumen</h3>
                         <p className="text-slate-500 max-w-sm mx-auto mb-6">Mulai rakit Modul Ajar dan RPP modern pertama Anda dalam hitungan menit.</p>
                         <Link
-                            href="/onboarding"
+                            href="/wizard"
                             className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition"
                         >
                             Buat Sekarang
