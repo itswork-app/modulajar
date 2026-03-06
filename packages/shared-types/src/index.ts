@@ -1,4 +1,4 @@
-export type GenerationMode = 'template' | 'edit_template' | 'from_scratch';
+export type GenerationMode = 'template' | 'edit_template' | 'from_scratch' | 'wizard';
 
 export interface GenerateModuleRequest {
     workspace_id?: string; // Often inferred via auth, but explicitly typed for completeness
@@ -6,7 +6,7 @@ export interface GenerateModuleRequest {
     subject: string;
     grade: number;
     semester?: string;
-    topic: string;
+    topic?: string;
     template_id: string | null;
     template_overrides?: Record<string, any>;
 }

@@ -156,6 +156,7 @@ export default function OnboardingWizardPage() {
         } catch (err: unknown) {
             setError((err as Error).message);
             setIsSubmitting(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
