@@ -11,11 +11,14 @@ interface SectionEditorProps {
 }
 
 export function SectionEditor({ section, content, onUpdate, onAI }: SectionEditorProps) {
-    const [localContent, setLocalContent] = useState(() => {
-        if (typeof content === 'string') return content;
-        if (content && typeof content === 'object') return JSON.stringify(content, null, 2);
-        return '';
-    });
+    const textProp = typeof content === 'string' ? content : (content ? JSON.stringify(content, null, 2) : '');
+    const [prevContentProp, setPrevContentProp] = useState(textProp);
+    const [localContent, setLocalContent] = useState(textProp);
+
+    if (textProp !== prevContentProp) {
+        setPrevContentProp(textProp);
+        setLocalContent(textProp);
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
