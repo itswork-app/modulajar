@@ -14,6 +14,7 @@ type JobStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
 
 interface JobDetail {
     id: string; // generation_id
+    module_id?: string;
     status: JobStatus;
     payload: { mapel?: string; semester?: string; subject?: string; };
     created_at: string;
@@ -310,6 +311,14 @@ export default function JobDetailPage() {
                                 </button>
                             )}
 
+                            {job.module_id && (
+                                <Link
+                                    href={`/w/${workspace?.id}/modules/${job.module_id}/edit`}
+                                    className="flex-1 flex items-center justify-center bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-indigo-700 hover:-translate-y-0.5 shadow-xl shadow-indigo-200 transition-all text-sm sm:text-base"
+                                >
+                                    <FileText className="w-5 h-5 mr-2" /> Edit Modul
+                                </Link>
+                            )}
                             {job.public_id && (
                                 <button
                                     onClick={handleCopyLink}
