@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { ModuleEditorResponse } from 'shared-types';
 import { Loader2, Save, ChevronLeft, Eye } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
 import { SectionNav } from '@/components/editor/SectionNav';
 import { SectionEditor } from '@/components/editor/SectionEditor';
 import { PreviewPane } from '@/components/editor/PreviewPane';
 import { AISuggestionModal } from '@/components/editor/AISuggestionModal';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface ModuleEditorProps {
     workspaceId: string;
@@ -15,6 +18,7 @@ interface ModuleEditorProps {
 }
 
 export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
+    const { getToken } = useAuth();
     const [data, setData] = useState<ModuleEditorResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -26,9 +30,13 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
         if (!data || saving) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/w/${workspaceId}/modules/${moduleId}`, {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE}/w/${workspaceId}/modules/${moduleId}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ patch: data.module_json }),
             });
             if (res.ok) {
@@ -40,7 +48,7 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
         } finally {
             setSaving(false);
         }
-    }, [data, saving, workspaceId, moduleId]);
+    }, [data, saving, workspaceId, moduleId, getToken]);
 
     // Debounced Autosave Logic
     useEffect(() => {
@@ -55,7 +63,10 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
 
     const fetchEditorData = useCallback(async () => {
         try {
-            const res = await fetch(`/api/w/${workspaceId}/modules/${moduleId}/editor`);
+            const token = await getToken();
+            const res = await fetch(`${API_BASE}/w/${workspaceId}/modules/${moduleId}/editor`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!res.ok) throw new Error('Failed to load editor data');
             const json = await res.json();
             setData(json);
@@ -64,7 +75,7 @@ export function ModuleEditor({ workspaceId, moduleId }: ModuleEditorProps) {
         } finally {
             setLoading(false);
         }
-    }, [workspaceId, moduleId]);
+    }, [workspaceId, moduleId, getToken]);
 
     useEffect(() => {
         fetchEditorData();

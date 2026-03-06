@@ -79,17 +79,18 @@ export default function JobsListPage() {
             if (!workspace?.id) return;
             try {
                 const token = await getToken();
-                const res = await fetch(`${API_BASE}/w/${workspace.id}/jobs`, {
+                const res = await fetch(`${API_BASE}/w/${workspace.id}/documents`, {
                     headers: { Authorization: `Bearer ${token}` },
                     signal: abortController.signal
                 });
                 if (!res.ok) {
                     const errData = await res.json();
-                    throw new Error(errData.error || 'Gagal mengambil data jobs.');
+                    throw new Error(errData.error || 'Gagal mengambil data modul.');
                 }
                 const data = await res.json();
                 if (!isMounted) return;
-                const jobsList: Job[] = Array.isArray(data) ? data : data.jobs || [];
+
+                const jobsList = (data.documents || []) as Job[];
                 const sortedJobs = jobsList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 setJobs(sortedJobs);
                 setError(null);
@@ -243,13 +244,31 @@ export default function JobsListPage() {
                                                     >
                                                         Edit Modul
                                                     </Link>
-                                                    <Link
-                                                        href={`/modules/${job.id}`}
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                const token = await getToken();
+                                                                // Use public_id if available, else id (job_id)
+                                                                const pid = (job as Job).id;
+                                                                const res = await fetch(`${API_BASE}/w/${workspace?.id}/documents/${pid}/download`, {
+                                                                    headers: { Authorization: `Bearer ${token}` }
+                                                                });
+                                                                if (res.ok) {
+                                                                    const { download_url } = await res.json();
+                                                                    window.location.href = download_url;
+                                                                } else {
+                                                                    alert('Gagal mengunduh dokumen.');
+                                                                }
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                alert('Terjadi kesalahan saat mengunduh.');
+                                                            }
+                                                        }}
                                                         className="inline-flex items-center text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-medium transition-colors"
                                                     >
                                                         <Download className="w-4 h-4 mr-1.5" />
                                                         Download
-                                                    </Link>
+                                                    </button>
                                                 </>
                                             )}
                                         </td>
