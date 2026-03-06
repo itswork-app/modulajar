@@ -53,7 +53,8 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
             if (url.includes('/profile') || url.includes('/school')) {
                 return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
             }
-            if (url.includes('/jobs')) return Promise.resolve({
+            // In the refactored code, the list page calls /documents
+            if (url.includes('/documents')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve([
                     { id: '1', status: 'QUEUED', payload: { mapel: 'Matematika' }, created_at: new Date().toISOString() },
                     { id: '2', status: 'FAILED', payload: { mapel: 'IPAS' }, created_at: new Date().toISOString() }

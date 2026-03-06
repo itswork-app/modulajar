@@ -161,7 +161,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
             if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
-            if (url.includes('/generate-semester')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true, job_id: 'test-job' }) });
+            if (url.includes('/modules/generate')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true, job_id: 'test-job' }) });
         });
 
         render(<OnboardingWizardPage />);
@@ -188,7 +188,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'IPAS' }) });
             if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
-            if (url.includes('/generate-semester')) return Promise.resolve({ status: 400, ok: false, json: () => Promise.resolve({ error: 'AI Error: Rate Limit' }) });
+            if (url.includes('/modules/generate')) return Promise.resolve({ status: 400, ok: false, json: () => Promise.resolve({ error: 'AI Error: Rate Limit' }) });
         });
 
         render(<OnboardingWizardPage />);

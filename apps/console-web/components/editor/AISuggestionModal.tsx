@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, Sparkles, X, Check } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
 import { AISuggestResponse } from 'shared-types';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface AISuggestionModalProps {
     workspaceId: string;
@@ -14,15 +17,20 @@ interface AISuggestionModalProps {
 }
 
 export function AISuggestionModal({ workspaceId, moduleId, section, content, onClose, onApply }: AISuggestionModalProps) {
+    const { getToken } = useAuth();
     const [loading, setLoading] = useState(true);
     const [suggestion, setSuggestion] = useState<string | null>(null);
 
     useEffect(() => {
         async function getSuggestion() {
             try {
-                const res = await fetch(`/api/w/${workspaceId}/modules/${moduleId}/ai-assist`, {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE}/w/${workspaceId}/modules/${moduleId}/ai-assist`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         section,
                         action: 'improve',
@@ -39,7 +47,7 @@ export function AISuggestionModal({ workspaceId, moduleId, section, content, onC
             }
         }
         getSuggestion();
-    }, [workspaceId, moduleId, section, content]);
+    }, [workspaceId, moduleId, section, content, getToken]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">

@@ -99,6 +99,30 @@ export default function JobDetailPage() {
             }
 
             const data = await res.json();
+
+            // If DONE, fetch enriched data from /modules
+            if (data.status === 'DONE') {
+                try {
+                    const moduleRes = await fetch(`${API_BASE}/w/${workspace.id}/modules/${generationId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (moduleRes.ok) {
+                        const moduleData = await moduleRes.json();
+                        // Merge job status with module details (pdf, etc)
+                        setJob({
+                            ...data,
+                            pdf_url: moduleData.pdf?.download_url || moduleData.pdf_url,
+                            public_id: moduleData.public_id || data.public_id,
+                            module_id: moduleData.id || data.module_id
+                        });
+                        setError(null);
+                        return;
+                    }
+                } catch (mErr) {
+                    console.error('Failed to fetch enriched module data:', mErr);
+                }
+            }
+
             setJob(data);
             setError(null);
         } catch (err: unknown) {

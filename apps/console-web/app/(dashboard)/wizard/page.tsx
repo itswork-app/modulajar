@@ -121,26 +121,25 @@ export default function OnboardingWizardPage() {
 
         try {
             const token = await getToken();
-            const res = await fetch(`${API_BASE}/w/${workspace.id}/internal/generate-semester`, {
+            const res = await fetch(`${API_BASE}/w/${workspace.id}/modules/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    jenjang: 'SD',
-                    kelas: '4', // Locked v1
+                    mode: 'wizard',
                     subject: formData.mapel,
+                    grade: 4, // SD Kelas 4 locked v1
+                    topic: formData.tema || formData.topik, // Simplified for wizard
                     semester: formData.semester,
-                    tema: formData.tema || undefined,
-                    topik: formData.topik || undefined,
-                    teacher_notes: formData.catatan || undefined,
+                    notes: formData.catatan || undefined,
                 })
             });
 
             if (!res.ok) {
                 const errData = await res.json();
-                throw new Error(errData.error || 'Gagal memulai proses generasi AI.');
+                throw new Error(errData.error || errData.message || 'Gagal memulai proses generasi AI.');
             }
 
             const data = await res.json();
@@ -148,7 +147,7 @@ export default function OnboardingWizardPage() {
             // Clean draft
             localStorage.removeItem('onboarding_draft');
 
-            // UX optimization: Go directly to the detail page instead of list
+            // UX: Go directly to the detail page
             if (data.job_id) {
                 router.push(`/modules/${data.job_id}`);
             } else {
