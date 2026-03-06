@@ -107,4 +107,26 @@ describe('Billing UX v1 - Integration Tests', () => {
 
         expect(klaimButton.hasAttribute('disabled')).toBe(false);
     });
+
+    it('billing page renders loading state initially', async () => {
+        mockUsageSummarySuccess();
+        render(<BillingPage />);
+        expect(screen.getByText('Memuat data billing...')).toBeDefined();
+    });
+
+    it('billing page renders error state if API fails', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global.fetch as any).mockImplementation((url: string) => {
+            if (url.includes('/usage-summary')) return Promise.resolve({
+                status: 500, ok: false, text: () => Promise.resolve('Error')
+            });
+            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+        });
+
+        render(<BillingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Gagal memuat data billing.')).toBeDefined();
+        });
+    });
 });
