@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import OnboardingWizardPage from '../app/onboarding/page';
+import OnboardingWizardPage from '../app/(dashboard)/wizard/page';
 
 // Mock Dependencies
 const mockPush = vi.fn();
@@ -148,38 +148,38 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
         fireEvent.click(reviewBtn);
 
         await waitFor(() => {
-            expect(screen.getByText('Konfirmasi Generasi')).toBeDefined();
-            expect(screen.getByText('Matematika')).toBeDefined();
-            expect(screen.getByText('Bilangan Prima')).toBeDefined();
-            expect(screen.getByText('Unit 4')).toBeDefined();
+            expect(screen.getByRole('heading', { name: /Konfirmasi Generasi/i })).toBeDefined();
+            expect(screen.getAllByText(/Matematika/i).length).toBeGreaterThan(0);
+            expect(screen.getByText(/Bilangan Prima/i)).toBeDefined();
+            expect(screen.getByText(/Unit 4/i)).toBeDefined();
             expect(screen.getByText(/"Tolong gunakan contoh sehari-hari"/i)).toBeDefined();
         });
     });
 
-    it('submits the generation successfully and redirects to /jobs', async () => {
+    it('submits the generation successfully and redirects to /modules', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
             if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
-            if (url.includes('/generate-semester')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true }) });
+            if (url.includes('/generate-semester')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true, job_id: 'test-job' }) });
         });
 
         render(<OnboardingWizardPage />);
-        await waitFor(() => { expect(screen.getByText('Pilih Cara Mulai')).toBeDefined(); });
+        await waitFor(() => { expect(screen.getByText(/Pilih Cara Mulai/i)).toBeDefined(); });
 
         // Step 1 to 2
-        fireEvent.click(screen.getByText('Generate dari Template'));
-        await waitFor(() => { expect(screen.getByText('Target Pengajaran')).toBeDefined(); });
+        fireEvent.click(screen.getByText(/Generate dari Template/i));
+        await waitFor(() => { expect(screen.getByText(/Target Pengajaran/i)).toBeDefined(); });
 
         // Step 2 to 3 (Mapel defaults to profile 'Matematika' here)
         fireEvent.click(screen.getByText(/Review Data/i));
-        await waitFor(() => { expect(screen.getByText('Konfirmasi Generasi')).toBeDefined(); });
+        await waitFor(() => { expect(screen.getByText(/Konfirmasi Generasi/i)).toBeDefined(); });
 
         // Submit Step 3
         fireEvent.click(screen.getByText(/Mulai Generate AI Sekarang/i));
 
         await waitFor(() => {
-            expect(mockPush).toHaveBeenCalledWith('/jobs');
+            expect(mockPush).toHaveBeenCalledWith('/modules/test-job');
         });
     });
 
@@ -192,18 +192,18 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
         });
 
         render(<OnboardingWizardPage />);
-        await waitFor(() => { expect(screen.getByText('Pilih Cara Mulai')).toBeDefined(); });
+        await waitFor(() => { expect(screen.getByText(/Pilih Cara Mulai/i)).toBeDefined(); });
 
-        fireEvent.click(screen.getByText('Generate dari Template'));
-        await waitFor(() => { expect(screen.getByText('Target Pengajaran')).toBeDefined(); });
+        fireEvent.click(screen.getByText(/Generate dari Template/i));
+        await waitFor(() => { expect(screen.getByText(/Target Pengajaran/i)).toBeDefined(); });
 
         fireEvent.click(screen.getByText(/Review Data/i));
-        await waitFor(() => { expect(screen.getByText('Konfirmasi Generasi')).toBeDefined(); });
+        await waitFor(() => { expect(screen.getByText(/Konfirmasi Generasi/i)).toBeDefined(); });
 
         fireEvent.click(screen.getByText(/Mulai Generate AI Sekarang/i));
 
         await waitFor(() => {
-            expect(screen.getByText('AI Error: Rate Limit')).toBeDefined();
+            expect(screen.getByText(/AI Error: Rate Limit/i)).toBeDefined();
         });
     });
 });

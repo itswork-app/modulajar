@@ -165,7 +165,7 @@ export default function JobDetailPage() {
 
     const handleRetry = () => {
         // Forward mapped payload configs to onboarding cache if needed, else dump to onboarding root
-        router.push('/onboarding');
+        router.push('/wizard');
     };
 
 
