@@ -77,7 +77,7 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
     it('job detail exposes secure share link + download PDF if DONE', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/modules/')) return Promise.resolve({
+            if (url.includes('/jobs/')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve({
                     id: 'doc-done',
                     status: 'DONE',
@@ -105,7 +105,7 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
     it('job detail renders failed state and prints the last_error appropriately without polling', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/modules/')) return Promise.resolve({
+            if (url.includes('/jobs/')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve({
                     id: 'doc-err',
                     status: 'FAILED',
