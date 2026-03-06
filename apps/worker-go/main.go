@@ -53,6 +53,7 @@ func main() {
 
 	// Register Handlers
 	http.Handle("/tasks/generate", worker.NewHandler(realWorker))
+	http.Handle("/tasks/ai-assist", worker.NewAIHandler(realWorker))
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

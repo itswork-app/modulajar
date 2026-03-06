@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ModuleDetailResponse } from 'shared-types';
-import { Loader2, Download, ExternalLink, FileText, CheckCircle2 } from 'lucide-react';
+import { Loader2, Download, ExternalLink, FileText, CheckCircle2, PenTool } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function ModuleDetailPage({ params }: { params: { workspaceId: string, moduleId: string } }) {
@@ -53,6 +53,12 @@ export default function ModuleDetailPage({ params }: { params: { workspaceId: st
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900">{module.topic}</h1>
                     </div>
+                    <button
+                        onClick={() => router.push(`/w/${params.workspaceId}/modules/${params.moduleId}/edit`)}
+                        className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                    >
+                        <PenTool className="w-5 h-5" /> Edit Module
+                    </button>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-8">

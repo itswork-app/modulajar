@@ -1,9 +1,22 @@
 import { FastifyInstance } from 'fastify';
-import { GenerateModuleRequest, GenerateModuleResponse, ModuleDetailResponse, GenerationMode } from 'shared-types';
+import {
+    GenerateModuleRequest,
+    GenerateModuleResponse,
+    ModuleDetailResponse,
+    GenerationMode,
+    ModuleEditorResponse,
+    ModulePatchRequest,
+    ModulePatchResponse,
+    ModuleVersion,
+    AISuggestRequest,
+    AISuggestResponse
+} from 'shared-types';
 import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
 import { logger } from '../utils/logger';
-import { generateRequestsTotal } from '../utils/metrics';
+import { generateRequestsTotal, moduleUpdateTotal, aiAssistTotal } from '../utils/metrics';
+import { renderModuleHtml, computeHtmlSha256 } from '../services/renderService';
+import { ulid } from 'ulid';
 
 /**
  * Compute ID for deduplication/idempotency.
@@ -208,6 +221,245 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             };
 
             return reply.send(response);
+        });
+
+        // GET /w/:workspaceId/modules/:moduleId/editor
+        childServer.get<{ Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/editor', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const moduleId = request.params.moduleId;
+
+            // 1. Fetch latest version
+            const versionResult = await fastify.db.query(
+                `SELECT dv.version, dv.module_json, p.kelas, p.semester, p.tahun_ajaran, p.teacher_name, p.school_name, p.public_id,
+                        meta.subject, meta.topic
+                 FROM document_versions dv
+                 JOIN documents d ON d.id = dv.document_id
+                 JOIN packages p ON p.id = d.package_id
+                 CROSS JOIN LATERAL (SELECT (dv.module_json->>'subject') as subject, (dv.module_json->>'topic') as topic) AS meta
+                 WHERE d.id = $1 AND d.workspace_id = $2
+                 ORDER BY dv.version DESC LIMIT 1`,
+                [moduleId, workspaceId]
+            );
+
+            if (!versionResult.rowCount || versionResult.rowCount === 0) {
+                return reply.code(404).send({ error: 'Module or version not found' });
+            }
+
+            const row = versionResult.rows[0];
+            const moduleJson = row.module_json;
+
+            // 2. Render HTML preview
+            const html = renderModuleHtml({
+                subjectName: row.subject || 'Sesuai Template',
+                kelas: row.kelas,
+                semester: row.semester,
+                tahunAjaran: row.tahun_ajaran,
+                teacherName: row.teacher_name,
+                schoolName: row.school_name,
+                title: moduleJson.title || `Modul Ajar ${row.subject}`,
+                pid: row.public_id,
+                did: row.public_id, // For now, use PID as DID if they match
+                verifyUrl: `https://verify.modulajar.app/verify/${row.public_id}`,
+                moduleJson
+            });
+
+            const resp: ModuleEditorResponse = {
+                module_id: moduleId,
+                version: row.version,
+                module_json: moduleJson,
+                html_preview: html
+            };
+
+            return reply.send(resp);
+        });
+
+        // PATCH /w/:workspaceId/modules/:moduleId
+        childServer.patch<{ Body: ModulePatchRequest, Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const moduleId = request.params.moduleId;
+            const { patch } = request.body;
+
+            // Basic validation
+            if (!patch || typeof patch !== 'object') {
+                moduleUpdateTotal.inc({ result: 'error' });
+                return reply.code(400).send({ error: 'Invalid patch format' });
+            }
+
+            // 1. Fetch current version
+            const current = await fastify.db.query(
+                `SELECT dv.version, dv.module_json, d.package_id
+                 FROM document_versions dv
+                 JOIN documents d ON d.id = dv.document_id
+                 WHERE d.id = $1 AND d.workspace_id = $2
+                 ORDER BY dv.version DESC LIMIT 1`,
+                [moduleId, workspaceId]
+            );
+
+            if (!current.rowCount || current.rowCount === 0) {
+                return reply.code(404).send({ error: 'Module not found' });
+            }
+
+            const currentModule = current.rows[0].module_json;
+            const newVersion = current.rows[0].version + 1;
+
+            // 2. Merge patch
+            const updatedModule = { ...currentModule, ...patch };
+
+            // 3. Re-render and hash
+            const pkgInfo = await fastify.db.query(
+                `SELECT kelas, semester, tahun_ajaran, teacher_name, school_name, public_id FROM packages WHERE id = $1`,
+                [current.rows[0].package_id]
+            );
+            const pkg = pkgInfo.rows[0];
+
+            const html = renderModuleHtml({
+                subjectName: updatedModule.subject || 'Sesuai Template',
+                kelas: pkg.kelas,
+                semester: pkg.semester,
+                tahunAjaran: pkg.tahun_ajaran,
+                teacherName: pkg.teacher_name,
+                schoolName: pkg.school_name,
+                title: updatedModule.title || `Modul Ajar ${updatedModule.subject}`,
+                pid: pkg.public_id,
+                did: pkg.public_id,
+                verifyUrl: `https://verify.modulajar.app/verify/${pkg.public_id}`,
+                moduleJson: updatedModule
+            });
+            const htmlSha = computeHtmlSha256(html);
+
+            // 4. Save new version
+            const newVersionId = ulid();
+            await fastify.db.query(
+                `INSERT INTO document_versions (id, document_id, version, module_json, html_sha256)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [newVersionId, moduleId, newVersion, JSON.stringify(updatedModule), htmlSha]
+            );
+
+            // 5. Update current version in documents table
+            await fastify.db.query(
+                `UPDATE documents SET version = $1 WHERE id = $2`,
+                [newVersion, moduleId]
+            );
+
+            moduleUpdateTotal.inc({ result: 'success' });
+            logger.info({ msg: 'Module version updated', module_id: moduleId, version: newVersion, workspace_id: workspaceId });
+
+            const resp: ModulePatchResponse = {
+                version: newVersion,
+                saved: true
+            };
+            return reply.send(resp);
+        });
+
+        // GET /w/:workspaceId/modules/:moduleId/preview
+        childServer.get<{ Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/preview', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const moduleId = request.params.moduleId;
+
+            const versionResult = await fastify.db.query(
+                `SELECT dv.module_json, p.kelas, p.semester, p.tahun_ajaran, p.teacher_name, p.school_name, p.public_id
+                 FROM document_versions dv
+                 JOIN documents d ON d.id = dv.document_id
+                 JOIN packages p ON p.id = d.package_id
+                 WHERE d.id = $1 AND d.workspace_id = $2
+                 ORDER BY dv.version DESC LIMIT 1`,
+                [moduleId, workspaceId]
+            );
+
+            if (!versionResult.rowCount || versionResult.rowCount === 0) {
+                return reply.code(404).send({ error: 'Module not found' });
+            }
+
+            const row = versionResult.rows[0];
+            const html = renderModuleHtml({
+                subjectName: row.module_json.subject || 'Sesuai Template',
+                kelas: row.kelas,
+                semester: row.semester,
+                tahunAjaran: row.tahun_ajaran,
+                teacherName: row.teacher_name,
+                schoolName: row.school_name,
+                title: row.module_json.title || `Modul Ajar ${row.module_json.subject}`,
+                pid: row.public_id,
+                did: row.public_id,
+                verifyUrl: `https://verify.modulajar.app/verify/${row.public_id}`,
+                moduleJson: row.module_json
+            });
+
+            return reply.type('text/html').send(html);
+        });
+
+        // GET /w/:workspaceId/modules/:moduleId/versions
+        childServer.get<{ Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/versions', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const moduleId = request.params.moduleId;
+
+            const versions = await fastify.db.query(
+                `SELECT version, created_at, created_by 
+                 FROM document_versions dv
+                 JOIN documents d ON d.id = dv.document_id
+                 WHERE d.id = $1 AND d.workspace_id = $2
+                 ORDER BY version DESC`,
+                [moduleId, workspaceId]
+            );
+
+            const resp: ModuleVersion[] = versions.rows.map(r => ({
+                version: r.version,
+                created_at: r.created_at.toISOString(),
+                created_by: r.created_by
+            }));
+
+            return reply.send(resp);
+        });
+
+        // POST /w/:workspaceId/modules/:moduleId/ai-assist
+        childServer.post<{ Body: AISuggestRequest, Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/ai-assist', {
+            preHandler: [fastify.workspaceGuard]
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const moduleId = request.params.moduleId;
+            const body = request.body;
+            const { section, action, content } = body;
+
+            // Proxy to worker-go (Internal call)
+            // Implementation detail: we use the internal hostname for the worker service
+            const workerUrl = process.env.WORKER_INTERNAL_URL || 'http://worker-go:8080/tasks/ai-assist';
+
+            try {
+                const workerResp = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        workspace_id: workspaceId,
+                        module_id: moduleId,
+                        section,
+                        action,
+                        content
+                    })
+                });
+
+                if (!workerResp.ok) {
+                    aiAssistTotal.inc({ section: body.section, action: body.action, result: 'error' });
+                    const errorText = await workerResp.text();
+                    logger.error({ msg: 'AI Assist failed in worker', status: workerResp.status, error: errorText });
+                    return reply.code(502).send({ error: 'AI Assistant currently unavailable' });
+                }
+
+                const data = await workerResp.json();
+                aiAssistTotal.inc({ section: body.section, action: body.action, result: 'success' });
+                return reply.send(data as AISuggestResponse);
+            } catch (err) {
+                aiAssistTotal.inc({ section: body.section || 'unknown', action: body.action || 'unknown', result: 'error' });
+                logger.error({ msg: 'Failed to contact AI worker', err });
+                return reply.code(503).send({ error: 'Service Unavailable' });
+            }
         });
 
     }, { prefix: '/w' });

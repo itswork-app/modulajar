@@ -2,6 +2,7 @@ package worker
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -117,5 +118,57 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(result)
+	}
+}
+
+// NewAIHandler creates a synchronous HTTP handler for AI assist requests.
+func NewAIHandler(w *Worker) http.HandlerFunc {
+	baseLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	return func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(rw, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			WorkspaceID string `json:"workspace_id"`
+			ModuleID    string `json:"module_id"`
+			Section     string `json:"section"`
+			Action      string `json:"action"`
+			Content     string `json:"content"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(rw, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		logger := baseLogger.With(
+			"workspace_id", req.WorkspaceID,
+			"module_id", req.ModuleID,
+			"section", req.Section,
+			"action", req.Action,
+		)
+
+		logger.Info("AI assist request received")
+
+		suggestion, resp, err := w.AssistSection(r.Context(), req.Section, req.Action, req.Content)
+		if err != nil {
+			logger.Error("AI assist failed", "error", err)
+			http.Error(rw, fmt.Sprintf("AI assist failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"suggestion": suggestion,
+			"ai_receipt": map[string]interface{}{
+				"model":       resp.ModelName,
+				"input_hash":  resp.PromptHash,
+				"output_hash": resp.OutputHash,
+			},
+		})
 	}
 }

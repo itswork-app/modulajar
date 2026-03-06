@@ -588,3 +588,140 @@ func TestWorker_ExecuteJob_ErrorPaths(t *testing.T) {
 		t.Errorf("expected validation failure, got %v", res.FailureReason)
 	}
 }
+
+func TestWorker_AssistSection_Success(t *testing.T) {
+	ctx := context.Background()
+
+	mockAI := &MockAIEngine{
+		GenerateResponse: &ai.GenerateResponse{
+			Content:   "Improved content",
+			ModelName: "gemini-1.5-flash",
+		},
+	}
+
+	w := &Worker{
+		Deps: WorkerDeps{
+			AI: mockAI,
+		},
+	}
+
+	resultContent, resp, err := w.AssistSection(ctx, "identitas", "Make it formal", "old content")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resultContent != "Improved content" {
+		t.Errorf("expected 'Improved content', got '%s'", resultContent)
+	}
+	if resp == nil || resp.Content != "Improved content" {
+		t.Errorf("expected valid ai response")
+	}
+
+	// Verify prompt formatting
+	prompt := mockAI.LastRequest.Prompt
+	if !strings.Contains(prompt, "Section: identitas") || !strings.Contains(prompt, "Action: Make it formal") {
+		t.Errorf("prompt missing key inputs: %s", prompt)
+	}
+}
+
+func TestWorker_AssistSection_NoAI(t *testing.T) {
+	ctx := context.Background()
+	w := &Worker{Deps: WorkerDeps{AI: nil}}
+
+	_, _, err := w.AssistSection(ctx, "identitas", "action", "content")
+	if err == nil || !strings.Contains(err.Error(), "AI engine unavailable") {
+		t.Errorf("expected AI engine unavailable error, got %v", err)
+	}
+}
+
+func TestWorker_AssistSection_AIFailure(t *testing.T) {
+	ctx := context.Background()
+
+	mockAI := &MockAIEngine{
+		GenerateError: fmt.Errorf("AI token limit"),
+	}
+
+	w := &Worker{
+		Deps: WorkerDeps{
+			AI: mockAI,
+		},
+	}
+
+	_, _, err := w.AssistSection(ctx, "identitas", "action", "content")
+	if err == nil || !strings.Contains(err.Error(), "AI token limit") {
+		t.Errorf("expected AI token limit error, got %v", err)
+	}
+}
+
+func TestAIHandler_Success(t *testing.T) {
+	mockAI := &MockAIEngine{
+		GenerateResponse: &ai.GenerateResponse{
+			Content:    "New Section Content",
+			ModelName:  "test-model",
+			PromptHash: "hash-prompt",
+			OutputHash: "hash-output",
+		},
+	}
+	w := &Worker{Deps: WorkerDeps{AI: mockAI}}
+	handler := NewAIHandler(w)
+
+	reqBody := `{"workspace_id":"ws1","module_id":"mod1","section":"pendahuluan","action":"detail","content":"old"}`
+	req := httptest.NewRequest("POST", "/tasks/ai-assist", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	rw := httptest.NewRecorder()
+
+	handler.ServeHTTP(rw, req)
+
+	if rw.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rw.Code)
+	}
+	if !strings.Contains(rw.Body.String(), "New Section Content") {
+		t.Errorf("expected suggestions in response, got %s", rw.Body.String())
+	}
+}
+
+func TestAIHandler_MethodNotAllowed(t *testing.T) {
+	w := &Worker{}
+	handler := NewAIHandler(w)
+
+	req := httptest.NewRequest("GET", "/tasks/ai-assist", nil)
+	rw := httptest.NewRecorder()
+
+	handler.ServeHTTP(rw, req)
+
+	if rw.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405, got %d", rw.Code)
+	}
+}
+
+func TestAIHandler_BadJSON(t *testing.T) {
+	w := &Worker{}
+	handler := NewAIHandler(w)
+
+	req := httptest.NewRequest("POST", "/tasks/ai-assist", strings.NewReader("bad json"))
+	rw := httptest.NewRecorder()
+
+	handler.ServeHTTP(rw, req)
+
+	if rw.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rw.Code)
+	}
+}
+
+func TestAIHandler_AIFailure(t *testing.T) {
+	mockAI := &MockAIEngine{
+		GenerateError: fmt.Errorf("AI Error"),
+	}
+	w := &Worker{Deps: WorkerDeps{AI: mockAI}}
+	handler := NewAIHandler(w)
+
+	reqBody := `{"section":"pendahuluan","action":"detail","content":"old"}`
+	req := httptest.NewRequest("POST", "/tasks/ai-assist", strings.NewReader(reqBody))
+	rw := httptest.NewRecorder()
+
+	handler.ServeHTTP(rw, req)
+
+	if rw.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", rw.Code)
+	}
+}
