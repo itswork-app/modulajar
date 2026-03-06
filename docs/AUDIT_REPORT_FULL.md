@@ -1,7 +1,7 @@
 # Modulajar — Full Institutional Audit Report
 
-**Date**: 2026-03-02
-**Branch**: `audit` (commit `db70665` — post PR-033 Workspace Identity)
+**Date**: 2026-03-06
+**Branch**: `pr-071-wallet-system-final` (commit `76626ca` — Wallet System Integration)
 **Auditor**: Antigravity
 
 ---
@@ -49,6 +49,10 @@ modulajar/
 | 005_verify_hardening.sql | Verify endpoint support |
 | 006_payment_events.sql | Payment webhook idempotency table |
 | 007_workspace_identity.sql | Workspace type, NPSN, school info |
+
+- **[NEW] `apps/api-ts/src/routes/wallet.ts`**: Summary and transaction history endpoints.
+- **[MODIFY] `apps/api-ts/src/routes/generate.ts`**: Atomic debit-before-insert logic.
+- **[MODIFY] `apps/api-ts/src/lib/wallet.ts`**: Instrumented metrics and CTE debit logic.
 
 ### 1.4 Service Map
 
@@ -148,7 +152,7 @@ modulajar/
 
 | # | Gap | Severity | Evidence |
 |---|-----|----------|----------|
-| R1 | **Debit-after-job race** — Job is created before debit; if debit fails, job exists without charge | Medium | [generate.ts:182-205](file:///home/kangza/workspace/modulajar/apps/api-ts/src/routes/generate.ts#L182-L205) |
+| R1 | **Debit-after-job race** — Job is created before debit; if debit fails, job exists without charge | **RESOLVED** | Fixed in PR-071: Wallet debit moved *before* job insertion in `generate.ts` and `modules.ts`. |
 | R2 | **API readyz trivial** — Always returns ok, doesn't verify DB connectivity | High | [index.ts:93](file:///home/kangza/workspace/modulajar/apps/api-ts/src/index.ts#L93) |
 
 ---
@@ -162,7 +166,9 @@ modulajar/
 | `/metrics` endpoint (Prometheus) | ✅ | [index.ts:83-86](file:///home/kangza/workspace/modulajar/apps/api-ts/src/index.ts#L83-L86) |
 | `http_requests_total` counter | ✅ | [metrics.ts:8-13](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L8-L13) |
 | `http_request_duration_ms` histogram | ✅ | [metrics.ts:15-21](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L15-L21) |
-| `wallet_debit_total`, `generate_requests_total` | ✅ | [metrics.ts:23-35](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L23-L35) |
+| `wallet_debit_total`, `wallet_debit_failed_total` | ✅ | [metrics.ts:29-40](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L29-L40) |
+| `wallet_balance_checks_total`, `wallet_transactions_total` | ✅ | [metrics.ts:23-27, 42-47](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L23-L27,L42-L47) |
+| `generate_requests_total` | ✅ | [metrics.ts:49-54](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L49-L54) |
 | Trace/correlation ID (`x-trace-id` → reqId) | ✅ | [index.ts:24](file:///home/kangza/workspace/modulajar/apps/api-ts/src/index.ts#L24) |
 | Structured JSON logging (pino) | ✅ | [logger.ts](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/logger.ts) |
 | Default process metrics (CPU/RAM) | ✅ | [metrics.ts:6](file:///home/kangza/workspace/modulajar/apps/api-ts/src/utils/metrics.ts#L6) |
@@ -183,6 +189,7 @@ modulajar/
 |---|-----|----------|
 | O1 | No dashboard documentation (metric names, Grafana JSON, or alerting rules) | Low |
 | O2 | Worker logs use `log/slog` but no explicit `trace_id` correlation from job metadata to log fields | Medium |
+| O3 | **UX Drift**: Several pages (Editor, Detail) were previously orphans; linked in PR-071 via Riwayat. | **FIXED** | [UI_CONSOLE_AUDIT.md](file:///home/kangza/workspace/modulajar/docs/UI_CONSOLE_AUDIT.md) |
 
 ---
 
@@ -192,5 +199,5 @@ modulajar/
 |----------|-------|-----|
 | **Critical** | 2 | S1, S2 |
 | **High** | 3 | S3, S4, S5 |
-| **Medium** | 5 | S6, S7, R1, D1, O2 |
+| **Medium** | 4 | S6, S7, D1, O2 (R1 resolved) |
 | **Low** | 3 | D2, D4, O1 |
