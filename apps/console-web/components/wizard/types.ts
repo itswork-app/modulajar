@@ -1,6 +1,6 @@
 export type WizardStep = 'mode' | 'inputs' | 'template' | 'generating' | 'done' | 'failed';
 
-export type GenerationMode = 'template' | 'edit_template' | 'from_scratch';
+export type GenerationMode = 'template' | 'edit_template' | 'from_scratch' | 'wizard';
 
 export interface WizardInputs {
     subject: string;

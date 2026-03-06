@@ -45,9 +45,12 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             const body = request.body;
             const { mode, subject, grade, topic, template_id, semester } = body;
 
-            if (!mode || !subject || !grade || !topic) {
+            if (!mode || !subject || !grade || (mode !== 'wizard' && !topic)) {
                 return reply.code(400).send({ error: 'Missing required fields: mode, subject, grade, topic' });
             }
+
+            const effectiveTopic = topic || subject; // Fallback for wizard mode 
+
 
             if (grade < 1 || grade > 12) {
                 return reply.code(400).send({ error: 'Invalid grade. Must be between 1 and 12.' });
@@ -70,7 +73,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             const schoolName = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].school_name : 'Sekolah Dasar';
 
             // 2. Compute canonical PID and Check idempotency
-            const packageKey = computePackageKey(workspaceId, mode, subject, grade, topic, template_id);
+            const packageKey = computePackageKey(workspaceId, mode, subject, grade, effectiveTopic, template_id);
 
             // Active job limit
             const activeJobs = await fastify.db.query(
@@ -121,7 +124,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                 pack_path: 'packs/wizard/' + mode + '/pack.json', // virtual path
                 mode: mode,
                 template_id: template_id,
-                topic: topic,
+                topic: effectiveTopic,
                 subject: subject,
                 grade: grade,
                 semester: semester || '1',
@@ -137,7 +140,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             try {
                 await debit(fastify.db, workspaceId, 1, debitRef, {
                     transaction_type: 'generate_module',
-                    note: `${subject} - ${topic}`,
+                    note: `${subject} - ${effectiveTopic}`,
                     job_id: jobId
                 });
             } catch (err: any) {
