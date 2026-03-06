@@ -24,6 +24,7 @@ interface UsageSummary {
     credits_remaining: number;
     documents_generated: number;
     month_usage: number;
+    jobs_failed: number;
 }
 
 interface Transaction {
