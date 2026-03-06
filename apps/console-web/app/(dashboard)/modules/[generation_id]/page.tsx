@@ -126,11 +126,6 @@ export default function JobDetailPage() {
             setPollCount(prev => prev + 1);
         };
 
-        // Determine delay: 1, 2, 4, 8, 8, 8...
-        const delay = Math.min(Math.pow(2, pollCount), 8) * 1000;
-
-        const timeoutId = setTimeout(fetchWithBackoff, delay);
-
         // Global timeout (5 minutes)
         const globalTimeout = setTimeout(() => {
             if (isProcessing) {
@@ -138,6 +133,16 @@ export default function JobDetailPage() {
                 setError('Proses terlalu lama. Silakan muat ulang halaman nanti.');
             }
         }, 5 * 60 * 1000);
+
+        if (!job && pollCount === 0) {
+            fetchWithBackoff();
+            return () => clearTimeout(globalTimeout);
+        }
+
+        // Determine delay: 1, 2, 4, 8, 8, 8...
+        const delay = Math.min(Math.pow(2, pollCount), 8) * 1000;
+
+        const timeoutId = setTimeout(fetchWithBackoff, delay);
 
         return () => {
             clearTimeout(timeoutId);
