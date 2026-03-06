@@ -1,0 +1,30 @@
+core-go	Check Worker Package Coverage Gate (≥80%)	﻿2026-03-06T04:21:01.0809063Z ##[group]Run echo ""
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0809323Z [36;1mecho ""[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0809555Z [36;1mecho "=============================================="[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0809885Z [36;1mecho "🔍 WORKER PACKAGE COVERAGE GATE (≥80%)"[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0810227Z [36;1mecho "=============================================="[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0810618Z [36;1mgo test -coverprofile=worker_coverage.out ./worker/...[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0811132Z [36;1mWORKER=$(go tool cover -func=worker_coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0811594Z [36;1mecho "Worker coverage: ${WORKER}%"[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0811840Z [36;1m[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0812066Z [36;1mWORKER_INT=$(echo "$WORKER" | awk '{printf "%d", $1}')[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0812373Z [36;1mif [ "$WORKER_INT" -lt 80 ]; then[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0812743Z [36;1m  echo "❌ GATE FAIL: worker coverage ${WORKER}% is below the 80% threshold."[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0813115Z [36;1m  exit 1[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0813319Z [36;1mfi[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0813531Z [36;1mecho "✅ Gate passed: worker ${WORKER}% ≥ 80%"[0m
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0862907Z shell: /usr/bin/bash -e {0}
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0863149Z env:
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0863629Z   DATABASE_URL: ***localhost:5432/modulajar_test?sslmode=disable
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0863997Z   DID_SECRET: test-did-secret
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0864234Z   PID_SECRET: test-pid-secret
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0864692Z   CHROME_BIN: /usr/bin/google-chrome
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0864937Z ##[endgroup]
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0930799Z 
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0931042Z ==============================================
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0931731Z 🔍 WORKER PACKAGE COVERAGE GATE (≥80%)
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:01.0932171Z ==============================================
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.2720393Z ok  	modulajar/apps/core-go/worker	0.369s	coverage: 74.9% of statements
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4906966Z Worker coverage: 74.9%
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4936651Z ❌ GATE FAIL: worker coverage 74.9% is below the 80% threshold.
+core-go	Check Worker Package Coverage Gate (≥80%)	2026-03-06T04:21:03.4949013Z ##[error]Process completed with exit code 1.

@@ -14,7 +14,7 @@ type JobStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
 interface Job {
     id: string; // generation_id
     status: JobStatus;
-    payload: { mapel?: string; semester?: string; subject?: string; }; // Handles varying property shapes
+    payload: { mapel?: string; semester?: string; subject?: string; topic?: string; materi?: string; }; // Handles varying property shapes
     created_at: string;
     updated_at: string;
 }
@@ -192,15 +192,19 @@ export default function JobsListPage() {
                         <table className="w-full text-sm text-left">
                             <thead className="text-xs text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-6 py-4 font-medium">Dokumen</th>
+                                    <th className="px-6 py-4 font-medium">Tanggal</th>
+                                    <th className="px-6 py-4 font-medium">Mata Pelajaran</th>
+                                    <th className="px-6 py-4 font-medium">Topik</th>
                                     <th className="px-6 py-4 font-medium">Status</th>
-                                    <th className="px-6 py-4 font-medium hidden sm:table-cell">Waktu</th>
                                     <th className="px-6 py-4 font-medium text-right">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {jobs.map((job) => (
                                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-6 py-4 whitespace-nowrap text-slate-600">
+                                            {new Date(job.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center">
                                                 <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 mr-4 border border-indigo-100/50">
@@ -216,29 +220,37 @@ export default function JobsListPage() {
                                                 </div>
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4 text-slate-700">
+                                            {/* Assuming topic or default text */}
+                                            {job.payload?.topic || job.payload?.materi || 'Tanpa Topik'}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {renderStatusChip(job.status)}
                                         </td>
-                                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap hidden sm:table-cell">
-                                            {new Date(job.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                            {job.status === 'DONE' ? (
-                                                <Link
-                                                    href={`/jobs/${job.id}`}
-                                                    className="inline-flex items-center text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-medium transition-colors"
-                                                >
-                                                    <Download className="w-4 h-4 mr-1.5" />
-                                                    Unduh
-                                                </Link>
-                                            ) : (
-                                                <Link
-                                                    href={`/jobs/${job.id}`}
-                                                    className="inline-flex items-center text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
-                                                >
-                                                    <Eye className="w-4 h-4 mr-1.5" />
-                                                    Lihat Detail
-                                                </Link>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                                            <Link
+                                                href={`/modules/${job.id}`}
+                                                className="inline-flex items-center text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                            >
+                                                <Eye className="w-4 h-4 mr-1.5" />
+                                                Detail
+                                            </Link>
+                                            {job.status === 'DONE' && (
+                                                <>
+                                                    <Link
+                                                        href={`/modules/${job.id}/edit`}
+                                                        className="inline-flex items-center text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                                    >
+                                                        Edit Modul
+                                                    </Link>
+                                                    <Link
+                                                        href={`/modules/${job.id}`}
+                                                        className="inline-flex items-center text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                                    >
+                                                        <Download className="w-4 h-4 mr-1.5" />
+                                                        Download
+                                                    </Link>
+                                                </>
                                             )}
                                         </td>
                                     </tr>
