@@ -9,6 +9,13 @@
  * - Idempotent via UNIQUE(workspace_id, reference_id, type)
  */
 
+import {
+    walletBalanceChecksTotal,
+    walletDebitTotal,
+    walletDebitFailedTotal,
+    walletTransactionsTotal
+} from '../utils/metrics';
+
 export interface DbClient {
     query(sql: string, params: unknown[]): Promise<{ rowCount: number | null; rows: Record<string, unknown>[] }>;
 }
@@ -43,6 +50,7 @@ export async function getBalance(db: DbClient, workspaceId: string): Promise<num
         WHERE workspace_id = $1`,
         [workspaceId]
     );
+    walletBalanceChecksTotal.inc();
     return parseInt(result.rows[0]?.balance as string || '0', 10);
 }
 
@@ -71,6 +79,9 @@ export async function credit(
     );
 
     const inserted = (result.rowCount ?? 0) > 0;
+    if (inserted) {
+        walletTransactionsTotal.inc({ type: 'credit' });
+    }
     return { inserted, ledgerId: inserted ? ledgerId : null };
 }
 
@@ -130,8 +141,11 @@ export async function debit(
         }
 
         // Not a duplicate → insufficient balance
+        walletDebitFailedTotal.inc({ reason: 'insufficient_balance' });
         throw new Error('Insufficient balance');
     }
 
+    walletDebitTotal.inc();
+    walletTransactionsTotal.inc({ type: 'debit' });
     return { inserted, ledgerId };
 }

@@ -37,6 +37,7 @@ test('Comprehensive Modules Routes', async (t) => {
                 if (sql.includes('SELECT id, public_id FROM packages')) return { rowCount: 0, rows: [] };
                 if (sql.includes('INSERT INTO packages')) return { rowCount: 1, rows: [] };
                 if (sql.includes('INSERT INTO generation_jobs')) return { rowCount: 1, rows: [] };
+                if (sql.includes('wallet_ledger')) return { rowCount: 1, rows: [{ current_balance: 100 }] };
                 return { rowCount: 0, rows: [] };
             }
         });
@@ -60,6 +61,7 @@ test('Comprehensive Modules Routes', async (t) => {
                     // Return 4 active jobs
                     return { rowCount: 4, rows: [{}, {}, {}, {}] };
                 }
+                if (sql.includes('wallet_ledger')) return { rowCount: 1, rows: [{ current_balance: 100 }] };
                 return { rowCount: 0, rows: [] };
             }
         });

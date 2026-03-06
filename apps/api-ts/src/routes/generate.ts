@@ -179,6 +179,25 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 trace_id: traceId // Persist Trace ID
             };
 
+            // 6. Debit wallet (idempotent via ON CONFLICT)
+            const debitRef = `JOB:${jobId}`;
+            try {
+                await debit(fastify.db, workspaceId, SD_FULL_SEMESTER_COST, debitRef, {
+                    transaction_type: 'generate_module',
+                    job_id: jobId,
+                    package_id: packageId
+                });
+            } catch (err: any) {
+                if (err.message === 'Insufficient balance') {
+                    return reply.code(402).send({
+                        error: 'insufficient_credits',
+                        message: 'Saldo kredit tidak cukup. Silakan top up untuk melanjutkan.'
+                    });
+                }
+                logger.warn({ trace_id: traceId, job_id: jobId, error: err }, 'Debit failed');
+                throw err;
+            }
+
             try {
                 await fastify.db.query(
                     `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
@@ -186,22 +205,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                     [jobId, workspaceId, packageId, 'queued', idempotencyKey, JSON.stringify(metadata)]
                 );
             } catch (err) {
-                generateRequestsTotal.inc({ result: 'failed' });
+                generateRequestsTotal.inc({ result: 'failed_insert' });
                 throw err;
-            }
-
-            // 6. Debit wallet (idempotent via ON CONFLICT)
-            const debitRef = `JOB:${jobId}`;
-            try {
-                await debit(fastify.db, workspaceId, SD_FULL_SEMESTER_COST, debitRef, {
-                    job_id: jobId,
-                    package_id: packageId
-                });
-            } catch {
-                // Balance already checked above; if debit fails here it's a race condition
-                // The job is already created — we can't roll back cleanly
-                // Debit idempotency ensures no double-charge on retry
-                logger.warn({ trace_id: traceId, job_id: jobId }, 'Debit failed after job creation — possible race');
             }
 
             // 7. Enqueue Cloud Task (placeholder)
