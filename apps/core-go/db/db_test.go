@@ -232,6 +232,9 @@ func TestMarkJobFailed(t *testing.T) {
 		t.Errorf("Expected queued, got %s", status)
 	}
 
+	// Simulate worker acquiring the job again for the 5th attempt
+	p.Exec(ctx, "UPDATE generation_jobs SET status='running' WHERE id=$1", jobID)
+
 	// Attempt 5 -> Failed
 	if err := MarkJobFailed(ctx, wsID, jobID, "error 5", 5); err != nil {
 		t.Errorf("MarkJobFailed 5 failed: %v", err)
@@ -627,6 +630,104 @@ func TestCountStuckJobs_NilPool(t *testing.T) {
 	defer func() { pool = origPool }()
 
 	_, err := CountStuckJobs(context.Background(), 300)
+	if err == nil {
+		t.Error("expected error when pool is nil")
+	}
+}
+
+func TestValidateTransition(t *testing.T) {
+	cases := []struct {
+		current string
+		next    string
+		valid   bool
+	}{
+		{StatusQueued, StatusRunning, true},
+		{StatusQueued, StatusDone, false},
+		{StatusRunning, StatusDone, true},
+		{StatusRunning, StatusFailed, true},
+		{StatusRunning, StatusQueued, true},
+		{StatusDone, StatusRunning, false},
+		{StatusFailed, StatusRunning, false},
+		{"", StatusQueued, true},
+		{"", StatusRunning, false},
+	}
+
+	for _, c := range cases {
+		err := ValidateTransition(c.current, c.next)
+		if c.valid && err != nil {
+			t.Errorf("Expected valid transition %s->%s, got err: %v", c.current, c.next, err)
+		}
+		if !c.valid && err == nil {
+			t.Errorf("Expected invalid transition %s->%s", c.current, c.next)
+		}
+	}
+}
+
+func TestDatasetFunctions(t *testing.T) {
+	p := setup(t)
+	defer p.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	entry := DatasetEntry{
+		ID:           "test-ds-01",
+		Subject:      "Pancasila",
+		Grade:        4,
+		Topic:        "Gotong Royong",
+		ModuleJSON:   []byte(`{"foo":"bar"}`),
+		QualityScore: 90,
+		OriginalHash: "hash-01",
+	}
+
+	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='test-ds-01'")
+
+	inserted, err := InsertDatasetEntry(ctx, entry)
+	if err != nil {
+		t.Fatalf("InsertDatasetEntry failed: %v", err)
+	}
+	if !inserted {
+		t.Errorf("Expected inserted=true")
+	}
+
+	inserted2, err := InsertDatasetEntry(ctx, entry)
+	if err != nil {
+		t.Fatalf("InsertDatasetEntry duplicate failed: %v", err)
+	}
+	if inserted2 {
+		t.Errorf("Expected inserted=false for duplicate")
+	}
+
+	candidates, err := GetTemplateCandidates(ctx, "Pancasila", 4)
+	if err != nil {
+		t.Fatalf("GetTemplateCandidates failed: %v", err)
+	}
+	if len(candidates) == 0 {
+		t.Errorf("Expected at least 1 candidate")
+	}
+
+	err = IncrementDatasetUsage(ctx, "test-ds-01")
+	if err != nil {
+		t.Errorf("IncrementDatasetUsage failed: %v", err)
+	}
+
+	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='test-ds-01'")
+}
+
+func TestDatasetFunctions_NilPool(t *testing.T) {
+	origPool := pool
+	pool = nil
+	defer func() { pool = origPool }()
+
+	ctx := context.Background()
+	_, err := InsertDatasetEntry(ctx, DatasetEntry{})
+	if err == nil {
+		t.Error("expected error when pool is nil")
+	}
+	_, err = GetTemplateCandidates(ctx, "Pancasila", 4)
+	if err == nil {
+		t.Error("expected error when pool is nil")
+	}
+	err = IncrementDatasetUsage(ctx, "test-ds-01")
 	if err == nil {
 		t.Error("expected error when pool is nil")
 	}
