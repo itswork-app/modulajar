@@ -14,11 +14,11 @@ import (
 
 // RealAIEngine wraps ai package
 type RealAIEngine struct {
-	Client *ai.GeminiClient
+	Engine AIEngine
 }
 
 func (r *RealAIEngine) Generate(ctx context.Context, req ai.GenerateRequest) (*ai.GenerateResponse, error) {
-	return r.Client.Generate(ctx, req)
+	return r.Engine.Generate(ctx, req)
 }
 
 // RealPDFEngine wraps render package
@@ -102,12 +102,22 @@ func (r *RealValidator) Validate(input validator.ValidatorInput) (*validator.Val
 // It initializes API clients from environment variables.
 func NewRealWorker(ctx context.Context) (*Worker, error) {
 	// AI
-	geminiKey := os.Getenv("GEMINI_API_KEY")
-	geminiModel := os.Getenv("GEMINI_MODEL")
-	if geminiModel == "" {
-		geminiModel = "gemini-2.0-flash"
+	var aiEngine AIEngine
+	openAIKey := os.Getenv("OPENAI_API_KEY")
+	if openAIKey != "" {
+		openAIModel := os.Getenv("OPENAI_MODEL")
+		if openAIModel == "" {
+			openAIModel = "gpt-4o"
+		}
+		aiEngine = ai.NewOpenAIClient(openAIKey, openAIModel, 0, 0)
+	} else {
+		geminiKey := os.Getenv("GEMINI_API_KEY")
+		geminiModel := os.Getenv("GEMINI_MODEL")
+		if geminiModel == "" {
+			geminiModel = "gemini-1.5-flash-latest"
+		}
+		aiEngine = ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
 	}
-	aiClient := ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
 
 	// GCS - Note: Client creation might fail if credentials missing
 	// Should we fail or allow nil (if optional)?
@@ -134,7 +144,7 @@ func NewRealWorker(ctx context.Context) (*Worker, error) {
 	}
 
 	deps := WorkerDeps{
-		AI:        &RealAIEngine{Client: aiClient},
+		AI:        &RealAIEngine{Engine: aiEngine},
 		PDF:       &RealPDFEngine{},
 		Storage:   realStorage,
 		JobStore:  &RealJobStore{},

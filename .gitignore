@@ -57,3 +57,4 @@ apps/worker-go/worker-go
 # Test deps
 chrome-bin/
 
+tmp/

@@ -335,7 +335,7 @@ No markdown formatting. Pure JSON.`,
 			// 2. Parse & Validate Schema
 			if useSD4Template {
 				var modulAjar curriculum.ModulAjarSD4
-				if err := json.Unmarshal([]byte(resp.Content), &modulAjar); err != nil {
+				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &modulAjar); err != nil {
 					lastErr = fmt.Errorf("invalid JSON (SD4): %v", err)
 					continue
 				}
@@ -368,7 +368,7 @@ No markdown formatting. Pure JSON.`,
 				}(modulAjar, qualityResult.Score)
 			} else {
 				var c curriculum.Curriculum
-				if err := json.Unmarshal([]byte(resp.Content), &c); err != nil {
+				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &c); err != nil {
 					lastErr = fmt.Errorf("invalid JSON (legacy): %v", err)
 					continue
 				}
@@ -724,6 +724,7 @@ func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 func resolveTemplateDir(packPath string) string {
 	candidates := []string{
 		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
+		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath))))), "templates", "v1"),
 		filepath.Join("templates", "v1"),
 		filepath.Join("..", "templates", "v1"),
 	}

@@ -56,7 +56,7 @@ async function seedAndRun() {
         job_id: jobId,
         package_id: packageId,
         workspace_id: WORKSPACE_ID,
-        pack_path: 'packs/wizard/wizard/pack.json',
+        pack_path: '../core-go/packs/merdeka/sd4/v1/pack.json',
         mode: 'wizard',
         topic: 'pecahan sederhana',
         subject: 'matematika',

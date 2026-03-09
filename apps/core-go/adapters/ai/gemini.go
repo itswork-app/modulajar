@@ -3,30 +3,12 @@ package ai
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
-
-// GenerateRequest encapsulates input for generation
-type GenerateRequest struct {
-	Prompt string
-}
-
-// GenerateResponse encapsulates output and receipt data
-type GenerateResponse struct {
-	Content     string
-	PromptHash  string // SHA256 of prompt
-	OutputHash  string // SHA256 of content
-	TokenInput  int
-	TokenOutput int
-	ModelName   string
-	DurationMs  int64
-}
 
 // GeminiClient handles interaction with Google Gemini API
 type GeminiClient struct {
@@ -146,12 +128,6 @@ func (c *GeminiClient) Generate(ctx context.Context, req GenerateRequest) (*Gene
 		ModelName:   c.model,
 		DurationMs:  duration.Milliseconds(),
 	}, nil
-}
-
-func sha256Sum(s string) string {
-	h := sha256.New()
-	h.Write([]byte(s))
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Internal structures for JSON decoding
