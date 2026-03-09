@@ -122,6 +122,25 @@ var (
 		Name: "template_selected_total",
 		Help: "Total number of templates selected for injection",
 	}, []string{"count"}) // "0", "1", "2", "3"
+
+	// PR-A5: Observability Alignment
+	GenerationDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "generation_duration_seconds",
+		Help:    "Total time for a job to complete (start to finish)",
+		Buckets: []float64{5, 10, 30, 60, 120, 300, 600},
+	}, []string{"result"}) // "done", "failed"
+
+	PdfRenderDurationSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "pdf_render_duration_seconds",
+		Help:    "Time spent in Typst/Playwright PDF rendering",
+		Buckets: []float64{0.5, 1, 2, 5, 10, 30, 60},
+	})
+
+	AiRequestDurationSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "ai_request_duration_seconds",
+		Help:    "Time spent waiting for LLM completion API",
+		Buckets: []float64{1, 2, 5, 10, 30, 60, 120},
+	})
 )
 
 // DefaultStuckThresholdSeconds is the default threshold for stuck job detection (5 minutes).
