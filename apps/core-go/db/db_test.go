@@ -670,7 +670,7 @@ func TestDatasetFunctions(t *testing.T) {
 	defer cancel()
 
 	entry := DatasetEntry{
-		ID:           "test-ds-01",
+		ID:           "00000000-0000-0000-0000-000000000001",
 		Subject:      "Pancasila",
 		Grade:        4,
 		Topic:        "Gotong Royong",
@@ -679,7 +679,7 @@ func TestDatasetFunctions(t *testing.T) {
 		OriginalHash: "hash-01",
 	}
 
-	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='test-ds-01'")
+	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='00000000-0000-0000-0000-000000000001'")
 
 	inserted, err := InsertDatasetEntry(ctx, entry)
 	if err != nil {
@@ -705,12 +705,12 @@ func TestDatasetFunctions(t *testing.T) {
 		t.Errorf("Expected at least 1 candidate")
 	}
 
-	err = IncrementDatasetUsage(ctx, "test-ds-01")
+	err = IncrementDatasetUsage(ctx, "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Errorf("IncrementDatasetUsage failed: %v", err)
 	}
 
-	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='test-ds-01'")
+	p.Exec(ctx, "DELETE FROM curriculum_dataset WHERE id='00000000-0000-0000-0000-000000000001'")
 }
 
 func TestDatasetFunctions_NilPool(t *testing.T) {
@@ -727,7 +727,7 @@ func TestDatasetFunctions_NilPool(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when pool is nil")
 	}
-	err = IncrementDatasetUsage(ctx, "test-ds-01")
+	err = IncrementDatasetUsage(ctx, "00000000-0000-0000-0000-000000000001")
 	if err == nil {
 		t.Error("expected error when pool is nil")
 	}
