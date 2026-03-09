@@ -16,6 +16,21 @@ var (
 		Help: "The total number of jobs acquired",
 	}, []string{"result"}) // "success", "failed"
 
+	JobStartedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "job_started_total",
+		Help: "The total number of jobs that transitioned to running",
+	})
+
+	JobCompletedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "job_completed_total",
+		Help: "The total number of jobs that transitioned to done",
+	})
+
+	JobFailedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "job_failed_total",
+		Help: "The total number of jobs that transitioned to failed",
+	})
+
 	JobDurationMs = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "job_duration_ms",
 		Help:    "Duration of job execution in ms",

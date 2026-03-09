@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/metrics"
 )
 
@@ -64,8 +65,9 @@ func NewHandler(w *Worker) http.HandlerFunc {
 			"workspace_id", payload.WorkspaceID,
 		)
 
-		logger.Info("Job acquired", "attempt", job.AttemptCount)
+		logger.Info("Job acquired", "attempt", job.AttemptCount, "status", db.StatusRunning)
 		metrics.JobsAcquiredTotal.WithLabelValues("success").Inc()
+		metrics.JobStartedTotal.Inc()
 
 		start := time.Now()
 
@@ -87,7 +89,7 @@ func NewHandler(w *Worker) http.HandlerFunc {
 				reason = result.FailureReason
 			}
 
-			logger.Error("Job failed", "error", reason, "duration_ms", durationMs)
+			logger.Error("Job failed", "error", reason, "duration_ms", durationMs, "to_status", db.StatusQueued)
 			metrics.JobDurationMs.WithLabelValues("failed").Observe(durationMs)
 			metrics.JobRetriesTotal.Inc()
 
@@ -95,16 +97,23 @@ func NewHandler(w *Worker) http.HandlerFunc {
 			// Note: We need to pass attemptCount. JobStore.MarkJobFailed expects it.
 			w.Deps.JobStore.MarkJobFailed(ctx, job.WorkspaceID, job.ID, reason, job.AttemptCount)
 
+			// If it reached max attempts and is now really 'failed'
+			if job.AttemptCount >= 5 {
+				metrics.JobFailedTotal.Inc()
+				logger.Error("Job terminal failure", "job_id", job.ID, "status", db.StatusFailed)
+			}
+
 			// Also update package
-			w.Deps.JobStore.UpdatePackageStatus(ctx, job.WorkspaceID, job.PackageID, "failed")
+			w.Deps.JobStore.UpdatePackageStatus(ctx, job.WorkspaceID, job.PackageID, db.StatusFailed)
 
 			rw.WriteHeader(http.StatusOK)
 			return
 		}
 
 		// Success
-		logger.Info("Job done successfully", "duration_ms", durationMs)
+		logger.Info("Job done successfully", "duration_ms", durationMs, "status", db.StatusDone)
 		metrics.JobDurationMs.WithLabelValues("done").Observe(durationMs)
+		metrics.JobCompletedTotal.Inc()
 
 		// MarkJobDone is usually called here to close the loop
 		// PR-030 Invariant: "MarkJobDone only after pdf_receipt persisted"
