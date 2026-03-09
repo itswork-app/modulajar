@@ -4,7 +4,10 @@ go 1.24.0
 
 replace modulajar/apps/core-go => ../core-go
 
-require modulajar/apps/core-go v0.0.0-00010101000000-000000000000
+require (
+	github.com/prometheus/client_golang v1.23.2
+	modulajar/apps/core-go v0.0.0-00010101000000-000000000000
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect
@@ -45,10 +48,10 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
