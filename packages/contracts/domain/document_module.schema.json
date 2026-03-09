@@ -1,0 +1,172 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://modulajar.app/schemas/domain/document_module.schema.json",
+    "title": "DocumentModuleJSON",
+    "description": "Schema for the module_json column in document_versions table",
+    "type": "object",
+    "properties": {
+        "meta": {
+            "type": "object",
+            "properties": {
+                "jenjang": {
+                    "type": "string",
+                    "enum": [
+                        "SD",
+                        "SMP",
+                        "SMA",
+                        "SMK"
+                    ]
+                },
+                "kelas": {
+                    "type": "string"
+                },
+                "mapel": {
+                    "type": "string"
+                },
+                "semester": {
+                    "type": "string"
+                },
+                "tahun_ajaran": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "jenjang",
+                "kelas",
+                "mapel"
+            ],
+            "additionalProperties": true
+        },
+        "identitas": {
+            "type": "object",
+            "properties": {
+                "sekolah": {
+                    "type": "string"
+                },
+                "guru": {
+                    "type": "string"
+                },
+                "alokasi_waktu": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": true
+        },
+        "tujuan_pembelajaran": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "materi_inti": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "langkah_pembelajaran": {
+            "type": "object",
+            "properties": {
+                "pendahuluan": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "inti": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "penutup": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": true
+        },
+        "asesmen": {
+            "type": "object",
+            "properties": {
+                "diagnostik": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "formatif": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sumatif": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": true
+        },
+        "diferensiasi": {
+            "type": "object",
+            "properties": {
+                "konten": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "proses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "produk": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": true
+        },
+        "profil_pancasila": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "lampiran": {
+            "type": "object",
+            "properties": {
+                "media": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sumber_belajar": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": true
+        }
+    },
+    "required": [
+        "meta",
+        "tujuan_pembelajaran",
+        "materi_inti",
+        "langkah_pembelajaran",
+        "asesmen"
+    ],
+    "additionalProperties": true
+}

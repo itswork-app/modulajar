@@ -103,8 +103,8 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		}
 
 		// Success
-		logger.Info("Job completed successfully", "duration_ms", durationMs)
-		metrics.JobDurationMs.WithLabelValues("completed").Observe(durationMs)
+		logger.Info("Job done successfully", "duration_ms", durationMs)
+		metrics.JobDurationMs.WithLabelValues("done").Observe(durationMs)
 
 		// MarkJobDone is usually called here to close the loop
 		// PR-030 Invariant: "MarkJobDone only after pdf_receipt persisted"

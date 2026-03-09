@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/santhosh-tekuri/jsonschema/v5"
+
 	"modulajar/apps/core-go/adapters/ai"
 	"modulajar/apps/core-go/adapters/ai/prompts"
 	"modulajar/apps/core-go/curriculum"
@@ -71,7 +73,7 @@ type RenderedDocument struct {
 type WorkerResult struct {
 	JobID             string                      `json:"job_id"`
 	PackageID         string                      `json:"package_id"`
-	Status            string                      `json:"status"` // "completed" or "failed"
+	Status            string                      `json:"status"` // "done" or "failed"
 	PlannerResult     *planner.PlannerResult      `json:"planner_result,omitempty"`
 	ValidationOK      bool                        `json:"validation_ok"`
 	Errors            []validator.ValidationError `json:"errors,omitempty"`
@@ -189,7 +191,7 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 			return &WorkerResult{
 				JobID:         payload.JobID,
 				PackageID:     payload.PackageID,
-				Status:        "completed",
+				Status:        "done",
 				PlannerResult: planResult,
 				ValidationOK:  true,
 				DocGraph:      graphResult,
@@ -697,7 +699,7 @@ No markdown formatting. Pure JSON.`,
 	return &WorkerResult{
 		JobID:             payload.JobID,
 		PackageID:         payload.PackageID,
-		Status:            "completed",
+		Status:            "done",
 		PlannerResult:     planResult,
 		ValidationOK:      true,
 		DocGraph:          graphResult,
@@ -711,6 +713,29 @@ func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 	if err != nil {
 		return TaskPayload{}, err
 	}
+
+	// Schema validation
+	// Assumes contracts/domain/generation_job.schema.json is available via relative or absolute path
+	// In production, might be better to embed it, but here we construct path dynamically
+	schemaPath := filepath.Join("..", "..", "packages", "contracts", "domain", "generation_job.schema.json")
+	if _, errStat := os.Stat(schemaPath); os.IsNotExist(errStat) {
+		// Try one level up (if running from core-go root)
+		schemaPath = filepath.Join("..", "packages", "contracts", "domain", "generation_job.schema.json")
+	}
+
+	sch, err := jsonschema.Compile(schemaPath)
+	if err != nil {
+		// Log but don't fail parsing if schema file is missing in some environments
+		slog.Warn("Could not load job schema for validation", "error", err)
+	} else {
+		var v interface{}
+		if err := json.Unmarshal(b, &v); err == nil {
+			if err := sch.Validate(v); err != nil {
+				return TaskPayload{}, fmt.Errorf("metadata validation failed: %v", err)
+			}
+		}
+	}
+
 	var p TaskPayload
 	if err := json.Unmarshal(b, &p); err != nil {
 		return TaskPayload{}, err

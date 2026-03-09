@@ -224,7 +224,7 @@ func TestWorker_ExecuteJob_Success(t *testing.T) {
 		t.Fatalf("ExecuteJob failed: %v", err)
 	}
 
-	if res.Status != "completed" {
+	if res.Status != "done" {
 		t.Fatalf("Job execution not done: %v", res.FailureReason)
 	}
 }
@@ -269,7 +269,7 @@ func TestWorker_ExecuteJob_AIFailure_Retry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res.Status != "completed" {
+	if res.Status != "done" {
 		t.Error("Expected success after retry")
 	}
 	if mockAI.CallCount != 2 {
@@ -310,7 +310,7 @@ func TestWorker_ExecuteJob_MaxAttemptsReached(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res.Status == "completed" {
+	if res.Status == "done" {
 		t.Error("Expected failure")
 	}
 	if mockAI.CallCount != 2 { // maxAttempts is 2 in code
@@ -380,7 +380,7 @@ func TestWorker_TemplateRankingInjection(t *testing.T) {
 		t.Fatalf("ExecuteJob failed: %v", err)
 	}
 
-	if res.Status != "completed" {
+	if res.Status != "done" {
 		t.Fatalf("Job execution not done: %v", res.FailureReason)
 	}
 
