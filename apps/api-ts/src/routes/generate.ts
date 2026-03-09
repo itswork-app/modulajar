@@ -241,6 +241,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             const debitRef = `JOB:${jobId}`;
             try {
                 await debit(fastify.db, workspaceId, SD_FULL_SEMESTER_COST, debitRef, {
+                    event_type: 'GenerationUsageDebit',
                     transaction_type: 'generate_module',
                     job_id: jobId,
                     package_id: packageId
