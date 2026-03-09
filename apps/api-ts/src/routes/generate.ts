@@ -42,7 +42,65 @@ export default async function generateRoutes(fastify: FastifyInstance) {
     fastify.register(async (childServer) => {
 
         childServer.post('/:workspaceId/internal/generate-semester', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: {
+                        workspaceId: { type: 'string' }
+                    }
+                },
+                body: {
+                    type: 'object',
+                    required: ['pack_id', 'semester', 'tahun_ajaran'],
+                    properties: {
+                        pack_id: { type: 'string' },
+                        semester: { type: 'string' },
+                        tahun_ajaran: { type: 'string' },
+                        kelas: { type: 'string' },
+                        teacher_name: { type: 'string' },
+                        school_name: { type: 'string' }
+                    }
+                },
+                response: {
+                    201: {
+                        type: 'object',
+                        required: ['job_id', 'package_id', 'pid', 'status'],
+                        properties: {
+                            job_id: { type: 'string' },
+                            package_id: { type: 'string' },
+                            pid: { type: 'string' },
+                            status: { type: 'string' },
+                            cost: { type: 'number' },
+                            balance_after: { type: 'number' },
+                            trace_id: { type: 'string' }
+                        }
+                    },
+                    200: {
+                        type: 'object',
+                        required: ['job_id', 'package_id', 'pid', 'status', 'idempotent'],
+                        properties: {
+                            job_id: { type: 'string' },
+                            package_id: { type: 'string' },
+                            pid: { type: 'string' },
+                            status: { type: 'string' },
+                            idempotent: { type: 'boolean' }
+                        }
+                    },
+                    400: { $ref: 'Error#' },
+                    402: {
+                        type: 'object',
+                        properties: {
+                            error: { type: 'string' },
+                            balance: { type: 'number' },
+                            cost: { type: 'number' },
+                            sisa_generate: { type: 'number' },
+                            message: { type: 'string' }
+                        }
+                    },
+                    409: { $ref: 'Error#' }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const body = request.body as {

@@ -1,5 +1,6 @@
 import fp from 'fastify-plugin';
 import { FastifyRequest, FastifyReply } from 'fastify';
+import schemasPlugin from './schemas';
 
 /**
  * Centralized Workspace Guard Plugin.
@@ -14,6 +15,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
  *   preHandler: [fastify.workspaceGuard]
  */
 const workspaceGuardPlugin = fp(async (fastify) => {
+    fastify.register(schemasPlugin);
     fastify.decorateRequest('workspaceId', '');
 
     fastify.decorate('workspaceGuard', async (request: FastifyRequest, reply: FastifyReply) => {

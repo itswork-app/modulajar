@@ -40,7 +40,39 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
         // POST /w/:workspaceId/modules/generate
         childServer.post<{ Body: GenerateModuleRequest; Params: { workspaceId: string } }>('/:workspaceId/modules/generate', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' } }
+                },
+                body: {
+                    type: 'object',
+                    required: ['mode', 'subject', 'grade'],
+                    properties: {
+                        mode: { type: 'string', enum: ['wizard', 'quick', 'template', 'edit_template', 'from_scratch'] },
+                        subject: { type: 'string' },
+                        grade: { type: 'integer', minimum: 1, maximum: 12 },
+                        topic: { type: 'string' },
+                        template_id: { type: 'string' },
+                        semester: { type: 'string' }
+                    }
+                },
+                response: {
+                    201: {
+                        type: 'object',
+                        required: ['job_id', 'module_id', 'status', 'pid'],
+                        properties: {
+                            job_id: { type: 'string' },
+                            module_id: { type: 'string' },
+                            status: { type: 'string' },
+                            pid: { type: 'string' }
+                        }
+                    },
+                    400: { $ref: 'Error#' },
+                    429: { $ref: 'Error#' }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const body = request.body;
@@ -181,7 +213,42 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
         // GET /w/:workspaceId/modules/:moduleId
         childServer.get<{ Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' }, moduleId: { type: 'string' } }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        required: ['module_id', 'status', 'verify'],
+                        properties: {
+                            module_id: { type: 'string' },
+                            subject: { type: 'string' },
+                            grade: { type: 'integer' },
+                            topic: { type: 'string' },
+                            status: { type: 'string' },
+                            pdf: {
+                                type: ['object', 'null'],
+                                required: ['download_url'],
+                                properties: {
+                                    download_url: { type: 'string' },
+                                    sha256: { type: 'string' }
+                                }
+                            },
+                            verify: {
+                                type: 'object',
+                                required: ['public_id', 'url'],
+                                properties: {
+                                    public_id: { type: 'string' },
+                                    url: { type: 'string' }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.params.workspaceId;
             const moduleId = request.params.moduleId;
@@ -248,7 +315,25 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
         // GET /w/:workspaceId/modules/:moduleId/editor
         childServer.get<{ Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/editor', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' }, moduleId: { type: 'string' } }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        required: ['module_id', 'version', 'module_json', 'html_preview'],
+                        properties: {
+                            module_id: { type: 'string' },
+                            version: { type: 'integer' },
+                            module_json: { type: 'object', additionalProperties: true },
+                            html_preview: { type: 'string' }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const moduleId = request.params.moduleId;
@@ -300,7 +385,30 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
         // PATCH /w/:workspaceId/modules/:moduleId
         childServer.patch<{ Body: ModulePatchRequest, Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' }, moduleId: { type: 'string' } }
+                },
+                body: {
+                    type: 'object',
+                    required: ['patch'],
+                    properties: {
+                        patch: { type: 'object' }
+                    }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        required: ['version', 'saved'],
+                        properties: {
+                            version: { type: 'integer' },
+                            saved: { type: 'boolean' }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const moduleId = request.params.moduleId;
@@ -453,7 +561,32 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
         // POST /w/:workspaceId/modules/:moduleId/ai-assist
         childServer.post<{ Body: AISuggestRequest, Params: { workspaceId: string, moduleId: string } }>('/:workspaceId/modules/:moduleId/ai-assist', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' }, moduleId: { type: 'string' } }
+                },
+                body: {
+                    type: 'object',
+                    required: ['section', 'action', 'content'],
+                    properties: {
+                        section: { type: 'string' },
+                        action: { type: 'string' },
+                        content: { type: 'string' }
+                    }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        required: ['suggestion'],
+                        properties: {
+                            suggestion: { type: 'string' },
+                            action: { type: 'string' }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const moduleId = request.params.moduleId;

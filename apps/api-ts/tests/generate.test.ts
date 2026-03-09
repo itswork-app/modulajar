@@ -404,7 +404,7 @@ test('Generate endpoint branch coverage', async (t) => {
             payload: { semester: 'S1', tahun_ajaran: '2025/2026' }
         });
         t.equal(res.statusCode, 400);
-        t.match(res.json().error, /Missing required fields/);
+        t.match(res.json().error, /Bad Request/);
         await fastify.close();
     });
 

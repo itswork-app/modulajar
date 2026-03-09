@@ -19,8 +19,14 @@ import onboardingRoutes from './routes/onboarding';
 import modulesRoutes from './routes/modules';
 import jobsRoutes from './routes/jobs';
 import walletRoutes from './routes/wallet';
+import schemasPlugin from './plugins/schemas';
 import dotenv from 'dotenv';
 import multipart from '@fastify/multipart';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import path from 'path';
+import fs from 'fs';
+import yaml from 'js-yaml';
 
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './utils/logger';
@@ -112,8 +118,36 @@ if (SERVICE_MODE === 'verify') {
     // ---------------------------------------------------------
     console.log('[STARTUP] Registering VERIFY mode routes...');
     fastify.register(verifyRoutes, { prefix: '/verify' });
-
 } else {
+    // Load OpenAPI spec
+    const openapiPath = path.join(__dirname, '../../contracts/api/openapi.yaml');
+    let openapiSpec = {};
+    try {
+        if (fs.existsSync(openapiPath)) {
+            openapiSpec = yaml.load(fs.readFileSync(openapiPath, 'utf8')) as any;
+            console.log(`[STARTUP] Loaded OpenAPI spec from ${openapiPath}`);
+        } else {
+            console.warn(`[STARTUP] WARNING: OpenAPI spec not found at ${openapiPath}`);
+        }
+    } catch (err) {
+        console.error(`[STARTUP] Failed to load OpenAPI spec:`, err);
+    }
+
+    fastify.register(swagger, {
+        openapi: openapiSpec,
+        hideUntagged: false, // Ensure all routes show up
+    } as any);
+
+    fastify.register(swaggerUi, {
+        routePrefix: '/docs/api',
+        uiConfig: {
+            docExpansion: 'list',
+            deepLinking: false
+        }
+    });
+
+    fastify.register(schemasPlugin);
+
     // ---------------------------------------------------------
     // API MODE: Full authenticated backend
     // ---------------------------------------------------------

@@ -15,7 +15,29 @@ function generateReferralCode(): string {
 export default async function authRoutes(fastify: FastifyInstance) {
     // GET /me
     fastify.get('/me', {
-        preHandler: [fastify.verifyClerk]
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        clerk_user_id: { type: 'string' },
+                        workspaces: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    name: { type: 'string' },
+                                    clerk_org_id: { type: 'string' },
+                                    role: { type: 'string' }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }, async (request, reply) => {
         const { clerk_user_id } = request.auth!;
 
@@ -37,7 +59,37 @@ export default async function authRoutes(fastify: FastifyInstance) {
     // POST /bootstrap
     // Idempotent: Ensures user has at least one workspace (personal)
     fastify.post('/bootstrap', {
-        preHandler: [fastify.verifyClerk]
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            body: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string' },
+                    clerk_org_id: { type: 'string' }
+                }
+            },
+            response: {
+                200: {
+                    oneOf: [
+                        {
+                            type: 'object',
+                            required: ['status', 'workspaceId'],
+                            properties: {
+                                status: { type: 'string', example: 'bootstrapped' },
+                                workspaceId: { type: 'string' }
+                            }
+                        },
+                        {
+                            type: 'object',
+                            required: ['message'],
+                            properties: {
+                                message: { type: 'string', example: 'User already bootstrapped' }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
     }, async (request, reply) => {
         const { clerk_user_id } = request.auth!;
         const body = (request.body || {}) as { clerk_org_id?: string; name?: string };

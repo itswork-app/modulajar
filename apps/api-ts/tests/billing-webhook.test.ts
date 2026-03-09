@@ -2,6 +2,7 @@ import tap from 'tap';
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import billingRoutes from '../src/routes/billing';
 import { createHmac } from 'crypto';
+import schemasPlugin from '../src/plugins/schemas';
 
 const test = tap.test;
 
@@ -15,6 +16,7 @@ test('Billing Webhook Hardening', async (t) => {
         const ledger: Array<any> = [];
 
         const fastify = Fastify();
+        fastify.register(schemasPlugin);
 
         // Replicate rawBody parser from index.ts
         fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
