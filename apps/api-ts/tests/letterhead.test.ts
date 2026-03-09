@@ -150,5 +150,68 @@ test('Letterhead API (Kop Surat)', async (t) => {
         t.equal(res.statusCode, 401, 'should return 401');
     });
 
+    await t.test('POST /w/:workspaceId/letterhead — all text fields', async (t) => {
+        const boundary = '----BoundaryAll';
+        const multipartBody = buildMultipart(boundary, {
+            letterhead_line1: 'LINE ONE',
+            letterhead_line2: 'LINE TWO',
+            letterhead_line3: 'LINE THREE',
+            letterhead_line4: 'LINE FOUR',
+            letterhead_contact: 'contact@test.com'
+        });
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_ID}/letterhead`,
+            headers: {
+                Authorization: `Bearer ${U_ID}`,
+                'Content-Type': `multipart/form-data; boundary=${boundary}`
+            },
+            body: multipartBody
+        });
+
+        t.equal(res.statusCode, 200, 'should handle all text fields');
+    });
+
+    await t.test('POST /w/:workspaceId/letterhead — rejects field > 120 chars', async (t) => {
+        const boundary = '----BoundaryLong';
+        const longValue = 'A'.repeat(121);
+        const multipartBody = buildMultipart(boundary, {
+            letterhead_line1: longValue
+        });
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_ID}/letterhead`,
+            headers: {
+                Authorization: `Bearer ${U_ID}`,
+                'Content-Type': `multipart/form-data; boundary=${boundary}`
+            },
+            body: multipartBody
+        });
+
+        t.equal(res.statusCode, 400, 'should reject field exceeding 120 chars');
+    });
+
+    await t.test('POST /w/:workspaceId/letterhead — rejects invalid logo mimetype', async (t) => {
+        const boundary = '----BoundaryBadLogo';
+        const multipartBody = buildMultipart(boundary,
+            { letterhead_line1: 'TEST' },
+            { name: 'logo', filename: 'test.gif', content: Buffer.from('fake-gif'), type: 'image/gif' }
+        );
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WS_ID}/letterhead`,
+            headers: {
+                Authorization: `Bearer ${U_ID}`,
+                'Content-Type': `multipart/form-data; boundary=${boundary}`
+            },
+            body: multipartBody
+        });
+
+        t.equal(res.statusCode, 400, 'should reject non PNG/JPG logo');
+    });
+
     await fastify.close();
 });

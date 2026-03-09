@@ -35,7 +35,7 @@ const workspaceGuardPlugin = fp(async (fastify) => {
         // 3. Check membership
         const result = await fastify.db.query(
             `SELECT 1 FROM workspace_members
-             WHERE workspace_id = $1 AND clerk_user_id = $2`,
+             WHERE TRIM(workspace_id) = $1 AND clerk_user_id = $2`,
             [workspaceId, clerkUserId]
         );
 

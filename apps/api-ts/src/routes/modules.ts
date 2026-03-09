@@ -18,6 +18,7 @@ import { generateRequestsTotal, moduleUpdateTotal, aiAssistTotal } from '../util
 import { computeHtmlSha256, renderModuleHtml } from '../services/renderService';
 import { ulid } from 'ulid';
 import { debit } from '../lib/wallet';
+import { validateDocumentModuleJson } from '../services/schemaValidator';
 
 /**
  * Compute ID for deduplication/idempotency.
@@ -330,6 +331,15 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
             // 2. Merge patch
             const updatedModule = { ...currentModule, ...patch };
+
+            const validation = validateDocumentModuleJson(updatedModule);
+            if (!validation.valid) {
+                moduleUpdateTotal.inc({ result: 'error_validation' });
+                return reply.code(400).send({
+                    error: 'Invalid module_json schema after patch',
+                    details: validation.errors
+                });
+            }
 
             // 3. Re-render and hash
             const pkgInfo = await fastify.db.query(

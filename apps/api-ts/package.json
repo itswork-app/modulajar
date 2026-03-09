@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.js",
+    "dev": "ts-node src/index.ts",
     "lint": "echo 'No lint yet'",
     "test": "tap --allow-incomplete-coverage --allow-empty-coverage --node-arg=-r --node-arg=ts-node/register 'tests/**/*.test.ts' tests/*.test.ts",
     "audit:wiring": "node ../../scripts/audit-wiring.mjs"
@@ -20,6 +20,8 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
     "@google-cloud/storage": "^7.19.0",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "fastify-plugin": "^5.1.0",

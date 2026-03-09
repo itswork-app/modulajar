@@ -10,6 +10,17 @@ const WORKSPACE_ID = 'ws_editor_001';
 const USER_ID = 'user_editor_1';
 const MODULE_ID = 'mod_editor_123';
 
+const validModuleJson = {
+    meta: { jenjang: "SD", kelas: "4", mapel: "IPA", semester: "1", tahun_ajaran: "2025/2026" },
+    identitas: { sekolah: "SD Test", guru: "Guru Test", alokasi_waktu: "2x35" },
+    tujuan_pembelajaran: ["tujuan1"],
+    materi_inti: ["materi1"],
+    langkah_pembelajaran: { pendahuluan: ["p1"], inti: ["i1"], penutup: ["p1"] },
+    asesmen: { diagnostik: ["d1"], formatif: ["f1"], sumatif: ["s1"] },
+    subject: 'IPA',
+    topic: 'Energi'
+};
+
 function buildApp(mocks: {
     dbQuery?: (sql: string, values: any[]) => Promise<any>;
 } = {}) {
@@ -49,7 +60,7 @@ test('Module Editor Integration Flow', async (t) => {
                         rowCount: 1,
                         rows: [{
                             version: 1,
-                            module_json: { subject: 'IPA', topic: 'Energi' },
+                            module_json: validModuleJson,
                             kelas: '4',
                             semester: '1',
                             tahun_ajaran: '2025/2026',
@@ -92,7 +103,7 @@ test('Module Editor Integration Flow', async (t) => {
                 if (sql.includes('SELECT dv.version, dv.module_json, d.package_id')) {
                     return {
                         rowCount: 1,
-                        rows: [{ version: 5, module_json: { topic: 'Old' }, package_id: 'pkg1' }]
+                        rows: [{ version: 5, module_json: { ...validModuleJson, topic: 'Old' }, package_id: 'pkg1' }]
                     };
                 }
                 if (sql.includes('SELECT kelas, semester, tahun_ajaran, teacher_name, school_name, public_id FROM packages')) {
@@ -135,9 +146,8 @@ test('Module Editor Integration Flow', async (t) => {
                         rowCount: 1,
                         rows: [{
                             module_json: {
-                                subject: 'IPA',
-                                topic: 'Energi',
-                                tujuan_pembelajaran: 'Siswa dapat menjelaskan energi'
+                                ...validModuleJson,
+                                tujuan_pembelajaran: ['Siswa dapat menjelaskan energi']
                             },
                             kelas: '4', semester: '1', tahun_ajaran: '2025',
                             teacher_name: 'Guru', school_name: 'SD', public_id: 'PID'

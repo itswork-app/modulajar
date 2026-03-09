@@ -20,7 +20,7 @@ var (
 		Name:    "job_duration_ms",
 		Help:    "Duration of job execution in ms",
 		Buckets: []float64{100, 500, 1000, 5000, 10000, 30000, 60000},
-	}, []string{"result"}) // "completed", "failed"
+	}, []string{"result"}) // "done", "failed"
 
 	JobRetriesTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "job_retries_total",
