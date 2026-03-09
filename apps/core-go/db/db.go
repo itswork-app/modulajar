@@ -273,8 +273,8 @@ func MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 			  AND r.reward_granted = false
 			RETURNING r.referrer_workspace
 		)
-		INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference_id)
-		SELECT REPLACE(gen_random_uuid()::text, '-', '')::CHAR(26), referrer_workspace, 'credit', 5, 'referral_reward'
+		INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference_id, metadata)
+		SELECT REPLACE(gen_random_uuid()::text, '-', '')::CHAR(26), referrer_workspace, 'credit', 5, $2, '{"event_type": "ReferralReward"}'::jsonb
 		FROM updated_referral;
 	`
 	_, err = pool.Exec(ctx, query, StatusDone, jobID, workspaceID)

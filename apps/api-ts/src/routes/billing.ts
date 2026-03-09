@@ -280,7 +280,10 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 // If the user wants `provider_event_id` as the reference, that's stricter.
                 // Let's use `provider_event_id` as requested for the ledger reference.
 
-                await credit(fastify.db, receipt.workspace_id as string, receipt.amount as number, body.id);
+                await credit(fastify.db, receipt.workspace_id as string, receipt.amount as number, body.id, {
+                    event_type: 'TopupConfirmed',
+                    receipt_id: receipt.id
+                });
 
                 await fastify.db.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
 
