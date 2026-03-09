@@ -6,7 +6,23 @@ export default async function walletRoutes(fastify: FastifyInstance) {
 
         // 1. Wallet Summary Endpoint
         childServer.get('/:workspaceId/wallet/summary', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' } }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            credits_remaining: { type: 'number' },
+                            documents_generated: { type: 'number' },
+                            month_usage: { type: 'number' }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
 
@@ -43,7 +59,28 @@ export default async function walletRoutes(fastify: FastifyInstance) {
 
         // 2. Transaction History Endpoint
         childServer.get('/:workspaceId/wallet/transactions', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' } }
+                },
+                response: {
+                    200: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                date: { type: 'string' },
+                                type: { type: 'string' },
+                                amount: { type: 'number' },
+                                status: { type: 'string' },
+                                note: { type: 'string' }
+                            }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
 

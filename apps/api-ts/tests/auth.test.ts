@@ -2,6 +2,7 @@ import tap from 'tap';
 import Fastify from 'fastify';
 import mockAuthPlugin from '../src/plugins/mock_auth';
 import authRoutes from '../src/routes/auth';
+import schemasPlugin from '../src/plugins/schemas';
 
 const test = tap.test;
 
@@ -22,6 +23,7 @@ function buildApp(opts: {
     existingWorkspaceRows?: any[];// rows returned by SELECT id FROM workspaces
 } = {}) {
     const fastify = Fastify();
+    fastify.register(schemasPlugin);
     const {
         memberRows = 0,
         workspaceRows = [{ id: 'ws-1', name: 'My Workspace', clerk_org_id: 'org-1', role: 'owner' }],
@@ -137,7 +139,8 @@ test('POST /bootstrap — already bootstrapped', async (t) => {
     const res = await fastify.inject({
         method: 'POST',
         url: '/bootstrap',
-        headers: { Authorization: AUTH_TOKEN }
+        headers: { Authorization: AUTH_TOKEN },
+        payload: {}
     });
 
     t.equal(res.statusCode, 200);
@@ -158,7 +161,8 @@ test('POST /bootstrap — new user creates workspace', async (t) => {
         const res = await fastify.inject({
             method: 'POST',
             url: '/bootstrap',
-            headers: { Authorization: AUTH_TOKEN }
+            headers: { Authorization: AUTH_TOKEN },
+            payload: {}
         });
 
         t.equal(res.statusCode, 200, `Expected 200, got ${res.statusCode}: ${res.body}`);
@@ -197,7 +201,8 @@ test('POST /bootstrap — new user creates workspace', async (t) => {
         const res = await fastify.inject({
             method: 'POST',
             url: '/bootstrap',
-            headers: { Authorization: AUTH_TOKEN }
+            headers: { Authorization: AUTH_TOKEN },
+            payload: {}
         });
 
         t.equal(res.statusCode, 200, `Expected 200, got ${res.statusCode}: ${res.body}`);
@@ -219,7 +224,8 @@ test('POST /bootstrap — DB error triggers ROLLBACK', async (t) => {
     const res = await fastify.inject({
         method: 'POST',
         url: '/bootstrap',
-        headers: { Authorization: AUTH_TOKEN }
+        headers: { Authorization: AUTH_TOKEN },
+        payload: {}
     });
 
     // Fastify translates unhandled throws to 500

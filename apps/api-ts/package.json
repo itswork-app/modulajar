@@ -19,12 +19,15 @@
     "@clerk/clerk-sdk-node": "^4.13.23",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
     "@google-cloud/storage": "^7.19.0",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "fastify-plugin": "^5.1.0",
+    "js-yaml": "^4.1.1",
     "pg": "^8.18.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
@@ -34,6 +37,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.2.3",
     "@types/pg": "^8.16.0",
     "@types/pino-http": "^5.8.4",

@@ -22,7 +22,33 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
         // ── POST /w/:workspaceId/internal/topup-intent ──
         childServer.post('/:workspaceId/internal/topup-intent', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' } }
+                },
+                body: {
+                    type: 'object',
+                    properties: {
+                        amount_idr: { type: 'integer' },
+                        product: { type: 'string' }
+                    }
+                },
+                response: {
+                    201: {
+                        type: 'object',
+                        properties: {
+                            receipt_id: { type: 'string' },
+                            external_ref: { type: 'string' },
+                            amount_idr: { type: 'number' },
+                            credits: { type: 'number' },
+                            status: { type: 'string' }
+                        }
+                    },
+                    400: { $ref: 'Error#' }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const body = request.body as {
@@ -73,7 +99,36 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
         // ── GET /w/:workspaceId/billing/summary ──
         childServer.get('/:workspaceId/billing/summary', {
-            preHandler: [fastify.workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: { workspaceId: { type: 'string' } }
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            balance_credits: { type: 'number' },
+                            sisa_generate: { type: 'number' },
+                            cost_per_generate: { type: 'number' },
+                            last_receipts: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        id: { type: 'string' },
+                                        external_ref: { type: 'string' },
+                                        amount: { type: 'number' },
+                                        status: { type: 'string' },
+                                        created_at: { type: 'string', format: 'date-time' }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
 
