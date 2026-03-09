@@ -28,15 +28,19 @@ function buildMultipart(boundary: string, fields: Record<string, string>, file?:
 
 function buildApp(dbMock: any) {
     const fastify = Fastify();
-    (fastify as any).decorate('db', dbMock);
+    // Wrap the dbMock to add workspace_members check
+    const wrappedDb = {
+        query: async (sql: string, params: any[]) => {
+            if (sql.includes('SELECT 1 FROM workspace_members')) return { rowCount: 1, rows: [] };
+            return dbMock.query(sql, params);
+        }
+    };
+    (fastify as any).decorate('db', wrappedDb);
     (fastify as any).decorate('storage', {
         generateSignedUrl: async () => 'https://signed'
     });
-    (fastify as any).decorate('workspaceGuard', (request: any, reply: any, done: any) => {
-        request.workspaceId = request.params.workspaceId;
-        done();
-    });
     fastify.register(mockAuthPlugin);
+    fastify.register(workspaceGuardPlugin);
     fastify.register(multipart);
     fastify.register(letterheadRoutes);
     fastify.register(billingRoutes);

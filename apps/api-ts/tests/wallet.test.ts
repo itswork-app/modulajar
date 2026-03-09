@@ -17,6 +17,9 @@ function createMockLedgerDb(): DbClient & { ledger: any[] } {
             if (sql.includes('SUM(') && sql.includes('wallet_ledger') && !sql.includes('INSERT')) {
                 const workspaceId = params[0];
                 const entries = ledger.filter(e => e.workspace_id === workspaceId);
+                if (entries.length === 0) {
+                    return { rowCount: 0, rows: [] }; // Test line 54 fallback
+                }
                 let balance = 0;
                 for (const e of entries) {
                     balance += e.type === 'credit' ? e.amount : -e.amount;
@@ -223,6 +226,14 @@ test('Wallet Service — Append-Only Ledger (PR-019)', async (t) => {
         } catch (err) {
             t.equal((err as Error).message, 'Debit amount must be positive');
         }
+    });
+
+    await t.test('Test 8: Handing metadata correctly', async (t) => {
+        const db = createMockLedgerDb();
+        await credit(db, 'ws-meta', 10, 'CREDIT:1', { reason: 'bonus' });
+        await debit(db, 'ws-meta', 5, 'DEBIT:1', { job: '123' });
+        const balance = await getBalance(db, 'ws-meta');
+        t.equal(balance, 5);
     });
 
 });

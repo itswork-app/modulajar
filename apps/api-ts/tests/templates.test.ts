@@ -386,6 +386,36 @@ test('GET /templates/recommended', async (t) => {
 });
 
 // ═══════════════════════════════════════════
+// INVALID JSON HANDLING TEST
+// ═══════════════════════════════════════════
+
+test('GET /templates/recommended — invalid JSON in module_json', async (t) => {
+    const fastify = buildApp([{
+        id: 'tmpl-bad',
+        subject: 'matematika',
+        grade: 4,
+        topic: 'pecahan',
+        module_json: '{invalid-json',
+        quality_score: 80,
+        usage_count: 2,
+    }]);
+    await fastify.ready();
+
+    const res = await fastify.inject({
+        method: 'GET',
+        url: `/w/${WORKSPACE_ID}/templates/recommended?subject=matematika&grade=4`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+    });
+
+    t.equal(res.statusCode, 200);
+    const templates = res.json().templates;
+    t.ok(Array.isArray(templates));
+    t.equal(templates[0].preview.tujuan_pembelajaran, '');
+
+    await fastify.close();
+});
+
+// ═══════════════════════════════════════════
 // RATE LIMITING TEST
 // ═══════════════════════════════════════════
 
