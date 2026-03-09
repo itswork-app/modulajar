@@ -11,6 +11,37 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Status constants for GenerationJob
+const (
+	StatusQueued  = "queued"
+	StatusRunning = "running"
+	StatusDone    = "done"
+	StatusFailed  = "failed"
+)
+
+// ValidateTransition checks if a job state transition is allowed.
+func ValidateTransition(current, next string) error {
+	allowed := false
+	switch current {
+	case StatusQueued:
+		allowed = (next == StatusRunning)
+	case StatusRunning:
+		allowed = (next == StatusDone || next == StatusFailed)
+	case StatusFailed, StatusDone:
+		allowed = false // Final states
+	default:
+		// If current is empty (new job), only queued is allowed
+		if current == "" {
+			allowed = (next == StatusQueued)
+		}
+	}
+
+	if !allowed {
+		return fmt.Errorf("invalid job state transition from %s to %s", current, next)
+	}
+	return nil
+}
+
 var pool *pgxpool.Pool
 
 // Init initializes the database connection pool.
@@ -121,7 +152,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 		)
 		UPDATE generation_jobs j
 		SET
-			status = 'running',
+			status = $1,
 			locked_at = NOW(),
 			attempt_count = attempt_count + 1,
 			next_run_at = NOW() + (INTERVAL '1 second' * POWER(2, attempt_count + 1))
@@ -150,7 +181,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 	// Letterhead Optional Fields
 	var l1, l2, l3, l4, contact, logo *string
 
-	err = tx.QueryRow(ctx, query).Scan(
+	err = tx.QueryRow(ctx, query, StatusRunning).Scan(
 		&job.ID,
 		&job.WorkspaceID,
 		&job.GenerationID,
@@ -210,6 +241,17 @@ func MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 		return fmt.Errorf("database not initialized")
 	}
 
+	// PR-A3: First fetch current status to validate transition
+	var currentStatus string
+	err := pool.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id = $1 AND workspace_id = $2", jobID, workspaceID).Scan(&currentStatus)
+	if err != nil {
+		return fmt.Errorf("failed to fetch current job status: %w", err)
+	}
+
+	if err := ValidateTransition(currentStatus, StatusDone); err != nil {
+		return err
+	}
+
 	// Atomically:
 	// 1. Update the generation_job to 'done'
 	// 2. Find the workspace_id that owns this job
@@ -219,8 +261,8 @@ func MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 	query := `
 		WITH updated_job AS (
 			UPDATE generation_jobs
-			SET status = 'done', locked_at = NULL
-			WHERE id = $1 AND workspace_id = $2
+			SET status = $1, locked_at = NULL
+			WHERE id = $2 AND workspace_id = $3
 			RETURNING workspace_id
 		),
 		updated_referral AS (
@@ -235,7 +277,7 @@ func MarkJobDone(ctx context.Context, workspaceID string, jobID string) error {
 		SELECT REPLACE(gen_random_uuid()::text, '-', '')::CHAR(26), referrer_workspace, 'credit', 5, 'referral_reward'
 		FROM updated_referral;
 	`
-	_, err := pool.Exec(ctx, query, jobID, workspaceID)
+	_, err = pool.Exec(ctx, query, StatusDone, jobID, workspaceID)
 
 	// If the CTE doesn't update a referral, no wallet_ledger entry is inserted.
 	// The job status is always updated to 'done'.
@@ -254,9 +296,20 @@ func MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg
 	// So if current attempt_count is 5, and it failed, we mark as failed.
 
 	maxAttempts := 5
-	status := "queued"
+	status := StatusQueued
 	if attemptCount >= maxAttempts {
-		status = "failed"
+		status = StatusFailed
+	}
+
+	// PR-A3: Validate transition
+	var currentStatus string
+	err := pool.QueryRow(ctx, "SELECT status FROM generation_jobs WHERE id = $1 AND workspace_id = $2", jobID, workspaceID).Scan(&currentStatus)
+	if err != nil {
+		return fmt.Errorf("failed to fetch current job status: %w", err)
+	}
+
+	if err := ValidateTransition(currentStatus, status); err != nil {
+		return err
 	}
 
 	// Calculate next_run_at
@@ -282,7 +335,7 @@ func MarkJobFailed(ctx context.Context, workspaceID string, jobID string, errMsg
 		WHERE id = $4 AND workspace_id = $5
 	`
 	// Status updates logic
-	_, err := pool.Exec(ctx, query, status, errMsg, intervalStr, jobID, workspaceID)
+	_, err = pool.Exec(ctx, query, status, errMsg, intervalStr, jobID, workspaceID)
 	return err
 }
 
