@@ -207,6 +207,7 @@ func setupSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			type VARCHAR(50) NOT NULL,
 			amount INT NOT NULL,
 			reference_id VARCHAR(255),
+			metadata JSONB,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW()
 		)`,
 		`CREATE TABLE referrals (

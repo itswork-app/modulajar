@@ -20,13 +20,18 @@ export interface DbClient {
     query(sql: string, params: unknown[]): Promise<{ rowCount: number | null; rows: Record<string, unknown>[] }>;
 }
 
+export type LedgerEvent = 'TopupConfirmed' | 'GenerationUsageDebit' | 'RefundCredit' | 'ReferralReward';
+
 export interface LedgerEntry {
     id: string;
     workspaceId: string;
     type: 'credit' | 'debit';
     amount: number;
     referenceId: string;
-    metadata?: Record<string, unknown>;
+    metadata: {
+        event_type: LedgerEvent;
+        [key: string]: unknown;
+    };
 }
 
 export interface WalletResult {
@@ -64,7 +69,7 @@ export async function credit(
     workspaceId: string,
     amount: number,
     referenceId: string,
-    metadata?: Record<string, unknown>
+    metadata: { event_type: LedgerEvent;[key: string]: unknown }
 ): Promise<WalletResult> {
     if (amount <= 0) throw new Error('Credit amount must be positive');
 
@@ -97,7 +102,7 @@ export async function debit(
     workspaceId: string,
     amount: number,
     referenceId: string,
-    metadata?: Record<string, unknown>
+    metadata: { event_type: LedgerEvent;[key: string]: unknown }
 ): Promise<WalletResult> {
     if (amount <= 0) throw new Error('Debit amount must be positive');
 
