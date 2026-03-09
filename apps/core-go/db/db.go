@@ -26,7 +26,7 @@ func ValidateTransition(current, next string) error {
 	case StatusQueued:
 		allowed = (next == StatusRunning)
 	case StatusRunning:
-		allowed = (next == StatusDone || next == StatusFailed)
+		allowed = (next == StatusDone || next == StatusFailed || next == StatusQueued)
 	case StatusFailed, StatusDone:
 		allowed = false // Final states
 	default:
