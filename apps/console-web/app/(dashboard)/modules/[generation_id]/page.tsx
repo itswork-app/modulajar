@@ -7,7 +7,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import {
     Loader2, AlertCircle, FileText, Download, CheckCircle2, XCircle,
     ArrowLeft, RefreshCw, Copy, Clock, Sparkles, BookOpen,
-    User, School, ChevronDown, ChevronUp, Zap, ExternalLink
+    User, School, ChevronDown, ChevronUp, ExternalLink, Eye, Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -96,6 +96,9 @@ export default function ModuleResultPage() {
     const [stageIndex, setStageIndex] = useState(0);
     const [isCopied, setIsCopied] = useState(false);
     const [showTechDetail, setShowTechDetail] = useState(false);
+    const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+    const [docVersion, setDocVersion] = useState<number | null>(null);
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // ── Rotate running stage label ─────────────────────────────────────────
     useEffect(() => {
@@ -134,6 +137,32 @@ export default function ModuleResultPage() {
         bootstrap();
         return () => { isMounted = false; };
     }, [isAuthLoaded, wsLoading, workspace, getToken, router]);
+
+    // ── Load HTML preview once job is DONE ────────────────────────────────
+    useEffect(() => {
+        if (job?.status !== 'DONE' || !workspace?.id || !generationId || htmlPreview !== null) return;
+        let isMounted = true;
+        setIsLoadingPreview(true);
+        getToken().then(token => {
+            fetch(`${API_BASE}/w/${workspace.id}/modules/${generationId}/editor`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then(r => {
+                if (r.ok) return r.json();
+                throw new Error('preview unavailable');
+            }).then(d => {
+                if (isMounted) {
+                    setHtmlPreview(d.html_preview);
+                    setDocVersion(d.version);
+                }
+            }).catch(() => {
+                /* graceful: preview stays null */
+            }).finally(() => {
+                if (isMounted) setIsLoadingPreview(false);
+            });
+        });
+        return () => { isMounted = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [job?.status, workspace?.id, generationId]);
 
     // ── Fetch job detail ───────────────────────────────────────────────────
     const fetchJob = useCallback(async () => {
@@ -321,7 +350,7 @@ export default function ModuleResultPage() {
                         </Link>
                         <Link href="/billing"
                             className="flex items-center gap-2 px-5 py-3 border border-slate-200 text-slate-500 rounded-xl text-sm font-bold hover:bg-slate-50 transition">
-                            <Zap className="w-4 h-4" /> Cek Saldo Kredit
+                            <AlertCircle className="w-4 h-4" /> Cek Saldo Kredit
                         </Link>
                     </div>
                 </div>
@@ -464,6 +493,67 @@ export default function ModuleResultPage() {
                                     <span className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-700">{value}</span>
                                 </div>
                             ) : null)}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ─── F: Pratinjau Dokumen (Done only) ──────────────────────── */}
+            {isDone && (
+                <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                <Eye className="w-4 h-4 text-indigo-600" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pratinjau Dokumen</p>
+                                {docVersion !== null && (
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                        {docVersion === 1 ? `Versi ${docVersion} – Hasil AI` : `Versi ${docVersion} – Revisi Manual`}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <Link
+                            href={`/modules/${generationId}/edit`}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
+                        >
+                            <Pencil className="w-3.5 h-3.5" /> Edit Cepat
+                        </Link>
+                    </div>
+
+                    {isLoadingPreview && (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+                        </div>
+                    )}
+
+                    {!isLoadingPreview && htmlPreview && (
+                        <div className="h-[520px] overflow-hidden">
+                            <iframe
+                                srcDoc={htmlPreview}
+                                title="Pratinjau Dokumen"
+                                sandbox="allow-same-origin"
+                                className="w-full h-full border-0"
+                                style={{ background: '#f8fafc' }}
+                            />
+                        </div>
+                    )}
+
+                    {!isLoadingPreview && !htmlPreview && (
+                        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                            <FileText className="w-10 h-10 text-slate-200" />
+                            <p className="text-sm font-bold text-slate-400">Pratinjau belum tersedia</p>
+                            <p className="text-xs text-slate-400 max-w-xs">
+                                Dokumen mungkin masih diproses. Buka editor untuk melihat isi lengkap.
+                            </p>
+                            <Link
+                                href={`/modules/${generationId}/edit`}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black hover:bg-indigo-100 transition mt-1"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" /> Buka Editor
+                            </Link>
                         </div>
                     )}
                 </div>
