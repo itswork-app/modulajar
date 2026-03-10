@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE curriculum_topics (
     id VARCHAR(30) PRIMARY KEY,
     jenjang VARCHAR(20) NOT NULL,
@@ -14,3 +15,7 @@ CREATE TABLE curriculum_topics (
 );
 
 CREATE INDEX idx_curriculum_topics_filtering ON curriculum_topics(jenjang, kelas, mata_pelajaran, semester);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_curriculum_topics_filtering;
+DROP TABLE IF EXISTS curriculum_topics;

@@ -83,7 +83,7 @@ export default function JobsListPage() {
         if (batchData) {
             try {
                 setActiveBatch(JSON.parse(batchData));
-            } catch (e) {
+            } catch {
                 sessionStorage.removeItem('modulajar_batch');
             }
         }

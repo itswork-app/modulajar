@@ -4,9 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Layers, School, User, ChevronRight, Plus, Trash2, Zap } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Layers, ChevronRight, Plus, Trash2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CreditPanel } from '@/components/wizard/CreditPanel';
 import Link from 'next/link';
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
