@@ -68,6 +68,7 @@ export default function BatchWizardPage() {
         kelas: '4',
         mapel: '',
         semester: '1',
+        fokusMateri: '',
     });
 
     const [topics, setTopics] = useState<string[]>(['']);
@@ -76,6 +77,9 @@ export default function BatchWizardPage() {
     // Curriculum Integration
     const [recommendedTopics, setRecommendedTopics] = useState<CurriculumTopic[]>([]);
     const [isLoadingTopics, setIsLoadingTopics] = useState(false);
+
+    // AI Integration
+    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
     // ── Load profile/school/usage data ──────────────────────────────────────
     useEffect(() => {
@@ -180,6 +184,49 @@ export default function BatchWizardPage() {
         fetchTopics();
         return () => { isMounted = false; };
     }, [workspace, getToken, contextData.jenjang, contextData.kelas, contextData.mapel, contextData.semester, currentStep]);
+
+    const handleGenerateAIPlan = async () => {
+        if (!workspace || !contextData.jenjang || !contextData.kelas || !contextData.mapel) return;
+
+        setIsGeneratingPlan(true);
+        setCurrentStep('TOPIK');
+        setError(null);
+
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE}/w/${workspace.id}/curriculum/planner`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    jenjang: contextData.jenjang,
+                    kelas: contextData.kelas,
+                    mapel: contextData.mapel,
+                    semester: contextData.semester,
+                    fokus_materi: contextData.fokusMateri
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Server gagal memproses rencana AI.');
+            }
+
+            const data = await res.json();
+            if (data.plan && data.plan.length > 0) {
+                setTopics(data.plan.map((t: CurriculumTopic) => t.title).slice(0, 16));
+            } else {
+                throw new Error('AI tidak mengembalikan topik yang valid.');
+            }
+        } catch (err: unknown) {
+            console.error('Failed to generate AI plan', err);
+            setError((err as Error).message);
+        } finally {
+            setIsGeneratingPlan(false);
+        }
+    };
 
     const handleAddTopic = () => {
         if (topics.length >= 16) return;
@@ -441,15 +488,39 @@ export default function BatchWizardPage() {
                                     ))}
                                 </div>
                             </div>
+
+                            <div className="space-y-3 pt-4 border-t border-slate-100">
+                                <label className="text-sm font-bold text-slate-900 ml-1">
+                                    Fokus Materi / Konteks Lokal <span className="text-slate-400 font-normal ml-1">(Opsional)</span>
+                                </label>
+                                <textarea
+                                    className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-medium transition-all shadow-sm min-h-[100px] resize-none"
+                                    placeholder="Contoh: Fokus pada pemahaman lingkungan sekitar sekolah, atau sesuaikan dengan gaya belajar visual anak-anak."
+                                    value={contextData.fokusMateri}
+                                    onChange={(e) => setContextData({ ...contextData, fokusMateri: e.target.value })}
+                                />
+                                <p className="text-xs text-slate-500 px-2 leading-relaxed">
+                                    Beritahu AI jika ada spesifikasi khusus agar rencana semester lebih kontekstual untuk siswa Anda.
+                                </p>
+                            </div>
                         </div>
 
-                        <button
-                            onClick={() => setCurrentStep('TOPIK')}
-                            disabled={!contextData.mapel}
-                            className="w-full mt-10 bg-emerald-600 text-white rounded-[1.25rem] py-5 font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-emerald-200 group flex items-center justify-center gap-2"
-                        >
-                            Lanjutkan ke Topik <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                                onClick={() => setCurrentStep('TOPIK')}
+                                disabled={!contextData.mapel}
+                                className="w-full bg-slate-50 text-slate-700 border-2 border-slate-200 rounded-[1.25rem] py-5 font-bold hover:bg-slate-100 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                Input Manual Topik
+                            </button>
+                            <button
+                                onClick={handleGenerateAIPlan}
+                                disabled={!contextData.mapel || isGeneratingPlan}
+                                className="w-full bg-linear-to-r from-emerald-600 to-indigo-600 text-white rounded-[1.25rem] py-5 font-bold hover:from-emerald-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-indigo-200 group flex items-center justify-center gap-2"
+                            >
+                                <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" /> Buat Rencana Semester AI
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -461,89 +532,107 @@ export default function BatchWizardPage() {
                             <p className="text-slate-500 font-medium">Masukkan topik untuk masing-masing modul. Satu baris mewakili satu modul.</p>
                         </div>
 
-                        {/* Kurikulum Merdeka Injection UI */}
-                        {isLoadingTopics ? (
-                            <div className="flex bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 items-center justify-center gap-2">
-                                <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
-                                <span className="text-sm font-medium text-slate-500">Mencari referensi Kurikulum Merdeka...</span>
-                            </div>
-                        ) : recommendedTopics.length > 0 ? (
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-6 shadow-sm">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600">
-                                            <Sparkles className="w-4 h-4" />
-                                        </div>
-                                        <h3 className="font-bold text-emerald-900">Rekomendasi Kurikulum Merdeka</h3>
-                                    </div>
-                                    <span className="text-xs font-black bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-md uppercase tracking-widest">{recommendedTopics.length} Topik</span>
+                        {/* AI Content Loading State */}
+                        {isGeneratingPlan ? (
+                            <div className="bg-white border-2 border-dashed border-indigo-200 rounded-4xl p-12 text-center shadow-lg shadow-indigo-50 flex flex-col items-center justify-center gap-4 animate-in zoom-in-95 duration-500">
+                                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-2">
+                                    <Sparkles className="w-8 h-8 text-indigo-500 animate-pulse" />
                                 </div>
-                                <p className="text-sm text-emerald-700/80 font-medium mb-4">Kami menemukan referensi daftar topik untuk semester ini berdasarkan pilihan kelas dan mata pelajaran.</p>
-                                <button
-                                    onClick={handleApplyRecommended}
-                                    className="w-full bg-white border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all rounded-xl py-3 font-bold text-emerald-700 shadow-sm"
-                                >
-                                    Gunakan Topik Kemdikbud &rarr;
-                                </button>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight">AI Sedang Menyusun Rencana</h3>
+                                <p className="text-slate-500 font-medium max-w-sm leading-relaxed">
+                                    Menganalisis Kurikulum Merdeka untuk <b>{contextData.mapel}</b> kelas <b>{contextData.kelas}</b> dan menyusun urutan pembelajaran terbaik...
+                                </p>
+                                <div className="w-48 h-1.5 bg-slate-100 rounded-full mt-4 overflow-hidden">
+                                    <div className="h-full bg-indigo-500 rounded-full w-full animate-progress origin-left" style={{ animationDuration: '3s' }} />
+                                </div>
                             </div>
-                        ) : null}
-
-                        <div className="space-y-3 mb-6">
-                            {topics.map((topic, i) => (
-                                <div key={i} className="flex items-center gap-3">
-                                    <div className="w-10 h-12 flex items-center justify-center bg-slate-100 text-slate-400 font-black rounded-xl border border-slate-200 shrink-0">
-                                        {i + 1}
+                        ) : (
+                            <>
+                                {/* Kurikulum Merdeka Injection UI */}
+                                {isLoadingTopics ? (
+                                    <div className="flex bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 items-center justify-center gap-2">
+                                        <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                                        <span className="text-sm font-medium text-slate-500">Mencari referensi Kurikulum Merdeka...</span>
                                     </div>
-                                    <input
-                                        type="text"
-                                        value={topic}
-                                        onChange={(e) => handleTopicChange(i, e.target.value)}
-                                        placeholder={`Modul ${i + 1} (Contoh: Rantai Makanan)`}
-                                        className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 font-medium shadow-sm transition-all"
-                                        autoFocus={i === topics.length - 1}
-                                    />
+                                ) : recommendedTopics.length > 0 ? (
+                                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-6 shadow-sm">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600">
+                                                    <Sparkles className="w-4 h-4" />
+                                                </div>
+                                                <h3 className="font-bold text-emerald-900">Rekomendasi Kurikulum Merdeka</h3>
+                                            </div>
+                                            <span className="text-xs font-black bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-md uppercase tracking-widest">{recommendedTopics.length} Topik</span>
+                                        </div>
+                                        <p className="text-sm text-emerald-700/80 font-medium mb-4">Kami menemukan referensi daftar topik untuk semester ini berdasarkan pilihan kelas dan mata pelajaran.</p>
+                                        <button
+                                            onClick={handleApplyRecommended}
+                                            className="w-full bg-white border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all rounded-xl py-3 font-bold text-emerald-700 shadow-sm"
+                                        >
+                                            Gunakan Topik Kemdikbud &rarr;
+                                        </button>
+                                    </div>
+                                ) : null}
+
+                                <div className="space-y-3 mb-6">
+                                    {topics.map((topic, i) => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <div className="w-10 h-12 flex items-center justify-center bg-slate-100 text-slate-400 font-black rounded-xl border border-slate-200 shrink-0">
+                                                {i + 1}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={topic}
+                                                onChange={(e) => handleTopicChange(i, e.target.value)}
+                                                placeholder={`Modul ${i + 1} (Contoh: Rantai Makanan)`}
+                                                className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 font-medium shadow-sm transition-all"
+                                                autoFocus={i === topics.length - 1}
+                                            />
+                                            <button
+                                                onClick={() => handleRemoveTopic(i)}
+                                                disabled={topics.length <= 1}
+                                                className="w-12 h-12 flex flex-col items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-30"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex justify-between items-center mb-10 pt-4 border-t border-slate-100">
                                     <button
-                                        onClick={() => handleRemoveTopic(i)}
-                                        disabled={topics.length <= 1}
-                                        className="w-12 h-12 flex flex-col items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-30"
+                                        onClick={handleAddTopic}
+                                        disabled={topics.length >= 16}
+                                        className="flex items-center gap-2 text-indigo-600 font-bold hover:text-indigo-800 disabled:opacity-50 transition-colors bg-indigo-50 px-4 py-2 rounded-xl"
                                     >
-                                        <Trash2 className="w-5 h-5" />
+                                        <Plus className="w-4 h-4" /> Tambah Topik Baru
+                                    </button>
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-500 font-medium">Est Biaya</div>
+                                        <div className="font-black text-slate-900 flex items-center gap-1 justify-end">
+                                            <Zap className="w-4 h-4 text-emerald-500" /> {topics.filter(t => t.trim().length > 0).length} token
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setCurrentStep('KONTEKS')}
+                                        className="w-1/3 bg-slate-100 text-slate-600 rounded-[1.25rem] py-5 font-bold hover:bg-slate-200 transition-all"
+                                    >
+                                        Kembali
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentStep('REVIEW')}
+                                        disabled={validTopics.length === 0}
+                                        className="w-2/3 bg-emerald-600 text-white rounded-[1.25rem] py-5 font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-emerald-200 group flex items-center justify-center gap-2"
+                                    >
+                                        Review Batch <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
                                 </div>
-                            ))}
-                        </div>
-
-                        <div className="flex justify-between items-center mb-10 pt-4 border-t border-slate-100">
-                            <button
-                                onClick={handleAddTopic}
-                                disabled={topics.length >= 16}
-                                className="flex items-center gap-2 text-indigo-600 font-bold hover:text-indigo-800 disabled:opacity-50 transition-colors bg-indigo-50 px-4 py-2 rounded-xl"
-                            >
-                                <Plus className="w-4 h-4" /> Tambah Topik Baru
-                            </button>
-                            <div className="text-right">
-                                <div className="text-xs text-slate-500 font-medium">Est Biaya</div>
-                                <div className="font-black text-slate-900 flex items-center gap-1 justify-end">
-                                    <Zap className="w-4 h-4 text-emerald-500" /> {topics.filter(t => t.trim().length > 0).length} token
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => setCurrentStep('KONTEKS')}
-                                className="w-1/3 bg-slate-100 text-slate-600 rounded-[1.25rem] py-5 font-bold hover:bg-slate-200 transition-all"
-                            >
-                                Kembali
-                            </button>
-                            <button
-                                onClick={() => setCurrentStep('REVIEW')}
-                                disabled={validTopics.length === 0}
-                                className="w-2/3 bg-emerald-600 text-white rounded-[1.25rem] py-5 font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-emerald-200 group flex items-center justify-center gap-2"
-                            >
-                                Review Batch <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                        </div>
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -555,7 +644,7 @@ export default function BatchWizardPage() {
                             <p className="text-slate-500 font-medium">Sistem akan mengeksekusi {validTopics.length} generasi modul berurutan.</p>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-200 rounded-[2.5rem] p-7 space-y-5 shadow-inner mb-8">
+                        <div className="bg-slate-50 border border-slate-200 rounded-4xl p-7 space-y-5 shadow-inner mb-8">
                             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs space-y-3">
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Target Generasi</div>
                                 <div className="flex justify-between items-center text-sm">

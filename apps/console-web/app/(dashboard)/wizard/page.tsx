@@ -262,20 +262,26 @@ export default function WizardV2Page() {
     return (
         <div className="max-w-3xl mx-auto py-8 lg:py-12 animate-in fade-in duration-500">
 
-            {/* Mode Selector */}
             {currentStep !== 'GENERATING' && (
                 <div className="flex justify-center mb-8">
-                    <div className="bg-slate-100 p-1 rounded-2xl inline-flex shadow-inner border border-slate-200/60">
-                        <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-900 font-bold shadow-sm shadow-slate-200/50 transition-all border border-slate-200/50">
+                    <div className="bg-slate-100 p-1 rounded-2xl inline-flex shadow-inner border border-slate-200/60 flex-wrap justify-center gap-1">
+                        <button className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-white text-slate-900 font-bold shadow-sm shadow-slate-200/50 transition-all border border-slate-200/50">
                             <BookOpen className="w-4 h-4 text-emerald-600" />
                             Single Modul
                         </button>
                         <button
                             onClick={() => router.push('/wizard/batch')}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-slate-500 font-medium hover:text-slate-800 hover:bg-slate-200/50 transition-all cursor-pointer"
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-slate-500 font-medium hover:text-slate-800 hover:bg-slate-200/50 transition-all cursor-pointer"
                         >
                             <Layers className="w-4 h-4" />
                             Batch Semester
+                        </button>
+                        <button
+                            onClick={() => router.push('/wizard/batch?mode=ai-planner')}
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-indigo-500 font-bold hover:text-indigo-700 hover:bg-indigo-50/50 transition-all cursor-pointer border border-transparent hover:border-indigo-100"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            Rencana Semester AI
                         </button>
                     </div>
                 </div>
