@@ -147,8 +147,8 @@ export default function OnboardingPage() {
             if (!sRes.ok) throw new Error("Gagal menyimpan identitas sekolah.");
 
             router.push('/wizard');
-        } catch (err: any) {
-            setError(err.message || "Terjadi kesalahan sistem.");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem.');
         } finally {
             setIsSubmitting(false);
         }

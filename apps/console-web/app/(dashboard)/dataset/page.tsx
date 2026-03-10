@@ -1,6 +1,6 @@
 'use client';
 
-import { Database, ShieldCheck, Zap, Activity, Info } from 'lucide-react';
+import { Database, ShieldCheck, Zap, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DatasetPage() {
