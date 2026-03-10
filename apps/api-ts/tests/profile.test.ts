@@ -33,7 +33,7 @@ function buildApp(profileData: any = null) {
 
             // POST (Upsert) profile
             if (sql.includes('INSERT INTO teachers')) {
-                const [wid, fullName, grade, subject, nip] = params;
+                const [id, wid, fullName, grade, subject, nip] = params;
                 return {
                     rowCount: 1,
                     rows: [{ full_name: fullName, primary_grade: grade, primary_subject: subject, nip: nip }]
