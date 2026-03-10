@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { ulid } from 'ulid';
 
 export default async function profileRoutes(fastify: FastifyInstance) {
 
@@ -50,8 +51,8 @@ export default async function profileRoutes(fastify: FastifyInstance) {
 
             // Upsert profile
             const result = await fastify.db.query(
-                `INSERT INTO teachers (workspace_id, full_name, primary_grade, primary_subject, nip)
-                 VALUES ($1, $2, $3, $4, $5)
+                `INSERT INTO teachers (id, workspace_id, full_name, primary_grade, primary_subject, nip)
+                 VALUES ($1, $2, $3, $4, $5, $6)
                  ON CONFLICT (workspace_id) 
                  DO UPDATE SET 
                     full_name = EXCLUDED.full_name,
@@ -60,7 +61,7 @@ export default async function profileRoutes(fastify: FastifyInstance) {
                     nip = EXCLUDED.nip,
                     updated_at = NOW()
                  RETURNING full_name, primary_grade, primary_subject, nip`,
-                [request.workspaceId, body.full_name, grade, body.primary_subject, nipVal]
+                [ulid(), request.workspaceId, body.full_name, grade, body.primary_subject, nipVal]
             );
 
             // Do not log PII (like NIP) down here, only structured logic points

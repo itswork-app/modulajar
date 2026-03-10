@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutTemplate, Sparkles, Star, Zap, Clock } from 'lucide-react';
+import { Sparkles, Star, Zap, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function TemplatesPage() {
