@@ -8,7 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, Che
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
-import Link from 'next/link';
+
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -415,30 +415,31 @@ export default function WizardV2Page() {
                         <div className="space-y-8">
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-3">
-                                    <label className="text-sm font-bold text-slate-900 ml-1">Jenjang <span className="text-emerald-500">*</span></label>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Jenjang <span className="text-emerald-500">*</span></label>
                                     <select
                                         className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
                                         value={formData.jenjang}
                                         onChange={(e) => {
                                             const newJenjang = e.target.value as Jenjang;
                                             const newKelas = KELAS_OPTIONS[newJenjang][0].toString();
-                                            setFormData(prev => ({ ...prev, jenjang: newJenjang, kelas: newKelas, mapel: '' }));
-                                            localStorage.setItem('wizard_draft', JSON.stringify({ ...formData, jenjang: newJenjang, kelas: newKelas, mapel: '' }));
+                                            handleChange('jenjang', newJenjang);
+                                            handleChange('kelas', newKelas);
+                                            handleChange('mapel', ''); // reset mapel
                                         }}
                                     >
-                                        {JENJANG_OPTIONS.map((j: string) => (
+                                        {JENJANG_OPTIONS.map(j => (
                                             <option key={j} value={j}>{j}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="space-y-3">
-                                    <label className="text-sm font-bold text-slate-900 ml-1">Fase / Kelas <span className="text-emerald-500">*</span></label>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Fase / Kelas <span className="text-emerald-500">*</span></label>
                                     <select
                                         className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
                                         value={formData.kelas}
                                         onChange={(e) => handleChange('kelas', e.target.value)}
                                     >
-                                        {KELAS_OPTIONS[formData.jenjang as Jenjang]?.map((k: number) => (
+                                        {KELAS_OPTIONS[formData.jenjang as Jenjang]?.map(k => (
                                             <option key={k} value={k.toString()}>Kelas {k}</option>
                                         ))}
                                     </select>
@@ -453,7 +454,7 @@ export default function WizardV2Page() {
                                     onChange={(e) => handleChange('mapel', e.target.value)}
                                 >
                                     <option value="" disabled>Pilih Mata Pelajaran</option>
-                                    {MAPEL_OPTIONS[formData.jenjang as Jenjang]?.map((m: string) => (
+                                    {MAPEL_OPTIONS[formData.jenjang as Jenjang]?.map(m => (
                                         <option key={m} value={m}>{m}</option>
                                     ))}
                                     {/* Enable rendering custom/old mapel if it's not in the list but stored in draft/profile */}
