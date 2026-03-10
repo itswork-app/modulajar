@@ -96,7 +96,7 @@ func NewWorker(deps WorkerDeps) *Worker {
 
 // ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
 // Invariant: Job is marked done ONLY if PDF generation and Upload are successful.
-func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (*WorkerResult, error) {
+func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (result *WorkerResult, err error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
@@ -111,9 +111,21 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 		}
 	}
 
+	// PR-A5: Start generation duration timer
+	startGen := time.Now()
+	defer func() {
+		duration := time.Since(startGen).Seconds()
+		resultStatus := db.StatusDone
+		if result != nil && result.Status == "failed" {
+			resultStatus = db.StatusFailed
+		}
+		metrics.GenerationDurationSeconds.WithLabelValues(resultStatus).Observe(duration)
+	}()
+
 	// 1. Load pack
 	pack, err := packloader.LoadPack(payload.PackPath)
 	if err != nil {
+		logger.Error("failed to load pack", "path", payload.PackPath, "error", err)
 		return failResult(fmt.Sprintf("failed to load pack: %v", err)), nil
 	}
 
@@ -328,8 +340,14 @@ No markdown formatting. Pure JSON.`,
 			}
 
 			req := ai.GenerateRequest{Prompt: schemaPrompt}
+
+			// PR-A5: Observe AI Request Duration
+			aiStart := time.Now()
 			resp, aiErr = w.Deps.AI.Generate(ctx, req)
+			metrics.AiRequestDurationSeconds.Observe(time.Since(aiStart).Seconds())
+
 			if aiErr != nil {
+				logger.Warn("AI protocol error", "attempt", attempt, "error", aiErr)
 				lastErr = fmt.Errorf("AI protocol error: %v", aiErr)
 				continue
 			}
@@ -365,7 +383,7 @@ No markdown formatting. Pure JSON.`,
 				// PR-062: Dataset Collection (Non-blocking)
 				go func(c curriculum.ModulAjarSD4, s int) {
 					if err := dataset.CollectDataset(context.Background(), &c, s); err != nil {
-						slog.Error("failed to collect dataset (SD4)", "error", err)
+						logger.Error("failed to collect dataset (SD4)", "error", err)
 					}
 				}(modulAjar, qualityResult.Score)
 			} else {
@@ -398,7 +416,7 @@ No markdown formatting. Pure JSON.`,
 				// PR-062: Dataset Collection (Non-blocking)
 				go func(curr curriculum.Curriculum, s int) {
 					if err := dataset.CollectDataset(context.Background(), &curr, s); err != nil {
-						slog.Error("failed to collect dataset (legacy)", "error", err)
+						logger.Error("failed to collect dataset (legacy)", "error", err)
 					}
 				}(c, qualityResult.Score)
 			}
@@ -416,7 +434,7 @@ No markdown formatting. Pure JSON.`,
 			for _, rt := range rankedTemplates {
 				go func(id string) {
 					if err := db.IncrementDatasetUsage(context.Background(), id); err != nil {
-						slog.Warn("failed to increment template usage", "id", id, "error", err)
+						logger.Warn("failed to increment template usage", "id", id, "error", err)
 					}
 				}(rt.Candidate.ID.String())
 			}
@@ -617,8 +635,14 @@ No markdown formatting. Pure JSON.`,
 				Watermark:    watermark,
 				MarginBottom: 0.8, // inch
 			}
+
+			// PR-A5: Observe PDF Render Duration
+			renderStart := time.Now()
 			pdfBytes, err := w.Deps.PDF.Generate(ctx, rd.HTML, opts)
+			metrics.PdfRenderDurationSeconds.Observe(time.Since(renderStart).Seconds())
+
 			if err != nil {
+				logger.Error("PDF render failed", "subject", rd.SubjectCode, "error", err)
 				return failResult(fmt.Sprintf("PDF render failed for %s: %v", rd.SubjectCode, err)), nil
 			}
 
