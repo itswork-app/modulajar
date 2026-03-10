@@ -67,8 +67,8 @@ export function InputsStep({ initialInputs, defaultGrade = 4, onSubmit }: Inputs
                                 type="button"
                                 onClick={() => setGrade(g)}
                                 className={`py-3 rounded-xl font-bold text-center transition-all ${grade === g
-                                        ? 'bg-emerald-600 text-white shadow-md'
-                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                                    ? 'bg-emerald-600 text-white shadow-md'
+                                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                                     }`}
                             >
                                 {g}
@@ -78,7 +78,9 @@ export function InputsStep({ initialInputs, defaultGrade = 4, onSubmit }: Inputs
                 </div>
 
                 <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Specific Topic</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Specific Topic <span className="text-red-500">*</span>
+                    </label>
                     <input
                         type="text"
                         value={topic}
@@ -94,7 +96,8 @@ export function InputsStep({ initialInputs, defaultGrade = 4, onSubmit }: Inputs
 
                 <button
                     type="submit"
-                    className="w-full flex justify-center items-center gap-2 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold transition-all shadow-lg shadow-emerald-200/50"
+                    disabled={!topic.trim()}
+                    className="w-full flex justify-center items-center gap-2 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold transition-all shadow-lg shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                     Continue <ArrowRight className="w-5 h-5" />
                 </button>

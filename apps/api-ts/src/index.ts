@@ -46,7 +46,8 @@ fastify.register(cors, {
     origin: [
         'https://modulajar.app',
         'https://app.modulajar.app',
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'http://localhost:3001'
     ],
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -110,6 +111,7 @@ fastify.get('/healthz', async () => ({ status: 'ok' }));
 fastify.get('/readyz', async () => ({ status: 'ok' }));
 
 // Core Plugins (Common to both modes)
+fastify.register(schemasPlugin);
 fastify.register(dbPlugin);
 
 if (SERVICE_MODE === 'verify') {
@@ -145,8 +147,6 @@ if (SERVICE_MODE === 'verify') {
             deepLinking: false
         }
     });
-
-    fastify.register(schemasPlugin);
 
     // ---------------------------------------------------------
     // API MODE: Full authenticated backend

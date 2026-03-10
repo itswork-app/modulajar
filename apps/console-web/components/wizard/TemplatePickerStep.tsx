@@ -129,10 +129,10 @@ export function TemplatePickerStep({ inputs, onSelect, onBack }: TemplatePickerS
                     disabled={!selectedId}
                     className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all shadow-lg ${selectedId
                         ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200/50 cursor-pointer'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed hidden'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70 shadow-none'
                         }`}
                 >
-                    Use Selected Template <ArrowRight className="w-4 h-4" />
+                    {selectedId ? 'Use Selected Template' : 'Select a Template Above'} <ArrowRight className="w-4 h-4" />
                 </button>
             </div>
         </motion.div>

@@ -11,7 +11,8 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
             const { workspaceId } = request.params;
 
             const { rowCount, rows } = await fastify.db.query(
-                `SELECT school_display_name, kab_kota, provinsi, alamat, school_npsn, school_verified
+                `SELECT school_display_name, kab_kota, provinsi, alamat, school_npsn, school_verified,
+                        principal_name, principal_nip, signature_location
                  FROM workspace_settings
                  WHERE workspace_id = $1`,
                 [workspaceId]
@@ -33,6 +34,9 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                 provinsi?: string;
                 alamat?: string;
                 school_npsn?: string;
+                principal_name?: string;
+                principal_nip?: string;
+                signature_location?: string;
             }
         }>('/:workspaceId/school', {
             preHandler: [fastify.workspaceGuard],
@@ -45,7 +49,10 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                         kab_kota: { type: 'string', nullable: true },
                         provinsi: { type: 'string', nullable: true },
                         alamat: { type: 'string', nullable: true },
-                        school_npsn: { type: 'string', nullable: true, pattern: '^[0-9]{8}$' }
+                        school_npsn: { type: 'string', nullable: true, pattern: '^[0-9]{8}$' },
+                        principal_name: { type: 'string', nullable: true },
+                        principal_nip: { type: 'string', nullable: true },
+                        signature_location: { type: 'string', nullable: true }
                     }
                 }
             }
@@ -73,10 +80,13 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                     provinsi, 
                     alamat, 
                     school_npsn,
+                    principal_name,
+                    principal_nip,
+                    signature_location,
                     school_verified,
                     updated_at
                 ) 
-                VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW())
                 ON CONFLICT (workspace_id) 
                 DO UPDATE SET 
                     school_display_name = EXCLUDED.school_display_name,
@@ -84,9 +94,13 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                     provinsi = EXCLUDED.provinsi,
                     alamat = EXCLUDED.alamat,
                     school_npsn = EXCLUDED.school_npsn,
+                    principal_name = EXCLUDED.principal_name,
+                    principal_nip = EXCLUDED.principal_nip,
+                    signature_location = EXCLUDED.signature_location,
                     school_verified = false,
                     updated_at = NOW()
-                RETURNING school_display_name, kab_kota, provinsi, alamat, school_npsn, school_verified
+                RETURNING school_display_name, kab_kota, provinsi, alamat, school_npsn, school_verified,
+                          principal_name, principal_nip, signature_location
             `;
 
             const { rows } = await fastify.db.query(query, [
@@ -95,7 +109,10 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                 body.kab_kota?.trim() || null,
                 body.provinsi?.trim() || null,
                 body.alamat?.trim() || null,
-                npsn
+                npsn,
+                body.principal_name?.trim() || null,
+                body.principal_nip?.trim() || null,
+                body.signature_location?.trim() || null
             ]);
 
             request.log.info({ workspaceId, action: 'upsert_school_identity' }, "School identity updated");
