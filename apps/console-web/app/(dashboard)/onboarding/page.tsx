@@ -7,8 +7,16 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { Loader2, User, School, PenTool, CheckCircle2, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { MAPEL_OPTIONS, Jenjang } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+function gradeToJenjang(grade: number): Jenjang {
+    if (grade <= 6) return 'SD';
+    if (grade <= 9) return 'SMP';
+    return 'SMA';
+}
+
 
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
@@ -246,13 +254,19 @@ export default function OnboardingPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-slate-700 ml-1">Mata Pelajaran Utama</label>
-                                        <input
-                                            type="text"
+                                        <select
                                             value={data.primary_subject}
                                             onChange={e => setData(prev => ({ ...prev, primary_subject: e.target.value }))}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Contoh: Matematika"
-                                        />
+                                        >
+                                            <option value="" disabled>Pilih Mata Pelajaran</option>
+                                            {(MAPEL_OPTIONS[gradeToJenjang(data.primary_grade)] ?? []).map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                            {data.primary_subject && !(MAPEL_OPTIONS[gradeToJenjang(data.primary_grade)] ?? []).includes(data.primary_subject) && (
+                                                <option value={data.primary_subject}>{data.primary_subject}</option>
+                                            )}
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-slate-700 ml-1">Kelas Utama</label>

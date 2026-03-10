@@ -264,35 +264,31 @@ export default function WizardV2Page() {
 
             {currentStep !== 'GENERATING' && (
                 <div className="flex justify-center mb-8">
-                    <div className="bg-slate-100 p-1 rounded-2xl inline-flex shadow-inner border border-slate-200/60 flex-wrap justify-center gap-1">
-                        <button className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-white text-slate-900 font-bold shadow-sm shadow-slate-200/50 transition-all border border-slate-200/50">
-                            <BookOpen className="w-4 h-4 text-emerald-600" />
-                            Single Modul
-                        </button>
-                        <button
-                            onClick={() => router.push('/wizard/batch')}
-                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-slate-500 font-medium hover:text-slate-800 hover:bg-slate-200/50 transition-all cursor-pointer"
+                    <div className="relative w-full max-w-xs">
+                        <select
+                            defaultValue="single"
+                            onChange={e => {
+                                const v = e.target.value;
+                                if (v === 'batch') router.push('/wizard/batch');
+                                else if (v === 'ai-planner') router.push('/wizard/batch?mode=ai-planner');
+                                else if (v === 'bundle') router.push('/wizard/bundle');
+                            }}
+                            className="w-full appearance-none bg-white border border-slate-200 rounded-2xl px-5 py-3 pr-10 text-sm font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
                         >
-                            <Layers className="w-4 h-4" />
-                            Batch Semester
-                        </button>
-                        <button
-                            onClick={() => router.push('/wizard/batch?mode=ai-planner')}
-                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-indigo-500 font-bold hover:text-indigo-700 hover:bg-indigo-50/50 transition-all cursor-pointer border border-transparent hover:border-indigo-100"
-                        >
-                            <Sparkles className="w-4 h-4" />
-                            Rencana Semester AI
-                        </button>
-                        <button
-                            onClick={() => router.push('/wizard/bundle')}
-                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-violet-600 font-bold hover:text-violet-800 hover:bg-violet-50/50 transition-all cursor-pointer border border-transparent hover:border-violet-100"
-                        >
-                            <Sparkles className="w-4 h-4" />
-                            Administrasi Lengkap
-                        </button>
+                            <option value="single">📄 Single Modul</option>
+                            <option value="batch">🗂️ Batch Semester</option>
+                            <option value="ai-planner">✨ Rencana Semester AI</option>
+                            <option value="bundle">🗃️ Administrasi Lengkap</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
             )}
+
 
             {/* Step Breadcrumbs (hidden during generation) */}
             {currentStep !== 'GENERATING' && (
