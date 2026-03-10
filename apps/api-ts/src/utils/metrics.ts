@@ -102,3 +102,23 @@ export const aiAssistTotal = new client.Counter({
     labelNames: ['section', 'action', 'result'],
     registers: [register],
 });
+
+// PR-C14: Administration Bundle Metrics
+export const bundleGenerationTotal = new client.Counter({
+    name: 'bundle_generation_total',
+    help: 'Total number of administration bundle generation requests',
+    registers: [register],
+});
+
+export const bundleSuccessTotal = new client.Counter({
+    name: 'bundle_success_total',
+    help: 'Total number of successfully completed bundles',
+    registers: [register],
+});
+
+export const bundleFailedTotal = new client.Counter({
+    name: 'bundle_failed_total',
+    help: 'Total number of failed bundle generations',
+    labelNames: ['reason'],
+    registers: [register],
+});

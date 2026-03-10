@@ -9,6 +9,7 @@ import workspaceRoutes from './routes/workspace';
 import profileRoutes from './routes/profile';
 import schoolRoutes from './routes/school';
 import generateRoutes from './routes/generate';
+import bundleRoutes from './routes/bundle';
 import billingRoutes from './routes/billing';
 import documentsRoutes from './routes/documents';
 import verifyRoutes from './routes/verify';
@@ -167,6 +168,7 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(profileRoutes);
     fastify.register(schoolRoutes);
     fastify.register(generateRoutes);
+    fastify.register(bundleRoutes);
     fastify.register(billingRoutes);
     fastify.register(documentsRoutes);
     fastify.register(letterheadRoutes);
