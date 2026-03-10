@@ -31,6 +31,18 @@ interface UsageSummary {
     documents_generated: number;
 }
 
+interface CurriculumTopic {
+    id: string;
+    jenjang: string;
+    kelas: number;
+    mata_pelajaran: string;
+    semester: number;
+    title: string;
+    display_order: number;
+    cp_reference?: string;
+    notes?: string;
+}
+
 const STEPS: { key: BatchStep; label: string }[] = [
     { key: 'KONTEKS', label: '1. Konteks' },
     { key: 'TOPIK', label: '2. Daftar Topik' },
@@ -61,6 +73,10 @@ export default function BatchWizardPage() {
 
     const [topics, setTopics] = useState<string[]>(['']);
     const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+    // Curriculum Integration
+    const [recommendedTopics, setRecommendedTopics] = useState<CurriculumTopic[]>([]);
+    const [isLoadingTopics, setIsLoadingTopics] = useState(false);
 
     // ── Load profile/school/usage data ──────────────────────────────────────
     useEffect(() => {
@@ -130,6 +146,42 @@ export default function BatchWizardPage() {
         return () => { isMounted = false; ctrl.abort(); };
     }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
+    // ── Load Recommended Topics ──────────────────────────────────────────────
+    useEffect(() => {
+        let isMounted = true;
+
+        async function fetchTopics() {
+            if (!workspace || !contextData.jenjang || !contextData.kelas || !contextData.mapel || currentStep !== 'TOPIK') return;
+
+            setIsLoadingTopics(true);
+            try {
+                const token = await getToken();
+                const params = new URLSearchParams({
+                    jenjang: contextData.jenjang,
+                    kelas: contextData.kelas,
+                    mapel: contextData.mapel,
+                    semester: contextData.semester
+                });
+
+                const res = await fetch(`${API_BASE}/w/${workspace.id}/curriculum/topics?${params.toString()}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted) setRecommendedTopics(data.topics || []);
+                }
+            } catch (err) {
+                console.error('Failed to load recommended topics', err);
+            } finally {
+                if (isMounted) setIsLoadingTopics(false);
+            }
+        }
+
+        fetchTopics();
+        return () => { isMounted = false; };
+    }, [workspace, getToken, contextData.jenjang, contextData.kelas, contextData.mapel, contextData.semester, currentStep]);
+
     const handleAddTopic = () => {
         if (topics.length >= 16) return;
         setTopics([...topics, '']);
@@ -146,6 +198,11 @@ export default function BatchWizardPage() {
         const newTopics = [...topics];
         newTopics[index] = val;
         setTopics(newTopics);
+    };
+
+    const handleApplyRecommended = () => {
+        if (recommendedTopics.length === 0) return;
+        setTopics(recommendedTopics.map(t => t.title).slice(0, 16));
     };
 
     const validTopics = topics.filter(t => t.trim().length > 0);
@@ -404,6 +461,33 @@ export default function BatchWizardPage() {
                             <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Daftar Topik Utama</h1>
                             <p className="text-slate-500 font-medium">Masukkan topik untuk masing-masing modul. Satu baris mewakili satu modul.</p>
                         </div>
+
+                        {/* Kurikulum Merdeka Injection UI */}
+                        {isLoadingTopics ? (
+                            <div className="flex bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 items-center justify-center gap-2">
+                                <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                                <span className="text-sm font-medium text-slate-500">Mencari referensi Kurikulum Merdeka...</span>
+                            </div>
+                        ) : recommendedTopics.length > 0 ? (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600">
+                                            <Sparkles className="w-4 h-4" />
+                                        </div>
+                                        <h3 className="font-bold text-emerald-900">Rekomendasi Kurikulum Merdeka</h3>
+                                    </div>
+                                    <span className="text-xs font-black bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-md uppercase tracking-widest">{recommendedTopics.length} Topik</span>
+                                </div>
+                                <p className="text-sm text-emerald-700/80 font-medium mb-4">Kami menemukan referensi daftar topik untuk semester ini berdasarkan pilihan kelas dan mata pelajaran.</p>
+                                <button
+                                    onClick={handleApplyRecommended}
+                                    className="w-full bg-white border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all rounded-xl py-3 font-bold text-emerald-700 shadow-sm"
+                                >
+                                    Gunakan Topik Kemdikbud &rarr;
+                                </button>
+                            </div>
+                        ) : null}
 
                         <div className="space-y-3 mb-6">
                             {topics.map((topic, i) => (
