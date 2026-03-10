@@ -261,5 +261,148 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
             };
         });
 
+        // PR-C13: Admin Dashboard Analytics
+        childServer.get<{ Params: { workspaceId: string } }>('/:workspaceId/admin/dashboard', {
+            preHandler: [fastify.workspaceGuard],
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const clerkUserId = request.auth?.clerk_user_id;
+
+            // --- Role Guard ---
+            const roleResult = await fastify.db.query(
+                `SELECT role FROM workspace_members WHERE workspace_id = $1 AND clerk_user_id = $2`,
+                [workspaceId, clerkUserId]
+            );
+            const role = roleResult.rows[0]?.role;
+            if (!role || !['owner', 'admin'].includes(role)) {
+                return reply.code(403).send({ error: 'Forbidden', message: 'Admin access required' });
+            }
+
+            const [
+                teacherCountResult,
+                totalModulesResult,
+                monthModulesResult,
+                creditsResult,
+                teacherStatsResult,
+                activityFeedResult,
+                bySubjectResult,
+                dailyModulesResult,
+            ] = await Promise.all([
+                // 1. Total teachers (members)
+                fastify.db.query(
+                    `SELECT COUNT(*) AS count FROM workspace_members WHERE workspace_id = $1`,
+                    [workspaceId]
+                ),
+                // 2. Total modules generated
+                fastify.db.query(
+                    `SELECT COUNT(*) AS count FROM generation_jobs WHERE workspace_id = $1 AND status = 'done'`,
+                    [workspaceId]
+                ),
+                // 3. Modules this month
+                fastify.db.query(
+                    `SELECT COUNT(*) AS count FROM generation_jobs
+                     WHERE workspace_id = $1 AND status = 'done'
+                     AND created_at >= date_trunc('month', NOW())`,
+                    [workspaceId]
+                ),
+                // 4. Credits summary via wallet_transactions
+                fastify.db.query(
+                    `SELECT
+                        COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS credits_in,
+                        COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS credits_out,
+                        COALESCE(SUM(CASE WHEN amount < 0 AND created_at >= date_trunc('month', NOW()) THEN ABS(amount) ELSE 0 END), 0) AS credits_this_month
+                     FROM wallet_transactions WHERE workspace_id = $1`,
+                    [workspaceId]
+                ),
+                // 5. Per-teacher stats
+                fastify.db.query(
+                    `SELECT 
+                        tp.full_name AS name,
+                        tp.primary_subject AS subject,
+                        COUNT(gj.id) AS modules_generated,
+                        MAX(gj.created_at) AS last_activity,
+                        COUNT(gj.id) AS credits_used
+                     FROM workspace_members wm
+                     LEFT JOIN teacher_profiles tp ON tp.workspace_id = wm.workspace_id AND tp.clerk_user_id = wm.clerk_user_id
+                     LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.clerk_user_id = wm.clerk_user_id AND gj.status = 'done'
+                     WHERE wm.workspace_id = $1
+                     GROUP BY wm.clerk_user_id, tp.full_name, tp.primary_subject
+                     ORDER BY modules_generated DESC`,
+                    [workspaceId]
+                ),
+                // 6. Recent activity feed (last 20)
+                fastify.db.query(
+                    `SELECT 
+                        COALESCE(tp.full_name, 'Guru') AS teacher_name,
+                        gj.metadata->>'subject' AS subject,
+                        gj.metadata->>'grade' AS grade,
+                        'generate' AS action,
+                        gj.created_at
+                     FROM generation_jobs gj
+                     LEFT JOIN teacher_profiles tp ON tp.workspace_id = gj.workspace_id AND tp.clerk_user_id = gj.clerk_user_id
+                     WHERE gj.workspace_id = $1 AND gj.status = 'done'
+                     ORDER BY gj.created_at DESC
+                     LIMIT 20`,
+                    [workspaceId]
+                ),
+                // 7. Modules by subject
+                fastify.db.query(
+                    `SELECT 
+                        COALESCE(metadata->>'subject', 'Lainnya') AS subject,
+                        COUNT(*) AS count
+                     FROM generation_jobs
+                     WHERE workspace_id = $1 AND status = 'done'
+                     GROUP BY subject
+                     ORDER BY count DESC
+                     LIMIT 10`,
+                    [workspaceId]
+                ),
+                // 8. Daily modules (last 14 days)
+                fastify.db.query(
+                    `SELECT 
+                        date_trunc('day', created_at)::date AS date,
+                        COUNT(*) AS count
+                     FROM generation_jobs
+                     WHERE workspace_id = $1 AND status = 'done'
+                     AND created_at >= NOW() - INTERVAL '14 days'
+                     GROUP BY date
+                     ORDER BY date ASC`,
+                    [workspaceId]
+                ),
+            ]);
+
+            const creditsIn = parseInt(creditsResult.rows[0]?.credits_in || '0', 10);
+            const creditsOut = parseInt(creditsResult.rows[0]?.credits_out || '0', 10);
+            const creditsThisMonth = parseInt(creditsResult.rows[0]?.credits_this_month || '0', 10);
+            const creditsRemaining = creditsIn - creditsOut;
+
+            return {
+                overview: {
+                    total_teachers: parseInt(teacherCountResult.rows[0]?.count || '0', 10),
+                    total_modules: parseInt(totalModulesResult.rows[0]?.count || '0', 10),
+                    modules_this_month: parseInt(monthModulesResult.rows[0]?.count || '0', 10),
+                    credits_remaining: creditsRemaining,
+                    credits_this_month: creditsThisMonth,
+                    credits_total: creditsIn,
+                },
+                teachers: teacherStatsResult.rows.map(r => ({
+                    name: r.name || 'Guru',
+                    subject: r.subject || '—',
+                    modules_generated: parseInt(r.modules_generated || '0', 10),
+                    last_activity: r.last_activity || null,
+                    credits_used: parseInt(r.credits_used || '0', 10),
+                })),
+                activity_feed: activityFeedResult.rows,
+                modules_by_subject: bySubjectResult.rows.map(r => ({
+                    subject: r.subject,
+                    count: parseInt(r.count || '0', 10),
+                })),
+                daily_modules: dailyModulesResult.rows.map(r => ({
+                    date: r.date,
+                    count: parseInt(r.count || '0', 10),
+                })),
+            };
+        });
+
     }, { prefix: '/w' });
 }

@@ -10,8 +10,10 @@ import {
     Gift,
     Building2,
     Settings,
+    BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWorkspaceRole } from '@/hooks/use-workspace-role';
 
 const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const navigation = [
 
 export function Sidebar() {
     const pathname = usePathname();
+    const { isAdmin } = useWorkspaceRole();
 
     return (
         <div className="flex flex-col h-full bg-white border-r border-slate-100 w-64 shrink-0">
@@ -67,6 +70,33 @@ export function Sidebar() {
                         </Link>
                     );
                 })}
+
+                {/* Admin-only section */}
+                {isAdmin && (
+                    <>
+                        <p className="px-3 text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1 mt-5">Admin Sekolah</p>
+                        <Link
+                            href="/workspace/dashboard"
+                            className={cn(
+                                'group flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150 relative',
+                                pathname.startsWith('/workspace/dashboard')
+                                    ? 'bg-indigo-50 text-indigo-700'
+                                    : 'text-slate-500 hover:bg-indigo-50/50 hover:text-indigo-700'
+                            )}
+                        >
+                            {pathname.startsWith('/workspace/dashboard') && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-indigo-500 rounded-r-full" />
+                            )}
+                            <BarChart3
+                                className={cn(
+                                    'mr-3 h-4 w-4 shrink-0 transition-colors',
+                                    pathname.startsWith('/workspace/dashboard') ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-500'
+                                )}
+                            />
+                            Dashboard Sekolah
+                        </Link>
+                    </>
+                )}
             </nav>
 
             {/* Footer hint */}

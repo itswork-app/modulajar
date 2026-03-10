@@ -17,8 +17,9 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "swr": "^2.4.0",
+    "recharts": "^3.8.0",
     "shared-types": "file:../../packages/shared-types",
+    "swr": "^2.4.0",
     "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {
