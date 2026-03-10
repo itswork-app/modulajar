@@ -4,12 +4,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, AlertCircle, FileText, Download, Eye, Clock, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { Loader2, AlertCircle, FileText, Download, Eye, Clock, CheckCircle2, XCircle, Search, Layers, X } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 type JobStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
+
+interface BatchSession {
+    batch_id: string;
+    job_ids: string[];
+    subject: string;
+    semester: string;
+    total: number;
+}
 
 interface Job {
     id: string; // generation_id
@@ -28,6 +37,7 @@ export default function JobsListPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isLoadingJobs, setIsLoadingJobs] = useState(true);
+    const [activeBatch, setActiveBatch] = useState<BatchSession | null>(null);
 
     // 1. Route Guards
     useEffect(() => {
@@ -67,8 +77,17 @@ export default function JobsListPage() {
         }
 
         checkPrerequisites();
-    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
+        // Load batch context if exists
+        const batchData = sessionStorage.getItem('modulajar_batch');
+        if (batchData) {
+            try {
+                setActiveBatch(JSON.parse(batchData));
+            } catch (e) {
+                sessionStorage.removeItem('modulajar_batch');
+            }
+        }
+    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
 
     // Run interval poll every 3 seconds IF there are active jobs
     useEffect(() => {
@@ -165,6 +184,64 @@ export default function JobsListPage() {
                 <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-xl flex items-start text-sm border border-red-100">
                     <AlertCircle className="w-5 h-5 mr-3 mt-0.5 shrink-0" />
                     <div>{error}</div>
+                </div>
+            )}
+
+            {activeBatch && (
+                <div className="mb-8 bg-emerald-50 border border-emerald-100 rounded-2xl p-6 relative overflow-hidden shadow-sm">
+                    <button
+                        onClick={() => {
+                            sessionStorage.removeItem('modulajar_batch');
+                            setActiveBatch(null);
+                        }}
+                        className="absolute top-4 right-4 text-emerald-600/50 hover:text-emerald-700 hover:bg-emerald-100/50 p-2 rounded-xl transition"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-start gap-4 mb-4">
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 border border-emerald-200/50 shadow-inner">
+                            <Layers className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-emerald-900 font-black text-lg">Batch: {activeBatch.subject}</h3>
+                            <p className="text-emerald-700/80 font-medium text-sm mt-0.5">Memproses {activeBatch.total} topik semester {activeBatch.semester}</p>
+                        </div>
+                    </div>
+
+                    {(() => {
+                        const batchJobs = jobs.filter(j => activeBatch.job_ids.includes(j.id));
+                        const done = batchJobs.filter(j => j.status === 'DONE').length;
+                        const failed = batchJobs.filter(j => j.status === 'FAILED').length;
+                        const processing = batchJobs.length - done - failed;
+                        const progressPct = activeBatch.total === 0 ? 0 : ((done + failed) / activeBatch.total) * 100;
+                        const isAllComplete = (done + failed) === activeBatch.total && activeBatch.total > 0;
+
+                        return (
+                            <div>
+                                <div className="flex justify-between items-end mb-2 text-sm">
+                                    <div className="font-bold text-emerald-800">
+                                        Progres Eksekusi
+                                    </div>
+                                    <div className="text-emerald-700 font-medium space-x-3">
+                                        <span>✓ {done} selesai</span>
+                                        {failed > 0 && <span className="text-red-500">✗ {failed} gagal</span>}
+                                        {processing > 0 && <span>⏳ {processing} antre/jalan</span>}
+                                    </div>
+                                </div>
+                                <div className="w-full h-3 bg-emerald-200/50 rounded-full overflow-hidden mb-3 shadow-inner">
+                                    <div
+                                        className={cn("h-full transition-all duration-500", failed > 0 ? "bg-amber-400" : "bg-emerald-500")}
+                                        style={{ width: `${progressPct}%` }}
+                                    />
+                                </div>
+                                {isAllComplete && (
+                                    <div className="text-emerald-800 font-black text-sm flex items-center gap-1 mt-2">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Semua selesai. Batch dapat ditutup.
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 

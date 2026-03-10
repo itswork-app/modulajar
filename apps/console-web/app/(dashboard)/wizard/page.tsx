@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, ChevronRight } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, ChevronRight, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
@@ -262,6 +262,25 @@ export default function WizardV2Page() {
     return (
         <div className="max-w-3xl mx-auto py-8 lg:py-12 animate-in fade-in duration-500">
 
+            {/* Mode Selector */}
+            {currentStep !== 'GENERATING' && (
+                <div className="flex justify-center mb-8">
+                    <div className="bg-slate-100 p-1 rounded-2xl inline-flex shadow-inner border border-slate-200/60">
+                        <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-900 font-bold shadow-sm shadow-slate-200/50 transition-all border border-slate-200/50">
+                            <BookOpen className="w-4 h-4 text-emerald-600" />
+                            Single Modul
+                        </button>
+                        <button
+                            onClick={() => router.push('/wizard/batch')}
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-slate-500 font-medium hover:text-slate-800 hover:bg-slate-200/50 transition-all cursor-pointer"
+                        >
+                            <Layers className="w-4 h-4" />
+                            Batch Semester
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Step Breadcrumbs (hidden during generation) */}
             {currentStep !== 'GENERATING' && (
                 <div className="mb-10 flex items-center gap-2 justify-center">
@@ -328,7 +347,7 @@ export default function WizardV2Page() {
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Kelas</div>
-                                        <div className="font-bold text-slate-800">{teacherProfile?.primary_grade ? `Kelas ${teacherProfile.primary_grade}` : '—'}</div>
+                                        <div className="font-bold text-slate-800">{formData.semester && formData.kelas ? <span className="font-bold text-slate-900 text-right">Sem {formData.semester} — Kelas {formData.kelas}</span> : '—'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -437,6 +456,7 @@ export default function WizardV2Page() {
                                     {MAPEL_OPTIONS[formData.jenjang as Jenjang]?.map((m: string) => (
                                         <option key={m} value={m}>{m}</option>
                                     ))}
+                                    {/* Enable rendering custom/old mapel if it's not in the list but stored in draft/profile */}
                                     {formData.mapel && !MAPEL_OPTIONS[formData.jenjang as Jenjang]?.includes(formData.mapel) && (
                                         <option value={formData.mapel}>{formData.mapel}</option>
                                     )}
