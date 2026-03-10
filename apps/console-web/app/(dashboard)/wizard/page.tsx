@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Zap, School, User, ChevronRight } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
+import { CreditPanel } from '@/components/wizard/CreditPanel';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -95,7 +96,7 @@ export default function WizardV2Page() {
                 setSchoolIdentity(sData);
 
                 // Usage / Credits
-                const usageRes = await fetch(`${API_BASE}/w/${workspace.id}/usage-summary`, opts);
+                const usageRes = await fetch(`${API_BASE}/w/${workspace.id}/wallet/summary`, opts);
                 if (usageRes.ok) {
                     const uData: UsageSummary = await usageRes.json();
                     if (isMounted) setUsageSummary(uData);
@@ -488,40 +489,9 @@ export default function WizardV2Page() {
                                 )}
                             </div>
 
-                            {/* Credit Card */}
-                            <div className={cn(
-                                'rounded-2xl p-5 flex items-center justify-between border transition-all',
-                                noCredits
-                                    ? 'bg-red-50 border-red-100'
-                                    : 'bg-emerald-600 border-emerald-500 shadow-lg shadow-emerald-200'
-                            )}>
-                                <div className="flex items-center gap-4">
-                                    <div className={cn('p-2.5 rounded-xl', noCredits ? 'bg-red-200/50' : 'bg-white/20')}>
-                                        <Zap className={cn('w-5 h-5', noCredits ? 'text-red-600' : 'text-white')} />
-                                    </div>
-                                    <div>
-                                        <div className={cn('text-[10px] font-black uppercase tracking-widest', noCredits ? 'text-red-400' : 'text-emerald-100')}>Credit Tersedia</div>
-                                        <div className={cn('text-2xl font-black', noCredits ? 'text-red-700' : 'text-white')}>
-                                            {usageSummary?.credits_remaining ?? '—'} Token
-                                        </div>
-                                    </div>
-                                </div>
-                                {noCredits && (
-                                    <button
-                                        onClick={() => router.push('/billing')}
-                                        className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-red-700 shadow-lg transition-colors"
-                                    >
-                                        Isi Saldo
-                                    </button>
-                                )}
-                            </div>
+                            {/* Credit Panel */}
+                            <CreditPanel credits={usageSummary?.credits_remaining ?? null} />
                         </div>
-
-                        {noCredits && (
-                            <p className="text-center text-xs font-bold text-red-500 uppercase tracking-widest mb-4">
-                                Saldo tidak mencukupi. Isi credit untuk melanjutkan generasi.
-                            </p>
-                        )}
 
                         <button
                             onClick={handleGenerate}
