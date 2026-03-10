@@ -305,54 +305,56 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                      AND created_at >= date_trunc('month', NOW())`,
                     [workspaceId]
                 ),
-                // 4. Credits summary via wallet_transactions
+                // 4. Credits via wallet_ledger (type = 'credit' | 'debit', amount always positive)
                 fastify.db.query(
                     `SELECT
-                        COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS credits_in,
-                        COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS credits_out,
-                        COALESCE(SUM(CASE WHEN amount < 0 AND created_at >= date_trunc('month', NOW()) THEN ABS(amount) ELSE 0 END), 0) AS credits_this_month
-                     FROM wallet_transactions WHERE workspace_id = $1`,
+                        COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) AS credits_in,
+                        COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) AS credits_out,
+                        COALESCE(SUM(CASE WHEN type = 'debit' AND created_at >= date_trunc('month', NOW()) THEN amount ELSE 0 END), 0) AS credits_this_month
+                     FROM wallet_ledger WHERE workspace_id = $1`,
                     [workspaceId]
                 ),
-                // 5. Per-teacher stats
+                // 5. Per-teacher stats (teachers table is 1-per-workspace, join on workspace_id only)
                 fastify.db.query(
-                    `SELECT 
-                        tp.full_name AS name,
-                        tp.primary_subject AS subject,
+                    `SELECT
+                        COALESCE(tp.full_name, 'Guru') AS name,
+                        COALESCE(tp.primary_subject, '\u2014') AS subject,
                         COUNT(gj.id) AS modules_generated,
                         MAX(gj.created_at) AS last_activity,
                         COUNT(gj.id) AS credits_used
                      FROM workspace_members wm
                      LEFT JOIN teachers tp ON tp.workspace_id = wm.workspace_id
-                     LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.clerk_user_id = wm.clerk_user_id AND gj.status = 'done'
+                     LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.status = 'done'
                      WHERE wm.workspace_id = $1
                      GROUP BY wm.clerk_user_id, tp.full_name, tp.primary_subject
                      ORDER BY modules_generated DESC`,
                     [workspaceId]
                 ),
-                // 6. Recent activity feed (last 20)
+                // 6. Recent activity feed (last 20) — use packages table for subject/grade
                 fastify.db.query(
-                    `SELECT 
-                        COALESCE(tp.full_name, 'Guru') AS teacher_name,
-                        gj.metadata->>'subject' AS subject,
-                        gj.metadata->>'grade' AS grade,
+                    `SELECT
+                        COALESCE(tp.full_name, p.teacher_name, 'Guru') AS teacher_name,
+                        p.teacher_name AS subject,
+                        p.kelas AS grade,
                         'generate' AS action,
                         gj.created_at
                      FROM generation_jobs gj
+                     JOIN packages p ON p.id = gj.package_id
                      LEFT JOIN teachers tp ON tp.workspace_id = gj.workspace_id
                      WHERE gj.workspace_id = $1 AND gj.status = 'done'
                      ORDER BY gj.created_at DESC
                      LIMIT 20`,
                     [workspaceId]
                 ),
-                // 7. Modules by subject
+                // 7. Modules by grade (packages table has kelas)
                 fastify.db.query(
-                    `SELECT 
-                        COALESCE(metadata->>'subject', 'Lainnya') AS subject,
+                    `SELECT
+                        COALESCE(p.kelas, 'Lainnya') AS subject,
                         COUNT(*) AS count
-                     FROM generation_jobs
-                     WHERE workspace_id = $1 AND status = 'done'
-                     GROUP BY subject
+                     FROM generation_jobs gj
+                     JOIN packages p ON p.id = gj.package_id
+                     WHERE gj.workspace_id = $1 AND gj.status = 'done'
+                     GROUP BY p.kelas
                      ORDER BY count DESC
                      LIMIT 10`,
                     [workspaceId]
@@ -374,7 +376,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
             const creditsIn = parseInt(creditsResult.rows[0]?.credits_in || '0', 10);
             const creditsOut = parseInt(creditsResult.rows[0]?.credits_out || '0', 10);
             const creditsThisMonth = parseInt(creditsResult.rows[0]?.credits_this_month || '0', 10);
-            const creditsRemaining = creditsIn - creditsOut;
+            const creditsRemaining = Math.max(0, creditsIn - creditsOut);
 
             return {
                 overview: {
