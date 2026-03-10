@@ -29,10 +29,10 @@ export default async function profileRoutes(fastify: FastifyInstance) {
             schema: {
                 body: {
                     type: 'object',
-                    required: ['full_name', 'primary_subject'],
+                    required: ['full_name'],
                     properties: {
                         full_name: { type: 'string', minLength: 1 },
-                        primary_subject: { type: 'string' },
+                        primary_subject: { type: 'string', default: '' },
                         primary_grade: { type: 'integer', minimum: 1, maximum: 12, default: 4 },
                         nip: { type: ['string', 'null'] }
                     }
@@ -41,13 +41,14 @@ export default async function profileRoutes(fastify: FastifyInstance) {
         }, async (request, reply) => {
             const body = request.body as {
                 full_name: string;
-                primary_subject: string;
+                primary_subject?: string;
                 primary_grade?: number;
                 nip?: string | null;
             };
 
             const grade = body.primary_grade ?? 4;
             const nipVal = body.nip || null;
+            const subject = body.primary_subject?.trim() || '';
 
             // Upsert profile
             const result = await fastify.db.query(
@@ -57,15 +58,12 @@ export default async function profileRoutes(fastify: FastifyInstance) {
                  DO UPDATE SET 
                     full_name = EXCLUDED.full_name,
                     primary_grade = EXCLUDED.primary_grade,
-                    primary_subject = EXCLUDED.primary_subject,
+                    primary_subject = CASE WHEN EXCLUDED.primary_subject != '' THEN EXCLUDED.primary_subject ELSE teachers.primary_subject END,
                     nip = EXCLUDED.nip,
                     updated_at = NOW()
                  RETURNING full_name, primary_grade, primary_subject, nip`,
-                [ulid(), request.workspaceId, body.full_name, grade, body.primary_subject, nipVal]
+                [ulid(), request.workspaceId, body.full_name, grade, subject, nipVal]
             );
-
-            // Do not log PII (like NIP) down here, only structured logic points
-            // Fastify's default logger might log request bodies if trace is on, but we configured it false above.
 
             return result.rows[0];
         });

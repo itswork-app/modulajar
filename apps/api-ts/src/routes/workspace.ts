@@ -323,7 +323,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                         MAX(gj.created_at) AS last_activity,
                         COUNT(gj.id) AS credits_used
                      FROM workspace_members wm
-                     LEFT JOIN teacher_profiles tp ON tp.workspace_id = wm.workspace_id AND tp.clerk_user_id = wm.clerk_user_id
+                     LEFT JOIN teachers tp ON tp.workspace_id = wm.workspace_id
                      LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.clerk_user_id = wm.clerk_user_id AND gj.status = 'done'
                      WHERE wm.workspace_id = $1
                      GROUP BY wm.clerk_user_id, tp.full_name, tp.primary_subject
@@ -339,7 +339,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                         'generate' AS action,
                         gj.created_at
                      FROM generation_jobs gj
-                     LEFT JOIN teacher_profiles tp ON tp.workspace_id = gj.workspace_id AND tp.clerk_user_id = gj.clerk_user_id
+                     LEFT JOIN teachers tp ON tp.workspace_id = gj.workspace_id
                      WHERE gj.workspace_id = $1 AND gj.status = 'done'
                      ORDER BY gj.created_at DESC
                      LIMIT 20`,
