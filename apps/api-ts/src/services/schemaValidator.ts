@@ -9,33 +9,29 @@ addFormats(ajv);
 const domainsPath = path.join(process.cwd(), '../../packages/contracts/domain');
 
 function loadSchema(filename: string) {
-    try {
-        const schemaPath = path.join(domainsPath, filename);
-        if (fs.existsSync(schemaPath)) {
-            const schemaContent = fs.readFileSync(schemaPath, 'utf8');
-            return JSON.parse(schemaContent);
-        }
-        return null;
-    } catch (err) {
-        console.warn(`Could not load schema ${filename}`, err);
-        return null;
+    const schemaPath = path.join(domainsPath, filename);
+    if (fs.existsSync(schemaPath)) {
+        const schemaContent = fs.readFileSync(schemaPath, 'utf8');
+        return JSON.parse(schemaContent);
     }
+    // PR-A6: Mandatory Enforcement
+    const err = new Error(`Mandatory schema file missing: ${filename} at ${schemaPath}`);
+    console.error(`CRITICAL: ${err.message}`);
+    throw err;
 }
 
 const documentModuleSchema = loadSchema('document_module.schema.json');
 const artifactMetadataSchema = loadSchema('artifact_metadata.schema.json');
 
-const validateDocumentModule = documentModuleSchema ? ajv.compile(documentModuleSchema) : null;
-const validateArtifactMetadata = artifactMetadataSchema ? ajv.compile(artifactMetadataSchema) : null;
+const validateDocumentModule = ajv.compile(documentModuleSchema);
+const validateArtifactMetadata = ajv.compile(artifactMetadataSchema);
 
 export function validateDocumentModuleJson(data: any): { valid: boolean; errors?: ErrorObject[] } {
-    if (!validateDocumentModule) return { valid: true }; // Skip if schema not found
     const valid = validateDocumentModule(data);
     return { valid: valid as boolean, errors: validateDocumentModule.errors || undefined };
 }
 
 export function validateArtifactMetadataJson(data: any): { valid: boolean; errors?: ErrorObject[] } {
-    if (!validateArtifactMetadata) return { valid: true }; // Skip if schema not found
     const valid = validateArtifactMetadata(data);
     return { valid: valid as boolean, errors: validateArtifactMetadata.errors || undefined };
 }
