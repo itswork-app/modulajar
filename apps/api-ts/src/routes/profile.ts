@@ -31,10 +31,10 @@ export default async function profileRoutes(fastify: FastifyInstance) {
                     type: 'object',
                     required: ['full_name', 'primary_subject'],
                     properties: {
-                        full_name: { type: 'string', minLength: 2 },
-                        primary_subject: { type: 'string', minLength: 1 },
+                        full_name: { type: 'string', minLength: 1 },
+                        primary_subject: { type: 'string' },
                         primary_grade: { type: 'integer', minimum: 1, maximum: 12, default: 4 },
-                        nip: { type: 'string', nullable: true }
+                        nip: { type: ['string', 'null'] }
                     }
                 }
             }
