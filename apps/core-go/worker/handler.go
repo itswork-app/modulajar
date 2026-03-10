@@ -48,7 +48,7 @@ func NewHandler(w *Worker) http.HandlerFunc {
 		}
 
 		// Construct payload from Metadata
-		payload, err := jobToPayload(job)
+		payload, err := w.jobToPayload(job)
 		if err != nil {
 			baseLogger.Error("Invalid metadata", "job_id", job.ID, "error", err)
 			w.Deps.JobStore.MarkJobFailed(ctx, payload.WorkspaceID, job.ID, "invalid metadata", job.AttemptCount)

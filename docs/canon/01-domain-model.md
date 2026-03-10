@@ -67,7 +67,8 @@ To solve implicit coupling between the Go background workers, TypeScript APIs, a
 
 - **API Request Phase:**
   - Fastify JSON Schema validates request models natively.
-  - Before writing patches to `document_versions`, the payload is filtered through `DocumentModuleJSON` schema. Invalid inputs return HTTP 400.
+  - Before writing patches to `document_versions`, the payload is filtered through `DocumentModuleJSON` schema. **Validation is mandatory;** if the schema cannot be loaded or validation fails, the request returns HTTP 400 or HTTP 500 depending on the failure type.
   
 - **Worker Execution Phase:**
-  - Polled jobs are coerced into a `TaskPayload` struct only *after* parsing the record `metadata` column against `generation_job.schema.json`. Invalid metadata fails the job locally to prevent panic or poisoning the worker run loop.
+  - Polled jobs are coerced into a `TaskPayload` struct only after parsing the record `metadata` column against `generation_job.schema.json`. 
+  - **Mandatory Enforcement:** The worker will now explicitly fail a job if the schema cannot be loaded or if validation fails. This ensures no malformed jobs poison the processing pipeline.

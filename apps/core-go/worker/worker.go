@@ -696,12 +696,25 @@ No markdown formatting. Pure JSON.`,
 						"generated_at":   time.Now().Format(time.RFC3339),
 					}
 
-					w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, map[string]interface{}{
+					// PR-A6: Validate Artifact Metadata before persistence
+					artifactMeta := map[string]interface{}{
 						"pdf_sha256":   rd.PDFHash,
 						"pdf_path":     rd.FilePath,
 						"generated_at": time.Now().Format(time.RFC3339),
-					})
+					}
+					if aiReceipt != nil {
+						artifactMeta["ai_config"] = aiReceipt
+						if m, ok := aiReceipt["model"].(string); ok {
+							artifactMeta["model"] = m
+						}
+					}
 
+					if err := w.validateMetadata(artifactMeta, "artifact_metadata.schema.json"); err != nil {
+						logger.Error("Artifact metadata validation failed", "error", err)
+						return failResult(fmt.Sprintf("artifact metadata validation failed: %v", err)), nil
+					}
+
+					w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, artifactMeta)
 					w.Deps.JobStore.UpdateDocumentStatus(ctx, payload.WorkspaceID, rd.DID, "done")
 				}
 				break
@@ -732,32 +745,62 @@ No markdown formatting. Pure JSON.`,
 }
 
 // Helpers
-func jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
-	b, err := json.Marshal(job.Metadata)
-	if err != nil {
-		return TaskPayload{}, err
+func (w *Worker) compileSchema(schemaName string) (*jsonschema.Schema, error) {
+	candidates := []string{
+		filepath.Join("..", "..", "packages", "contracts", "domain", schemaName),       // from apps/core-go
+		filepath.Join("..", "..", "..", "packages", "contracts", "domain", schemaName), // from apps/core-go/worker
+		filepath.Join("packages", "contracts", "domain", schemaName),                   // from root
 	}
 
-	// Schema validation
-	// Assumes contracts/domain/generation_job.schema.json is available via relative or absolute path
-	// In production, might be better to embed it, but here we construct path dynamically
-	schemaPath := filepath.Join("..", "..", "packages", "contracts", "domain", "generation_job.schema.json")
-	if _, errStat := os.Stat(schemaPath); os.IsNotExist(errStat) {
-		// Try one level up (if running from core-go root)
-		schemaPath = filepath.Join("..", "packages", "contracts", "domain", "generation_job.schema.json")
+	var schemaPath string
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			schemaPath = c
+			break
+		}
+	}
+
+	if schemaPath == "" {
+		return nil, fmt.Errorf("mandatory schema %s not found in any expected location", schemaName)
 	}
 
 	sch, err := jsonschema.Compile(schemaPath)
 	if err != nil {
-		// Log but don't fail parsing if schema file is missing in some environments
-		slog.Warn("Could not load job schema for validation", "error", err)
-	} else {
-		var v interface{}
-		if err := json.Unmarshal(b, &v); err == nil {
-			if err := sch.Validate(v); err != nil {
-				return TaskPayload{}, fmt.Errorf("metadata validation failed: %v", err)
-			}
-		}
+		return nil, fmt.Errorf("mandatory schema %s invalid at %s: %w", schemaName, schemaPath, err)
+	}
+	return sch, nil
+}
+
+func (w *Worker) validateMetadata(metadata map[string]interface{}, schemaName string) error {
+	b, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("metadata marshal failed: %w", err)
+	}
+
+	sch, err := w.compileSchema(schemaName)
+	if err != nil {
+		return err
+	}
+
+	var v interface{}
+	if err := json.Unmarshal(b, &v); err != nil {
+		return fmt.Errorf("metadata unmarshal for validation failed: %w", err)
+	}
+	if err := sch.Validate(v); err != nil {
+		return fmt.Errorf("validation against %s failed: %v", schemaName, err)
+	}
+	return nil
+}
+
+func (w *Worker) jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
+	// PR-A6: Mandatory Schema Validation
+	if err := w.validateMetadata(job.Metadata, "generation_job.schema.json"); err != nil {
+		return TaskPayload{}, err
+	}
+
+	b, err := json.Marshal(job.Metadata)
+	if err != nil {
+		return TaskPayload{}, err
 	}
 
 	var p TaskPayload

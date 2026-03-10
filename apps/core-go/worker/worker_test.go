@@ -457,12 +457,13 @@ func TestResolveTemplateDir(t *testing.T) {
 }
 
 func TestJobToPayload_Error(t *testing.T) {
+	worker := &Worker{}
 	job := &db.GenerationJob{
 		Metadata: map[string]interface{}{
 			"semester": make(chan int), // JSON marshal error
 		},
 	}
-	_, err := jobToPayload(job)
+	_, err := worker.jobToPayload(job)
 	if err == nil {
 		t.Error("expected error for unmarshalable metadata")
 	}
@@ -474,12 +475,12 @@ func TestJobToPayload_Error(t *testing.T) {
 		},
 	}
 	// This might fail if JSON unmarshal to struct fails due to type mismatch
-	_, err = jobToPayload(job2)
+	_, err = worker.jobToPayload(job2)
 	if err == nil {
 		// Wait, json unmashal int to string fails? No, usually not.
 		// Let's use a nested struct that doesn't match
 		job2.Metadata["semester"] = map[string]string{"foo": "bar"}
-		_, err = jobToPayload(job2)
+		_, err = worker.jobToPayload(job2)
 		if err == nil {
 			t.Error("expected error for type mismatch")
 		}
