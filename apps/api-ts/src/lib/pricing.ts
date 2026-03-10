@@ -28,6 +28,16 @@ export const PRICING_TABLE: PricingTier[] = [
 export const SD_FULL_SEMESTER_COST = 5;
 
 /**
+ * Administration bundle document costs (in credits).
+ */
+export const ATP_COST = 1;
+export const PROTA_COST = 1;
+export const PROMES_COST = 1;
+/** Per-topic modul ajar cost within a bundle — reuses SD_FULL_SEMESTER_COST. */
+export const BUNDLE_MODUL_COST = SD_FULL_SEMESTER_COST;
+
+
+/**
  * Look up credits for an IDR amount.
  * Returns the matching tier or null if no exact match.
  */

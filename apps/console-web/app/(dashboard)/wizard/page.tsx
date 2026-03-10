@@ -283,6 +283,13 @@ export default function WizardV2Page() {
                             <Sparkles className="w-4 h-4" />
                             Rencana Semester AI
                         </button>
+                        <button
+                            onClick={() => router.push('/wizard/bundle')}
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-violet-600 font-bold hover:text-violet-800 hover:bg-violet-50/50 transition-all cursor-pointer border border-transparent hover:border-violet-100"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            Administrasi Lengkap
+                        </button>
                     </div>
                 </div>
             )}
