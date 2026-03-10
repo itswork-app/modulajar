@@ -46,13 +46,13 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                     required: ['school_display_name'],
                     properties: {
                         school_display_name: { type: 'string', minLength: 3 },
-                        kab_kota: { type: 'string', nullable: true },
-                        provinsi: { type: 'string', nullable: true },
-                        alamat: { type: 'string', nullable: true },
-                        school_npsn: { type: 'string', nullable: true, pattern: '^[0-9]{8}$' },
-                        principal_name: { type: 'string', nullable: true },
-                        principal_nip: { type: 'string', nullable: true },
-                        signature_location: { type: 'string', nullable: true }
+                        kab_kota: { type: ['string', 'null'] },
+                        provinsi: { type: ['string', 'null'] },
+                        alamat: { type: ['string', 'null'] },
+                        school_npsn: { type: ['string', 'null'], pattern: '^([0-9]{8})?$' },
+                        principal_name: { type: ['string', 'null'] },
+                        principal_nip: { type: ['string', 'null'] },
+                        signature_location: { type: ['string', 'null'] }
                     }
                 }
             }
