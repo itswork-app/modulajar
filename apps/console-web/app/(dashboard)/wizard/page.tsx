@@ -8,6 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, Che
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
+import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -60,6 +61,8 @@ export default function WizardV2Page() {
     const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
     const [formData, setFormData] = useState({
+        jenjang: 'SD' as Jenjang,
+        kelas: '4',
         mapel: '',
         semester: '1',
         tema: '',
@@ -106,8 +109,18 @@ export default function WizardV2Page() {
                 const draft = localStorage.getItem('wizard_draft');
                 if (draft) {
                     setFormData(JSON.parse(draft));
-                } else if (pData.primary_subject) {
-                    setFormData(prev => ({ ...prev, mapel: pData.primary_subject! }));
+                } else if (pData) {
+                    const grade = pData.primary_grade ?? 4;
+                    let jenjang: Jenjang = 'SD';
+                    if (grade >= 10) jenjang = 'SMA';
+                    else if (grade >= 7) jenjang = 'SMP';
+
+                    setFormData(prev => ({
+                        ...prev,
+                        jenjang,
+                        kelas: grade.toString(),
+                        mapel: pData.primary_subject || ''
+                    }));
                 }
 
                 if (isMounted) setIsLoadingData(false);
@@ -146,7 +159,7 @@ export default function WizardV2Page() {
                 body: JSON.stringify({
                     mode: 'wizard',
                     subject: formData.mapel,
-                    grade: teacherProfile?.primary_grade ?? 4,
+                    grade: parseInt(formData.kelas, 10),
                     topic: formData.tema || formData.topik,
                     semester: formData.semester,
                     notes: formData.catatan || undefined,
@@ -281,7 +294,7 @@ export default function WizardV2Page() {
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Kelas</div>
-                                        <div className="font-bold text-slate-800">{teacherProfile?.primary_grade ? `Kelas ${teacherProfile.primary_grade}` : '—'}</div>
+                                        <div className="font-bold text-slate-800">{formData.semester && formData.kelas ? <span className="font-bold text-slate-900 text-right">Sem {formData.semester} — Kelas {formData.kelas}</span> : '—'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -349,18 +362,34 @@ export default function WizardV2Page() {
                         <div className="space-y-8">
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-3">
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Jenjang</label>
-                                    <div className="px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-500 flex justify-between items-center cursor-not-allowed">
-                                        <span className="font-bold">SD</span>
-                                        <span className="text-[9px] font-black bg-slate-200 px-2 py-0.5 rounded text-slate-600 uppercase tracking-tighter">Locked v1</span>
-                                    </div>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Jenjang <span className="text-emerald-500">*</span></label>
+                                    <select
+                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        value={formData.jenjang}
+                                        onChange={(e) => {
+                                            const newJenjang = e.target.value as Jenjang;
+                                            const newKelas = KELAS_OPTIONS[newJenjang][0].toString();
+                                            handleChange('jenjang', newJenjang);
+                                            handleChange('kelas', newKelas);
+                                            handleChange('mapel', ''); // reset mapel
+                                        }}
+                                    >
+                                        {JENJANG_OPTIONS.map(j => (
+                                            <option key={j} value={j}>{j}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="space-y-3">
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Fase / Kelas</label>
-                                    <div className="px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-500 flex justify-between items-center cursor-not-allowed">
-                                        <span className="font-bold">Fase B (Kelas {teacherProfile?.primary_grade ?? 4})</span>
-                                        <span className="text-[9px] font-black bg-emerald-100 px-2 py-0.5 rounded text-emerald-600 uppercase tracking-tighter">Profil</span>
-                                    </div>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Fase / Kelas <span className="text-emerald-500">*</span></label>
+                                    <select
+                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        value={formData.kelas}
+                                        onChange={(e) => handleChange('kelas', e.target.value)}
+                                    >
+                                        {KELAS_OPTIONS[formData.jenjang as Jenjang]?.map(k => (
+                                            <option key={k} value={k.toString()}>Kelas {k}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -372,9 +401,13 @@ export default function WizardV2Page() {
                                     onChange={(e) => handleChange('mapel', e.target.value)}
                                 >
                                     <option value="" disabled>Pilih Mata Pelajaran</option>
-                                    {['Matematika', 'Bahasa Indonesia', 'Bahasa Inggris', 'IPAS', 'PPKn', 'PJOK', 'Seni Budaya'].map(m => (
+                                    {MAPEL_OPTIONS[formData.jenjang as Jenjang]?.map(m => (
                                         <option key={m} value={m}>{m}</option>
                                     ))}
+                                    {/* Enable rendering custom/old mapel if it's not in the list but stored in draft/profile */}
+                                    {formData.mapel && !MAPEL_OPTIONS[formData.jenjang as Jenjang]?.includes(formData.mapel) && (
+                                        <option value={formData.mapel}>{formData.mapel}</option>
+                                    )}
                                 </select>
                             </div>
 

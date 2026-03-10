@@ -8,6 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Layers, School, U
 import { cn } from '@/lib/utils';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
 import Link from 'next/link';
+import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -52,6 +53,8 @@ export default function BatchWizardPage() {
     const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
     const [contextData, setContextData] = useState({
+        jenjang: 'SD' as Jenjang,
+        kelas: '4',
         mapel: '',
         semester: '1',
     });
@@ -98,8 +101,18 @@ export default function BatchWizardPage() {
                     setUsageSummary(uData);
                 }
 
-                if (pData.primary_subject) {
-                    setContextData(prev => ({ ...prev, mapel: pData.primary_subject || '' }));
+                if (pData) {
+                    const grade = pData.primary_grade ?? 4;
+                    let jenjang: Jenjang = 'SD';
+                    if (grade >= 10) jenjang = 'SMA';
+                    else if (grade >= 7) jenjang = 'SMP';
+
+                    setContextData(prev => ({
+                        ...prev,
+                        jenjang,
+                        kelas: grade.toString(),
+                        mapel: pData.primary_subject || ''
+                    }));
                 }
 
                 setIsLoadingData(false);
@@ -163,7 +176,7 @@ export default function BatchWizardPage() {
                     body: JSON.stringify({
                         mode: 'wizard',
                         subject: contextData.mapel,
-                        grade: teacherProfile?.primary_grade ?? 4,
+                        grade: parseInt(contextData.kelas, 10),
                         topic: topic,
                         semester: contextData.semester,
                     }),
@@ -298,24 +311,55 @@ export default function BatchWizardPage() {
                                 <div className="font-bold text-slate-800">{teacherProfile?.full_name || user?.fullName}</div>
                                 <div className="text-sm text-slate-500">{schoolIdentity?.school_display_name}</div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fase / Kelas</div>
-                                <div className="font-black text-2xl text-emerald-600 border border-emerald-200 bg-emerald-100 px-4 py-1 rounded-xl">
-                                    {teacherProfile?.primary_grade ?? 4}
-                                </div>
-                            </div>
                         </div>
 
                         <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-slate-900 ml-1">Jenjang <span className="text-emerald-500">*</span></label>
+                                    <select
+                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        value={contextData.jenjang}
+                                        onChange={(e) => {
+                                            const newJenjang = e.target.value as Jenjang;
+                                            const newKelas = KELAS_OPTIONS[newJenjang][0].toString();
+                                            setContextData(prev => ({ ...prev, jenjang: newJenjang, kelas: newKelas, mapel: '' }));
+                                        }}
+                                    >
+                                        {JENJANG_OPTIONS.map(j => (
+                                            <option key={j} value={j}>{j}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-slate-900 ml-1">Fase / Kelas <span className="text-emerald-500">*</span></label>
+                                    <select
+                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        value={contextData.kelas}
+                                        onChange={(e) => setContextData({ ...contextData, kelas: e.target.value })}
+                                    >
+                                        {KELAS_OPTIONS[contextData.jenjang as Jenjang]?.map(k => (
+                                            <option key={k} value={k.toString()}>Kelas {k}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-slate-900 ml-1">Mata Pelajaran</label>
-                                <input
-                                    type="text"
+                                <label className="text-sm font-bold text-slate-900 ml-1">Mata Pelajaran <span className="text-emerald-500">*</span></label>
+                                <select
+                                    className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
                                     value={contextData.mapel}
                                     onChange={(e) => setContextData({ ...contextData, mapel: e.target.value })}
-                                    className="w-full bg-slate-50 border-slate-200 rounded-2xl px-5 py-4 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500 transition-colors font-medium"
-                                    placeholder="Contoh: Ilmu Pengetahuan Alam dan Sosial (IPAS)"
-                                />
+                                >
+                                    <option value="" disabled>Pilih Mata Pelajaran</option>
+                                    {MAPEL_OPTIONS[contextData.jenjang as Jenjang]?.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                    {contextData.mapel && !MAPEL_OPTIONS[contextData.jenjang as Jenjang]?.includes(contextData.mapel) && (
+                                        <option value={contextData.mapel}>{contextData.mapel}</option>
+                                    )}
+                                </select>
                             </div>
                             <div className="space-y-3">
                                 <label className="text-sm font-bold text-slate-900 ml-1 flex justify-between">
@@ -437,7 +481,7 @@ export default function BatchWizardPage() {
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-400 font-medium">Semester / Kelas</span>
-                                    <span className="font-bold text-slate-900 text-right">Sem {contextData.semester} — Kelas {teacherProfile?.primary_grade}</span>
+                                    <span className="font-bold text-slate-900 text-right">Sem {contextData.semester} — Kelas {contextData.kelas}</span>
                                 </div>
                             </div>
 
