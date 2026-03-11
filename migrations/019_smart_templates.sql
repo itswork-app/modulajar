@@ -1,6 +1,7 @@
 -- Migration: 019_smart_templates
 -- Description: Adds Smart Template System tables and relates them to generation jobs
 
+-- +goose Up
 -- document_templates: stores layout structure and metadata
 CREATE TABLE document_templates (
     id CHAR(26) PRIMARY KEY,
@@ -28,3 +29,8 @@ CREATE TABLE workspace_default_templates (
 -- Add template_id to generation_jobs to track which template was used for the job
 ALTER TABLE generation_jobs 
 ADD COLUMN template_id CHAR(26) REFERENCES document_templates(id);
+
+-- +goose Down
+ALTER TABLE generation_jobs DROP COLUMN IF EXISTS template_id;
+DROP TABLE IF EXISTS workspace_default_templates;
+DROP TABLE IF EXISTS document_templates;

@@ -386,3 +386,230 @@ test('Workspace Identity (PR-033)', async (t) => {
         await fastify.close();
     });
 });
+
+// ═══════════════════════════════════════════
+// POST /w/:workspaceId/verify-school (PR-056)
+// ═══════════════════════════════════════════
+test('POST /w/:workspaceId/verify-school', async (t) => {
+
+    await t.test('returns 404 when NPSN not found', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                // Auth/Guard mocks
+                if (sql.includes('FROM workspace_members')) return { rowCount: 1, rows: [{}] };
+                // School lookup
+                if (sql.includes('FROM schools_reference')) return { rowCount: 0, rows: [] };
+                return { rowCount: 0, rows: [] };
+            },
+            connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(workspaceRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/verify-school`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { npsn: '12345678' }
+        });
+
+        t.equal(res.statusCode, 404, 'returns 404 for unknown NPSN');
+        await fastify.close();
+    });
+
+    await t.test('returns 200 and updates properties when NPSN found', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                if (sql.includes('FROM workspace_members')) return { rowCount: 1, rows: [{}] };
+                if (sql.includes('FROM schools_reference')) return {
+                    rowCount: 1,
+                    rows: [{ nama_resmi: 'SD TEST', kab_kota: 'KOTA X', provinsi: 'PROV Y', alamat: 'ALAMAT Z' }]
+                };
+                if (sql.includes('INSERT INTO workspace_settings')) return { rowCount: 1, rows: [] };
+                if (sql.includes('UPDATE workspaces SET is_verified = true')) return { rowCount: 1, rows: [] };
+                return { rowCount: 0, rows: [] };
+            },
+            connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(workspaceRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/verify-school`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { npsn: '12345678' }
+        });
+
+        t.equal(res.statusCode, 200, 'returns 200 for successful verification');
+        t.equal(res.json().verified, true);
+        t.equal(res.json().school_display_name, 'SD TEST');
+        await fastify.close();
+    });
+});
+
+// ═══════════════════════════════════════════
+// GET /w/:workspaceId/usage-summary (PR-057)
+// ═══════════════════════════════════════════
+test('GET /w/:workspaceId/usage-summary', async (t) => {
+    t.test('returns correct summary', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                if (sql.includes('FROM workspace_members')) return { rowCount: 1, rows: [{}] };
+                // getBalance (wallet_ledger)
+                if (sql.includes('wallet_ledger')) return { rowCount: 1, rows: [{ balance: 125 }] };
+                // documents_generated (status = 'done')
+                if (sql.includes('FROM generation_jobs') && sql.includes("status = 'done'")) return { rowCount: 1, rows: [{ count: '10' }] };
+                // jobs_failed (status = 'failed')
+                if (sql.includes('FROM generation_jobs') && sql.includes("status = 'failed'")) return { rowCount: 1, rows: [{ count: '3' }] };
+                // recent_jobs (ORDER BY created_at DESC)
+                if (sql.includes('FROM generation_jobs') && sql.includes('ORDER BY created_at DESC')) {
+                    return {
+                        rowCount: 1,
+                        rows: [{
+                            generation_id: 'gen-1',
+                            subject: 'IPA',
+                            semester: '1',
+                            status: 'done',
+                            created_at: new Date().toISOString()
+                        }]
+                    };
+                }
+                return { rowCount: 0, rows: [] };
+            },
+            connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(workspaceRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/usage-summary`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 200);
+        const body = res.json();
+        t.equal(body.credits_remaining, 125);
+        t.equal(body.documents_generated, 10);
+        t.equal(body.jobs_failed, 3);
+        t.ok(Array.isArray(body.recent_jobs));
+        t.equal(body.recent_jobs[0]?.subject, 'IPA');
+        await fastify.close();
+    });
+});
+
+// ═══════════════════════════════════════════
+// GET /w/:workspaceId/admin/dashboard (PR-C13)
+// ═══════════════════════════════════════════
+test('GET /w/:workspaceId/admin/dashboard', async (t) => {
+    await t.test('returns 403 for non-admins', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                if (sql.includes('FROM workspace_members')) {
+                    // First call is guard, second is role check
+                    // Actually guard check is done once.
+                    // But admin/dashboard has its own role check at the top.
+                    return { rowCount: 1, rows: [{ role: 'member' }] };
+                }
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(workspaceRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/admin/dashboard`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+        t.equal(res.statusCode, 403, 'Forbidden for non-admin');
+        await fastify.close();
+    });
+
+    await t.test('returns dashboard for admins', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string, params: any[]) => {
+                // Role check
+                if (sql.includes('SELECT role FROM workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+
+                // 1. Teacher counter
+                if (sql.includes('SELECT COUNT(*) AS count FROM workspace_members')) return { rowCount: 1, rows: [{ count: '15' }] };
+
+                // 2. Total modules
+                if (sql.includes('SELECT COUNT(*) AS count FROM generation_jobs') && sql.includes("status = 'done'")) return { rowCount: 1, rows: [{ count: '100' }] };
+
+                // 3. Month modules (using CURRENT_DATE or similar in real SQL, we just match common patterns)
+                if (sql.includes('created_at >=') && sql.includes('generation_jobs')) return { rowCount: 1, rows: [{ count: '20' }] };
+
+                // 4. Wallet stats (balance, total_in)
+                if (sql.includes('wallet_ledger')) {
+                    return {
+                        rowCount: 1,
+                        rows: [{
+                            credits_in: '500',
+                            credits_out: '250',
+                            credits_this_month: '50'
+                        }]
+                    };
+                }
+
+                // 5. Teacher activity stats
+                if (sql.includes('GROUP BY clerk_user_id')) {
+                    return { rowCount: 1, rows: [{ name: 'Chef', subject: 'IPA', modules_generated: '5', last_activity: new Date(), credits_used: '10' }] };
+                }
+
+                // 6. Activity feed
+                if (sql.includes('JOIN packages p')) {
+                    return {
+                        rowCount: 1,
+                        rows: [{
+                            teacher_name: 'Chef',
+                            subject: 'IPA',
+                            grade: '4',
+                            action: 'generate',
+                            created_at: new Date()
+                        }]
+                    };
+                }
+
+                // Default handle for guard or others
+                if (sql.includes('FROM workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+
+                return { rowCount: 0, rows: [] };
+            },
+            connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(workspaceRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/admin/dashboard`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+
+        t.equal(res.statusCode, 200, 'returns 200 for admin');
+        const body = res.json();
+        t.equal(body.overview.total_teachers, 15);
+        t.equal(body.overview.total_modules, 100);
+        t.equal(body.overview.credits_remaining, 250);
+        t.ok(Array.isArray(body.teachers));
+        await fastify.close();
+    });
+});

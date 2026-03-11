@@ -50,6 +50,12 @@ interface UsageSummary {
     documents_generated: number;
 }
 
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
+}
+
 const STEPS: { key: WizardStep; label: string }[] = [
     { key: 'IDENTITAS', label: '1. Identitas' },
     { key: 'TARGET', label: '2. Target' },
@@ -73,7 +79,7 @@ export default function WizardV2Page() {
     const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
     const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
 
-    const [templates, setTemplates] = useState<any[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     const [formData, setFormData] = useState({

@@ -474,6 +474,7 @@ No markdown formatting. Pure JSON.`,
 					"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
 					"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
 					"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+					"ALL_SECTIONS":       func() string { return "(All Sections Placeholder)" },
 					"KOP_SURAT":          func() string { return "" },
 				}
 

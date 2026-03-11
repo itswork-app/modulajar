@@ -441,3 +441,494 @@ test('Rate limiting', async (t) => {
         await fastify.close();
     });
 });
+
+// ═══════════════════════════════════════════
+// NEW CRUD ENDPOINTS TESTS (PR-C15)
+// ═══════════════════════════════════════════
+
+test('GET /w/:workspaceId/templates', async (t) => {
+    const fastify = buildApp();
+
+    // We override the db at the prototype or just replace the property if needed,
+    // but fastify.decorate was already called. 
+    // Wait, let's just create a custom buildApp for CRUD tests to avoid decorate collision:
+    const fastifyCrud = Fastify();
+    fastifyCrud.decorate('db', {
+        query: async (sql: string, values: any[]) => {
+            if (sql.includes('SELECT 1 FROM workspace_members')) {
+                return { rowCount: 1, rows: [] };
+            }
+            if (sql.includes('SELECT id, workspace_id, name')) {
+                return { rowCount: 1, rows: [{ id: 'tmpl-001', name: 'My Template' }] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastifyCrud.register(mockAuthPlugin);
+    fastifyCrud.register(workspaceGuardPlugin);
+    fastifyCrud.register(templateRoutes);
+
+    await fastifyCrud.ready();
+
+    const res = await fastifyCrud.inject({
+        method: 'GET',
+        url: `/w/${WORKSPACE_ID}/templates?document_type=modul_ajar`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+    });
+
+    t.equal(res.statusCode, 200);
+    t.ok(Array.isArray(res.json().templates));
+    t.equal(res.json().templates[0].name, 'My Template');
+
+    await fastifyCrud.close();
+});
+
+test('POST /w/:workspaceId/templates', async (t) => {
+    const fastifyCrud = Fastify();
+    fastifyCrud.decorate('db', {
+        query: async (sql: string, values: any[]) => {
+            if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+            if (sql.includes('INSERT INTO document_templates')) {
+                return { rowCount: 1, rows: [{ id: 'tpl_123' }] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastifyCrud.register(mockAuthPlugin);
+    fastifyCrud.register(workspaceGuardPlugin);
+    fastifyCrud.register(templateRoutes);
+    await fastifyCrud.ready();
+
+    const res = await fastifyCrud.inject({
+        method: 'POST',
+        url: `/w/${WORKSPACE_ID}/templates`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+        payload: {
+            name: 'New Template',
+            document_type: 'modul_ajar',
+            layout_definition: { sections: [] }
+        }
+    });
+
+    t.equal(res.statusCode, 201);
+    t.ok(res.json().id);
+
+    await fastifyCrud.close();
+});
+
+test('PUT /w/:workspaceId/templates/:id', async (t) => {
+    const fastifyCrud = Fastify();
+    fastifyCrud.decorate('db', {
+        query: async (sql: string, values: any[]) => {
+            if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+            if (sql.includes('SELECT id FROM document_templates')) {
+                return { rowCount: 1, rows: [{ id: 'tpl_123' }] };
+            }
+            if (sql.includes('UPDATE document_templates')) {
+                return { rowCount: 1, rows: [{ id: 'tpl_123' }] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastifyCrud.register(mockAuthPlugin);
+    fastifyCrud.register(workspaceGuardPlugin);
+    fastifyCrud.register(templateRoutes);
+    await fastifyCrud.ready();
+
+    const res = await fastifyCrud.inject({
+        method: 'PUT',
+        url: `/w/${WORKSPACE_ID}/templates/tpl_123`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+        payload: {
+            name: 'Updated Template',
+            description: 'Updated description',
+            layout_definition: { sections: [{ id: 'A', enabled: true }] }
+        }
+    });
+
+    t.equal(res.statusCode, 200);
+
+    await fastifyCrud.close();
+});
+
+test('GET /w/:workspaceId/templates/default', async (t) => {
+    const fastifyCrud = Fastify();
+    fastifyCrud.decorate('db', {
+        query: async (sql: string, values: any[]) => {
+            if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+            if (sql.includes('SELECT document_type, template_id')) {
+                return { rowCount: 1, rows: [{ document_type: 'modul_ajar', template_id: 'default_123' }] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastifyCrud.register(mockAuthPlugin);
+    fastifyCrud.register(workspaceGuardPlugin);
+    fastifyCrud.register(templateRoutes);
+    await fastifyCrud.ready();
+
+    const res = await fastifyCrud.inject({
+        method: 'GET',
+        url: `/w/${WORKSPACE_ID}/templates/default?document_type=modul_ajar`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+    });
+
+    t.equal(res.statusCode, 200);
+    t.equal(res.json().defaults[0].template_id, 'default_123');
+    await fastifyCrud.close();
+
+    // test empty defaults
+    const fastify404 = Fastify();
+    fastify404.decorate('db', {
+        query: async (sql: string) => {
+            if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastify404.register(mockAuthPlugin);
+    fastify404.register(workspaceGuardPlugin);
+    fastify404.register(templateRoutes);
+    await fastify404.ready();
+
+    const res404 = await fastify404.inject({
+        method: 'GET',
+        url: `/w/${WORKSPACE_ID}/templates/default?document_type=modul_ajar`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+    });
+    t.equal(res404.statusCode, 200);
+    t.same(res404.json().defaults, []);
+    await fastify404.close();
+});
+
+test('POST /w/:workspaceId/templates/default', async (t) => {
+    const fastifyCrud = Fastify();
+    fastifyCrud.decorate('db', {
+        query: async (sql: string, values: any[]) => {
+            if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+            if (sql.includes('SELECT id FROM document_templates')) {
+                return { rowCount: 1, rows: [{ id: 'tpl_999' }] };
+            }
+            if (sql.includes('INSERT INTO workspace_default_templates')) {
+                return { rowCount: 1, rows: [] };
+            }
+            return { rowCount: 0, rows: [] };
+        },
+        connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
+        totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { }
+    } as any);
+    fastifyCrud.register(mockAuthPlugin);
+    fastifyCrud.register(workspaceGuardPlugin);
+    fastifyCrud.register(templateRoutes);
+    await fastifyCrud.ready();
+
+    const res = await fastifyCrud.inject({
+        method: 'POST',
+        url: `/w/${WORKSPACE_ID}/templates/default`,
+        headers: { Authorization: `Bearer ${USER_ID}` },
+        payload: {
+            document_type: 'modul_ajar',
+            template_id: 'tpl_999'
+        }
+    });
+
+    t.equal(res.statusCode, 200);
+
+    await fastifyCrud.close();
+});
+
+test('Templates Branch Coverage — Admin Checks & Error Cases', async (t) => {
+
+    await t.test('POST /w/:workspaceId/templates — returns 403 for non-admin', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'member' }] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/templates`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { name: 'Test', document_type: 'atp', layout_definition: { sections: [] } }
+        });
+        t.equal(res.statusCode, 403);
+        await fastify.close();
+    });
+
+    await t.test('PUT /w/:workspaceId/templates/:id — returns 404 for missing template', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT id FROM document_templates')) return { rowCount: 0, rows: [] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PUT',
+            url: `/w/${WORKSPACE_ID}/templates/tpl_missing`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { name: 'Update', layout_definition: { sections: [] } }
+        });
+        t.equal(res.statusCode, 404);
+        await fastify.close();
+    });
+
+    await t.test('POST /w/:workspaceId/templates/default — returns 400 for invalid template_id', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'owner' }] };
+                if (sql.includes('SELECT id FROM document_templates')) return { rowCount: 0, rows: [] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/templates/default`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { document_type: 'modul_ajar', template_id: 'bad_id' }
+        });
+        t.equal(res.statusCode, 400);
+        await fastify.close();
+    });
+
+    await t.test('POST /w/:workspaceId/templates — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                throw new Error('Database disconnected');
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/templates`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { name: 'Test', document_type: 'atp', layout_definition: { sections: [] } }
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('PUT /w/:workspaceId/templates/:id — returns 403 for non-admin', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'member' }] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PUT',
+            url: `/w/${WORKSPACE_ID}/templates/tpl_123`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { name: 'Update', layout_definition: { sections: [] } }
+        });
+        t.equal(res.statusCode, 403);
+        await fastify.close();
+    });
+
+    await t.test('PUT /w/:workspaceId/templates/:id — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT id FROM document_templates')) return { rowCount: 1, rows: [{ id: 'tpl_123' }] };
+                if (sql.includes('UPDATE document_templates')) throw new Error('Update failed');
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'PUT',
+            url: `/w/${WORKSPACE_ID}/templates/tpl_123`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { name: 'Update', layout_definition: { sections: [] } }
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('GET /templates/recommended — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT')) throw new Error('Query failed');
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/templates/recommended?subject=matematika&grade=4`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            remoteAddress: '127.0.0.99' // Unique IP to avoid 429
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('GET /w/:workspaceId/templates — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT id, workspace_id')) throw new Error('Fetch failed');
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/templates`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('POST /w/:workspaceId/templates/default — returns 403 for non-admin', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'member' }] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/templates/default`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { document_type: 'atp', template_id: 'tpl_123' }
+        });
+        t.equal(res.statusCode, 403);
+        await fastify.close();
+    });
+
+    await t.test('POST /w/:workspaceId/templates/default — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT id FROM document_templates')) return { rowCount: 1, rows: [{ id: 'tpl_123' }] };
+                if (sql.includes('INSERT INTO workspace_default_templates')) throw new Error('Insert failed');
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'POST',
+            url: `/w/${WORKSPACE_ID}/templates/default`,
+            headers: { Authorization: `Bearer ${USER_ID}` },
+            payload: { document_type: 'atp', template_id: 'tpl_123' }
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('GET /w/:workspaceId/templates/default — returns 500 on db error', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
+                if (sql.includes('SELECT document_type, template_id')) throw new Error('Fetch default failed');
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/${WORKSPACE_ID}/templates/default`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+        t.equal(res.statusCode, 500);
+        await fastify.close();
+    });
+
+    await t.test('Workspace Guard — returns 403 for non-member', async (t) => {
+        const fastify = Fastify();
+        fastify.decorate('db', {
+            query: async (sql: string) => {
+                if (sql.includes('workspace_members')) return { rowCount: 0, rows: [] };
+                return { rowCount: 0, rows: [] };
+            }
+        } as any);
+        fastify.register(mockAuthPlugin);
+        fastify.register(workspaceGuardPlugin);
+        fastify.register(templateRoutes);
+        await fastify.ready();
+
+        const res = await fastify.inject({
+            method: 'GET',
+            url: `/w/NOT_MY_WORKSPACE/templates`,
+            headers: { Authorization: `Bearer ${USER_ID}` }
+        });
+        t.equal(res.statusCode, 403);
+        t.match(res.json().message, /Not a member/);
+        await fastify.close();
+    });
+});
+

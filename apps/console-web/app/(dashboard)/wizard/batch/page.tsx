@@ -37,9 +37,14 @@ interface CurriculumTopic {
     mata_pelajaran: string;
     semester: number;
     title: string;
-    display_order: number;
     cp_reference?: string;
     notes?: string;
+}
+
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
 }
 
 const STEPS: { key: BatchStep; label: string }[] = [
@@ -71,7 +76,7 @@ export default function BatchWizardPage() {
         fokusMateri: '',
     });
 
-    const [templates, setTemplates] = useState<any[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     const [topics, setTopics] = useState<string[]>(['']);

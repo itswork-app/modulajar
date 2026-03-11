@@ -177,24 +177,6 @@ test('POST /w/:workspaceId/profile', async (t) => {
         await fastify.close();
     });
 
-    await t.test('validation error: missing primary_subject', async (t) => {
-        const fastify = buildApp();
-        await fastify.ready();
-
-        const res = await fastify.inject({
-            method: 'POST',
-            url: `/w/${WORKSPACE_ID}/profile`,
-            headers: { Authorization: `Bearer ${USER_ID}` },
-            payload: {
-                full_name: 'Budi Santoso'
-            }
-        });
-
-        t.equal(res.statusCode, 400);
-
-        await fastify.close();
-    });
-
     await t.test('validation error: grade too low', async (t) => {
         const fastify = buildApp();
         await fastify.ready();

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import {
-    Loader2, LayoutTemplate, Plus, MoreVertical,
-    CheckCircle2, AlertCircle, Edit, Trash, Type,
+    Loader2, LayoutTemplate, Plus,
+    CheckCircle2, AlertCircle, Edit, Type,
     GripVertical, Eye, EyeOff, Save, X, Star, FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -136,7 +136,7 @@ export default function TemplatesPage() {
                 const err = await res.json();
                 setToast({ type: 'error', message: err.error || 'Gagal mengatur default.' });
             }
-        } catch (error) {
+        } catch {
             setToast({ type: 'error', message: 'Terjadi kesalahan sistem.' });
         }
     };
@@ -197,7 +197,7 @@ export default function TemplatesPage() {
                 const err = await res.json();
                 setToast({ type: 'error', message: err.error || 'Gagal menyimpan template.' });
             }
-        } catch (error) {
+        } catch {
             setToast({ type: 'error', message: 'Terjadi kesalahan sistem.' });
         } finally {
             setIsSaving(false);

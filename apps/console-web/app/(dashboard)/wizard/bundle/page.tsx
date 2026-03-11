@@ -19,6 +19,12 @@ const MODUL_COST = 5;
 
 type BundleStep = 'KONTEKS' | 'TOPIK' | 'ESTIMASI' | 'GENERATE';
 
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
+}
+
 const STEPS: { key: BundleStep; label: string }[] = [
     { key: 'KONTEKS', label: 'Konteks' },
     { key: 'TOPIK', label: 'Topik' },
@@ -55,7 +61,7 @@ export default function BundleWizardPage() {
     const [newTopic, setNewTopic] = useState('');
     const [fokusMateri, setFokusMateri] = useState('');
 
-    const [templates, setTemplates] = useState<any[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     // Pre-fill teacher/school from profile
