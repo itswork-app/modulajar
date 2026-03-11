@@ -8,6 +8,7 @@ export interface GenerateModuleRequest {
     semester?: string;
     topic?: string;
     template_id: string | null;
+    layout_template_id?: string;
     template_overrides?: Record<string, any>;
 }
 

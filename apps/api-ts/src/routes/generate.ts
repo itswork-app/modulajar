@@ -59,7 +59,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                         tahun_ajaran: { type: 'string' },
                         kelas: { type: 'string' },
                         teacher_name: { type: 'string' },
-                        school_name: { type: 'string' }
+                        school_name: { type: 'string' },
+                        template_id: { type: 'string' }
                     }
                 },
                 response: {
@@ -110,6 +111,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 kelas?: string;
                 teacher_name?: string;
                 school_name?: string;
+                template_id?: string;
             };
 
             if (!body.pack_id || !body.semester || !body.tahun_ajaran) {
@@ -257,11 +259,23 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 throw err;
             }
 
+            // Resolve template_id
+            let templateIdToUse = body.template_id || null;
+            if (!templateIdToUse) {
+                const defaultsRes = await fastify.db.query(
+                    `SELECT template_id FROM workspace_default_templates WHERE workspace_id = $1 AND document_type = 'modul_ajar'`,
+                    [workspaceId]
+                );
+                if (defaultsRes.rowCount && defaultsRes.rowCount > 0) {
+                    templateIdToUse = defaultsRes.rows[0].template_id;
+                }
+            }
+
             try {
                 await fastify.db.query(
-                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-                    [jobId, workspaceId, packageId, 'queued', idempotencyKey, JSON.stringify(metadata)]
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, template_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+                    [jobId, workspaceId, packageId, 'queued', idempotencyKey, templateIdToUse, JSON.stringify(metadata)]
                 );
             } catch (err) {
                 generateRequestsTotal.inc({ result: 'failed_insert' });

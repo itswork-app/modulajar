@@ -168,10 +168,22 @@ func setupSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			school_name VARCHAR(255) NOT NULL,
 			status VARCHAR(50) NOT NULL
 		)`,
+		`CREATE TABLE document_templates (
+			id CHAR(26) PRIMARY KEY,
+			workspace_id CHAR(26) REFERENCES workspaces(id),
+			name TEXT NOT NULL,
+			description TEXT,
+			document_type TEXT NOT NULL,
+			template_version INT NOT NULL DEFAULT 1,
+			layout_definition JSONB NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)`,
 		`CREATE TABLE generation_jobs (
 			id CHAR(26) PRIMARY KEY,
 			workspace_id CHAR(26) NOT NULL REFERENCES workspaces(id),
 			package_id CHAR(26) NOT NULL REFERENCES packages(id),
+			template_id CHAR(26) REFERENCES document_templates(id),
 			status VARCHAR(50) NOT NULL,
 			generation_id VARCHAR(255) NOT NULL,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
