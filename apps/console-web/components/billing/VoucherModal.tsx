@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Ticket, HelpCircle, Loader2 } from 'lucide-react';
+import { X, Ticket, HelpCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
+import { useWorkspace } from '@/hooks/use-workspace';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface VoucherModalProps {
     isOpen: boolean;
@@ -9,22 +13,45 @@ interface VoucherModalProps {
 }
 
 export function VoucherModal({ isOpen, onClose }: VoucherModalProps) {
+    const { getToken } = useAuth();
+    const { workspace } = useWorkspace();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const handleRedeem = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!code.trim()) return;
+        if (!code.trim() || !workspace) return;
 
         setIsLoading(true);
         setError(null);
 
-        // Placeholder delay to simulate API verification
-        setTimeout(() => {
-            setError('Fitur penukaran voucher akan aktif secara penuh pada update selanjutnya.');
+        try {
+            const token = await getToken();
+            const response = await fetch(`${API_BASE}/w/${workspace.id}/voucher/redeem`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ code })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Gagal menukarkan voucher.');
+            }
+
+            setIsSuccess(true);
+            setTimeout(() => {
+                onClose();
+                window.location.reload(); // Refresh to update balance
+            }, 2000);
+        } catch (err: any) {
+            setError(err.message || 'Terjadi kesalahan saat menghubungi server.');
             setIsLoading(false);
-        }, 800);
+        }
     };
 
     if (!isOpen) return null;
@@ -49,53 +76,64 @@ export function VoucherModal({ isOpen, onClose }: VoucherModalProps) {
                     </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleRedeem} className="p-6">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                        Masukkan Kode Voucher
-                    </label>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={code}
-                            onChange={(e) => {
-                                setCode(e.target.value.toUpperCase());
-                                setError(null);
-                            }}
-                            placeholder="M-AJAR-ABC"
-                            className="w-full pl-4 pr-10 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono text-lg tracking-wider bg-slate-50"
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="mt-3 text-sm font-medium text-red-600 flex items-start gap-1.5">
-                            <HelpCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                            <span>{error}</span>
+                {/* Content */}
+                {isSuccess ? (
+                    <div className="p-12 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-300">
+                        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-6 text-emerald-600">
+                            <CheckCircle2 className="w-10 h-10" />
                         </div>
-                    )}
-
-                    <div className="mt-8 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors"
-                            disabled={isLoading}
-                        >
-                            Batal
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={!code.trim() || isLoading}
-                            className={`flex-2 flex items-center justify-center py-3 rounded-xl font-bold text-white transition-all shadow-md ${!code.trim() || isLoading
-                                ? 'bg-slate-300 shadow-none cursor-not-allowed'
-                                : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-0.5'
-                                }`}
-                        >
-                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Klaim Kredit'}
-                        </button>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">Berhasil!</h3>
+                        <p className="text-slate-500">Voucher Anda telah berhasil ditukarkan. Saldo akan segera diperbarui.</p>
                     </div>
-                </form>
+                ) : (
+                    <form onSubmit={handleRedeem} className="p-6">
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                            Masukkan Kode Voucher
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={code}
+                                onChange={(e) => {
+                                    setCode(e.target.value.toUpperCase());
+                                    setError(null);
+                                }}
+                                placeholder="VA-XXXX-XXXX"
+                                className="w-full pl-4 pr-10 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono text-lg tracking-wider bg-slate-50"
+                                disabled={isLoading}
+                                autoFocus
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="mt-3 text-sm font-medium text-red-600 flex items-start gap-1.5">
+                                <HelpCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <div className="mt-8 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors"
+                                disabled={isLoading}
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!code.trim() || isLoading}
+                                className={`flex-2 flex items-center justify-center py-3 rounded-xl font-bold text-white transition-all shadow-md ${!code.trim() || isLoading
+                                    ? 'bg-slate-300 shadow-none cursor-not-allowed'
+                                    : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-0.5'
+                                    }`}
+                            >
+                                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Klaim Kredit'}
+                            </button>
+                        </div>
+                    </form>
+                )}
 
             </div>
         </div>

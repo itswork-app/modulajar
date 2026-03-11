@@ -21,6 +21,7 @@ import modulesRoutes from './routes/modules';
 import jobsRoutes from './routes/jobs';
 import walletRoutes from './routes/wallet';
 import curriculumRoutes from './routes/curriculum';
+import voucherRoutes from './routes/voucher';
 import schemasPlugin from './plugins/schemas';
 import dotenv from 'dotenv';
 import multipart from '@fastify/multipart';
@@ -179,6 +180,7 @@ if (SERVICE_MODE === 'verify') {
     fastify.register(jobsRoutes);
     fastify.register(walletRoutes);
     fastify.register(curriculumRoutes);
+    fastify.register(voucherRoutes);
 }
 
 const start = async () => {

@@ -20,7 +20,7 @@ export interface DbClient {
     query(sql: string, params: unknown[]): Promise<{ rowCount: number | null; rows: Record<string, unknown>[] }>;
 }
 
-export type LedgerEvent = 'TopupConfirmed' | 'GenerationUsageDebit' | 'RefundCredit' | 'ReferralReward';
+export type LedgerEvent = 'TopupConfirmed' | 'GenerationUsageDebit' | 'RefundCredit' | 'ReferralReward' | 'VoucherRedeem';
 
 export interface LedgerEntry {
     id: string;
