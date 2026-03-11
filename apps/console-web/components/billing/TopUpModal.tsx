@@ -57,8 +57,9 @@ export function TopUpModal({ isOpen, onClose }: TopUpModalProps) {
             const data = await response.json();
             // Redirect to Xendit
             window.location.href = data.payment_url;
-        } catch (err: any) {
-            setError(err.message || 'Terjadi kesalahan saat menghubungi server.');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat menghubungi server.';
+            setError(message);
             setIsLoading(false);
         }
     };

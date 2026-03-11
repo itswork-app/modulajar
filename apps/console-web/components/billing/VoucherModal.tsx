@@ -48,8 +48,9 @@ export function VoucherModal({ isOpen, onClose }: VoucherModalProps) {
                 onClose();
                 window.location.reload(); // Refresh to update balance
             }, 2000);
-        } catch (err: any) {
-            setError(err.message || 'Terjadi kesalahan saat menghubungi server.');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat menghubungi server.';
+            setError(message);
             setIsLoading(false);
         }
     };
