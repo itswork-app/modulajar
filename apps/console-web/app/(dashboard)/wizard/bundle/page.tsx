@@ -10,12 +10,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ATP_COST = 1;
 const PROTA_COST = 1;
 const PROMES_COST = 1;
 const MODUL_COST = 5;
+const SEMESTER_OPTIONS = ['1', '2'];
+
 
 type BundleStep = 'KONTEKS' | 'TOPIK' | 'ESTIMASI' | 'GENERATE';
 
@@ -32,8 +35,8 @@ const STEPS: { key: BundleStep; label: string }[] = [
     { key: 'GENERATE', label: 'Generate' },
 ];
 
-const JENJANG_OPTIONS = ['SD', 'SMP', 'SMA', 'SMK'];
-const SEMESTER_OPTIONS = ['1', '2'];
+
+
 
 export default function BundleWizardPage() {
     const router = useRouter();
@@ -231,22 +234,36 @@ export default function BundleWizardPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Jenjang</label>
-                                <select value={ctx.jenjang} onChange={e => setCtx(p => ({ ...p, jenjang: e.target.value }))}
+                                <select value={ctx.jenjang} onChange={e => {
+                                    const newJenjang = e.target.value as Jenjang;
+                                    const newKelas = String(KELAS_OPTIONS[newJenjang]?.[0] ?? '1');
+                                    setCtx(p => ({ ...p, jenjang: newJenjang, kelas: newKelas, subject: '' }));
+                                }}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500 outline-none">
-                                    {JENJANG_OPTIONS.map(j => <option key={j}>{j}</option>)}
+                                    {JENJANG_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Kelas</label>
-                                <input value={ctx.kelas} onChange={e => setCtx(p => ({ ...p, kelas: e.target.value }))}
-                                    placeholder="mis. 4"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500 outline-none" />
+                                <select value={ctx.kelas} onChange={e => setCtx(p => ({ ...p, kelas: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500 outline-none">
+                                    {(KELAS_OPTIONS[ctx.jenjang as Jenjang] ?? []).map(k => (
+                                        <option key={k} value={String(k)}>Kelas {k}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="space-y-1 col-span-2">
                                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Mata Pelajaran</label>
-                                <input value={ctx.subject} onChange={e => setCtx(p => ({ ...p, subject: e.target.value }))}
-                                    placeholder="mis. Matematika"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500 outline-none" />
+                                <select value={ctx.subject} onChange={e => setCtx(p => ({ ...p, subject: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-violet-500 outline-none">
+                                    <option value="" disabled>Pilih Mata Pelajaran</option>
+                                    {(MAPEL_OPTIONS[ctx.jenjang as Jenjang] ?? []).map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                    {ctx.subject && !(MAPEL_OPTIONS[ctx.jenjang as Jenjang] ?? []).includes(ctx.subject) && (
+                                        <option value={ctx.subject}>{ctx.subject}</option>
+                                    )}
+                                </select>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Semester</label>
