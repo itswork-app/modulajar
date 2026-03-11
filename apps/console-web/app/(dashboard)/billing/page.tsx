@@ -261,8 +261,13 @@ export default function BillingPage() {
                                     <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-6 py-4 text-slate-600 font-medium">{trx.date}</td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                                                {trx.type.replace('_', ' ').toUpperCase()}
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${trx.type === 'topup_xendit' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                                    trx.type === 'voucher_redeem' ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                                                        'bg-slate-100 text-slate-700 border-slate-200'
+                                                }`}>
+                                                {trx.type === 'topup_xendit' ? 'TOP-UP XENDIT' :
+                                                    trx.type === 'voucher_redeem' ? 'VOUCHER REDEEM' :
+                                                        trx.type.replace('_', ' ').toUpperCase()}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-slate-500">{trx.note || '-'}</td>

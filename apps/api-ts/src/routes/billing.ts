@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { createHash, randomBytes, createHmac } from 'crypto';
 import { SD_FULL_SEMESTER_COST, idrToCredits, getDefaultTier } from '../lib/pricing';
 import { getBalance, credit } from '../lib/wallet';
+import { xendit } from '../lib/xendit';
 import { constantTimeCompare } from '../utils/crypto';
 import { logger } from '../utils/logger';
 
@@ -95,6 +96,66 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 credits,
                 status: 'pending'
             });
+        });
+
+        // PR-C16: Xendit Top-Up Intent
+        childServer.post('/:workspaceId/billing/topup-intent', {
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                body: {
+                    type: 'object',
+                    properties: {
+                        amount_idr: { type: 'integer', minimum: 10000 }
+                    },
+                    required: ['amount_idr']
+                }
+            }
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const { amount_idr } = request.body as { amount_idr: number };
+
+            const tier = idrToCredits(amount_idr);
+            if (!tier) {
+                return reply.code(400).send({
+                    error: 'Invalid amount',
+                    message: `No pricing tier for IDR ${amount_idr}`
+                });
+            }
+
+            const { ulid } = await import('ulid');
+            const receiptId = ulid();
+            const externalRef = generateExternalRef();
+
+            // 1. Create Invoice in Xendit
+            // Use clerk user email if available, otherwise fallback
+            const userEmail = (request.auth as any)?.email;
+
+            let invoice;
+            try {
+                invoice = await xendit.createInvoice({
+                    externalId: externalRef,
+                    amount: amount_idr,
+                    payerEmail: userEmail,
+                    description: `Top-up ${tier.credits} Token - ModulAjar`
+                });
+            } catch (err) {
+                logger.error(err, 'Failed to create Xendit invoice');
+                return reply.code(502).send({ error: 'Payment gateway error' });
+            }
+
+            // 2. Create Receipt
+            await fastify.db.query(
+                `INSERT INTO receipts (id, workspace_id, external_ref, amount, status, payment_method)
+                 VALUES ($1, $2, $3, $4, 'pending', 'xendit')`,
+                [receiptId, workspaceId, externalRef, tier.credits]
+            );
+
+            return {
+                payment_url: invoice.invoice_url,
+                intent_id: invoice.id,
+                amount: amount_idr,
+                credits_estimated: tier.credits
+            };
         });
 
         // ── GET /w/:workspaceId/billing/summary ──
@@ -307,6 +368,104 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 status: 'rejected',
                 credits_posted: 0
             });
+        });
+
+        // PR-C16: Xendit Webhook
+        childServer.post('/webhooks/xendit', async (request, reply) => {
+            const token = request.headers['x-callback-token'] as string;
+
+            if (!xendit.verifyCallback(token)) {
+                logger.warn('Invalid Xendit callback token');
+                return reply.code(401).send({ error: 'Unauthorized' });
+            }
+
+            const body = request.body as any;
+            const xenditId = body.id;
+            const externalRef = body.external_id;
+            const status = body.status; // 'PAID' or 'SETTLED' are success
+
+            if (status !== 'PAID' && status !== 'SETTLED') {
+                logger.info({ xenditId, status }, 'Ignoring non-paid Xendit event');
+                return reply.code(200).send({ status: 'ignored' });
+            }
+
+            // Replay Protection
+            const { ulid } = await import('ulid');
+            const eventId = ulid();
+            const payloadHash = createHash('sha256').update(JSON.stringify(body)).digest('hex');
+
+            try {
+                await fastify.db.query(
+                    `INSERT INTO payment_events (id, provider_event_id, payload_hash, status, received_at)
+                     VALUES ($1, $2, $3, $4, NOW())`,
+                    [eventId, xenditId, payloadHash, 'processing']
+                );
+            } catch (err: any) {
+                if (err.code === '23505') {
+                    return reply.code(200).send({ status: 'idempotent_replay' });
+                }
+                throw err;
+            }
+
+            // Business Logic
+            const receiptResult = await fastify.db.query(
+                `SELECT id, workspace_id, amount, status FROM receipts WHERE external_ref = $1`,
+                [externalRef]
+            );
+
+            if (!receiptResult.rowCount) {
+                await fastify.db.query(`UPDATE payment_events SET status = 'failed_no_receipt' WHERE id = $1`, [eventId]);
+                return reply.code(200).send({ status: 'failed_unknown_ref' });
+            }
+
+            const receipt = receiptResult.rows[0];
+
+            if (receipt.status === 'confirmed') {
+                await fastify.db.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
+                return { status: 'already_processed', receipt_id: receipt.id };
+            }
+
+            // Start processing confirmed payment
+            const dbClient = await fastify.db.connect();
+            try {
+                await dbClient.query('BEGIN');
+
+                // 1. Update Receipt
+                await dbClient.query(
+                    `UPDATE receipts SET status = 'confirmed', updated_at = NOW() WHERE id = $1`,
+                    [receipt.id]
+                );
+
+                // 2. Ledger Credit
+                const creditResult = await credit(dbClient, receipt.workspace_id as string, receipt.amount as number, xenditId, {
+                    event_type: 'TopupConfirmed',
+                    receipt_id: receipt.id,
+                    provider: 'xendit'
+                });
+
+                // 3. Update Receipt with Ledger ID
+                if (creditResult.ledgerId) {
+                    await dbClient.query(
+                        `UPDATE receipts SET ledger_id = $1 WHERE id = $2`,
+                        [creditResult.ledgerId, receipt.id]
+                    );
+                }
+
+                // 4. Update Event Status
+                await dbClient.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
+
+                await dbClient.query('COMMIT');
+
+                logger.info({ xenditId, workspaceId: receipt.workspace_id }, 'Xendit payment confirmed and credited');
+            } catch (err) {
+                await dbClient.query('ROLLBACK');
+                logger.error(err, 'Failed to process Xendit payment confirmation');
+                throw err;
+            } finally {
+                dbClient.release();
+            }
+
+            return { status: 'success', receipt_id: receipt.id };
         });
 
     }, { prefix: '/internal' });
