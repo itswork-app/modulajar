@@ -50,6 +50,12 @@ interface UsageSummary {
     documents_generated: number;
 }
 
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
+}
+
 const STEPS: { key: WizardStep; label: string }[] = [
     { key: 'IDENTITAS', label: '1. Identitas' },
     { key: 'TARGET', label: '2. Target' },
@@ -72,6 +78,9 @@ export default function WizardV2Page() {
     const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
     const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
     const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     const [formData, setFormData] = useState({
         jenjang: 'SD' as Jenjang,
@@ -120,6 +129,13 @@ export default function WizardV2Page() {
                 if (usageRes.ok) {
                     const uData: UsageSummary = await usageRes.json();
                     if (isMounted) setUsageSummary(uData);
+                }
+
+                // Templates
+                const tplRes = await fetch(`${API_BASE}/w/${workspace.id}/templates?document_type=modul_ajar`, opts);
+                if (tplRes.ok) {
+                    const tData = await tplRes.json();
+                    if (isMounted) setTemplates(tData.templates || []);
                 }
 
                 // Pre-fill form from profile or saved draft
@@ -216,6 +232,7 @@ export default function WizardV2Page() {
                     topic: formData.tema || formData.topik,
                     semester: formData.semester,
                     notes: formData.catatan || undefined,
+                    template_id: selectedTemplate || undefined,
                 }),
             });
 
@@ -700,6 +717,21 @@ export default function WizardV2Page() {
                                         <p className="text-xs text-slate-500 italic leading-relaxed">&ldquo;{formData.catatan}&rdquo;</p>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Template Selection */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs space-y-3">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Format & Tata Letak Template</div>
+                                <select
+                                    value={selectedTemplate}
+                                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                                    className="w-full text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3"
+                                >
+                                    <option value="">(Otomatis berdasarkan pilihan Default Workspace)</option>
+                                    {templates.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} {t.workspace_id === null ? '(Standard ModulAjar)' : '(School Template)'}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Credit Panel */}

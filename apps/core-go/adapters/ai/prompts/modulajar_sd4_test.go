@@ -52,3 +52,20 @@ func TestSystemPromptNoAI(t *testing.T) {
 		t.Error("expected system prompt to instruct no AI mention")
 	}
 }
+
+func TestBuildFewShotPrompt(t *testing.T) {
+	// Empty case
+	empty := BuildFewShotPrompt(nil)
+	if empty != "" {
+		t.Error("expected empty few shot with no examples")
+	}
+
+	// With examples
+	withExamples := BuildFewShotPrompt([]string{"example 1", "example 2"})
+	if !strings.Contains(withExamples, "EXAMPLE 1") {
+		t.Error("expected EXAMPLE 1 in few shot prompt")
+	}
+	if !strings.Contains(withExamples, "example 2") {
+		t.Error("expected example 2 content in few shot prompt")
+	}
+}

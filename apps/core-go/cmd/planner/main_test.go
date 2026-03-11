@@ -4,16 +4,16 @@ import (
 	"testing"
 )
 
-func TestRun(t *testing.T) {
-	// 1. Success case (default)
+func TestMainExit(t *testing.T) {
+	// Success path
 	err := Run([]string{"planner"})
 	if err != nil {
-		t.Errorf("expected success, got %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// 2. File not found
-	err = Run([]string{"planner", "/nonexistent"})
+	// Error path
+	err = Run([]string{"planner", "-pack", "nonexistent.json"})
 	if err == nil {
-		t.Error("expected error for nonexistent file, got nil")
+		t.Error("Expected error because pack file not exist")
 	}
 }

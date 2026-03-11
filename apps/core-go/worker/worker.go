@@ -55,6 +55,9 @@ type TaskPayload struct {
 	LetterheadLine4   string `json:"letterhead_line4,omitempty"`
 	LetterheadContact string `json:"letterhead_contact,omitempty"`
 	LogoFilePath      string `json:"logo_file_path,omitempty"`
+
+	// Smart Templates Layout Definition
+	LayoutDefinition map[string]interface{} `json:"layout_definition,omitempty"`
 }
 
 // RenderedDocument holds the composed HTML for one document (subject).
@@ -471,6 +474,7 @@ No markdown formatting. Pure JSON.`,
 					"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
 					"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
 					"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+					"ALL_SECTIONS":       func() string { return "(All Sections Placeholder)" },
 					"KOP_SURAT":          func() string { return "" },
 				}
 
@@ -588,6 +592,8 @@ No markdown formatting. Pure JSON.`,
 			LetterheadLine4:   payload.LetterheadLine4,
 			LetterheadContact: payload.LetterheadContact,
 			LogoDataURI:       logoDataURI,
+
+			LayoutDefinition: payload.LayoutDefinition,
 
 			ModulAjarSD4:     resultSD4,
 			LegacyCurriculum: resultLegacy,
@@ -810,6 +816,12 @@ func (w *Worker) jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
 	p.JobID = job.ID
 	p.PackageID = job.PackageID
 	p.WorkspaceID = job.WorkspaceID
+
+	// Extract LayoutDefinition if present
+	if layoutMap, ok := job.Metadata["layout_definition"].(map[string]interface{}); ok {
+		p.LayoutDefinition = layoutMap
+	}
+
 	return p, nil
 }
 

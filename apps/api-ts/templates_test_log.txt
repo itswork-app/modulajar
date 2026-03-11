@@ -1,0 +1,436 @@
+TAP version 14
+1..1
+# Subtest: tests/templates.test.ts
+    # Subtest: computeSimilarity
+        # Subtest: identical strings return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 1 - identical strings return 1.0 # time=10.382ms
+        
+        # Subtest: completely different strings return 0.0
+            ok 1 - should be equal
+            1..1
+        ok 2 - completely different strings return 0.0 # time=0.62ms
+        
+        # Subtest: partial overlap returns between 0 and 1
+            ok 1 - Score should be between 0 and 1, got 0.3333333333333333
+            1..1
+        ok 3 - partial overlap returns between 0 and 1 # time=0.891ms
+        
+        # Subtest: empty strings both return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 4 - empty strings both return 1.0 # time=0.592ms
+        
+        # Subtest: one empty string returns 0.0
+            ok 1 - should be equal
+            1..1
+        ok 5 - one empty string returns 0.0 # time=0.602ms
+        
+        1..5
+    ok 1 - computeSimilarity # time=32.841ms
+    
+    # Subtest: calculateScore
+        # Subtest: perfect scores return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 1 - perfect scores return 1.0 # time=0.731ms
+        
+        # Subtest: zero scores return 0.0
+            ok 1 - should be equal
+            1..1
+        ok 2 - zero scores return 0.0 # time=0.545ms
+        
+        # Subtest: quality has most weight
+            ok 1 - Quality weight > usage weight
+            1..1
+        ok 3 - quality has most weight # time=0.516ms
+        
+        # Subtest: values are clamped
+            ok 1 - Score capped at 1.0
+            1..1
+        ok 4 - values are clamped # time=0.506ms
+        
+        1..4
+    ok 2 - calculateScore # time=7.386ms
+    
+    # Subtest: buildPreview
+        # Subtest: extracts fields correctly
+            ok 1 - has tujuan
+            ok 2 - has kegiatan
+            ok 3 - has assessment
+            1..3
+        ok 1 - extracts fields correctly # time=0.893ms
+        
+        # Subtest: truncates long fields to 200 chars
+            ok 1 - Tujuan truncated: 200
+            ok 2 - Kegiatan truncated: 200
+            ok 3 - Assessment truncated: 200
+            1..3
+        ok 2 - truncates long fields to 200 chars # time=0.503ms
+        
+        # Subtest: handles array tujuan_pembelajaran
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - handles array tujuan_pembelajaran # time=2.127ms
+        
+        # Subtest: handles empty/null input
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 4 - handles empty/null input # time=0.854ms
+        
+        # Subtest: handles string kegiatan
+            ok 1 - should be equal
+            1..1
+        ok 5 - handles string kegiatan # time=0.474ms
+        
+        # Subtest: handles string penilaian
+            ok 1 - should be equal
+            1..1
+        ok 6 - handles string penilaian # time=0.657ms
+        
+        1..6
+    ok 3 - buildPreview # time=11.222ms
+    
+    {"level":"info","time":"2026-03-11T09:16:45.930Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":"pecahan","workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    # Subtest: GET /templates/recommended
+        # Subtest: 200 — returns ranked templates
+            ok 1 - Expected 200, got 200: {"templates":[{"id":"tmpl-001","subject":"matematika","grade":4,"topic":"pecahan","score":77,"preview":{"tujuan_pembelajaran":"Siswa dapat membandingkan dua pecahan.","ringkasan_kegiatan":"Siswa melakukan eksplorasi dengan benda konkret.","assessment_summary":"Tes tertulis membandingkan pecahan.; Unjuk kerja.; Observasi selama diskusi."}},{"id":"tmpl-002","subject":"matematika","grade":4,"topic":"bilangan bulat","score":54,"preview":{"tujuan_pembelajaran":"Siswa memahami bilangan bulat.","ringkasan_kegiatan":"Latihan soal.","assessment_summary":"Quiz."}}]}
+            ok 2 - templates is array
+            ok 3 - has templates
+            ok 4 - max 3 templates
+            ok 5 - has id
+            ok 6 - has subject
+            ok 7 - grade is number
+            ok 8 - score is number
+            ok 9 - has preview
+            ok 10 - preview has tujuan
+            1..10
+        ok 1 - 200 — returns ranked templates # time=170.956ms
+        
+        # Subtest: 200 — empty dataset returns empty array
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 2 - 200 — empty dataset returns empty array # time=55.515ms
+        
+        # Subtest: 400 — missing subject
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 3 - 400 — missing subject # time=48.488ms
+        
+        # Subtest: 400 — missing grade
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 4 - 400 — missing grade # time=26.492ms
+        
+        # Subtest: 400 — invalid grade (0)
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 5 - 400 — invalid grade (0) # time=25.019ms
+        
+        # Subtest: 400 — invalid grade (13)
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 6 - 400 — invalid grade (13) # time=32.82ms
+        
+        # Subtest: 400 — grade is not a number
+            ok 1 - should be equal
+            1..1
+        ok 7 - 400 — grade is not a number # time=30.97ms
+        
+        # Subtest: module_json is never exposed in response
+            ok 1 - should be equal
+            ok 2 - module_json must not appear in response
+            1..2
+        ok 8 - module_json is never exposed in response # time=35.435ms
+        
+        # Subtest: 401 — no auth header
+            ok 1 - should be equal
+            1..1
+        ok 9 - 401 — no auth header # time=22.587ms
+        
+        # Subtest: 200 — topic is optional
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 10 - 200 — topic is optional # time=22.781ms
+        
+        # Subtest: templates are sorted by score descending
+            ok 1 - should be equal
+            ok 2 - Sorted by score desc
+            1..2
+        ok 11 - templates are sorted by score descending # time=21.432ms
+        
+        1..11
+    ok 4 - GET /templates/recommended # time=503.73ms
+    
+    # Subtest: GET /templates/recommended — invalid JSON in module_json
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 5 - GET /templates/recommended — invalid JSON in module_json # time=22.366ms
+    
+    # Subtest: Rate limiting
+        # Subtest: 429 after exceeding limit
+            ok 1 - Should be rate limited
+            ok 2 - should match pattern
+            1..2
+        ok 1 - 429 after exceeding limit # time=43.354ms
+        
+        1..1
+    ok 6 - Rate limiting # time=44.998ms
+    
+    # Subtest: GET /w/:workspaceId/templates
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 7 - GET /w/:workspaceId/templates # time=27.677ms
+    
+    # Subtest: POST /w/:workspaceId/templates
+        ok 1 - should be equal
+        ok 2 - should be equal
+        1..2
+    ok 8 - POST /w/:workspaceId/templates # time=31.491ms
+    
+    {"level":"info","time":"2026-03-11T09:16:45.993Z","service":"api-ts","event":"template_api_request","subject":"fisika","grade":10,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.202Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.249Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.272Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":"pecahan","workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.295Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.321Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.322Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-2","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.322Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-3","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.323Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-4","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.323Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-5","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.323Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-6","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.324Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-7","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.324Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-8","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.324Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-9","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.324Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-a","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.324Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-b","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.325Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-c","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.325Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-d","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.325Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-e","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.326Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-f","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.326Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-g","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.326Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-h","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.326Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-i","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.327Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-j","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.327Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-k","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.327Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-l","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.327Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-m","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.328Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-n","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.328Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-o","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.328Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-p","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.328Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-q","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.328Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-r","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.329Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-s","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.329Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-t","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.329Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-u","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.329Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-v","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.329Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-w","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.330Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-x","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.330Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-y","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.330Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-z","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.330Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-10","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.330Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-11","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.331Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-12","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.331Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-13","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.332Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-14","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.334Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-15","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.334Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-16","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.335Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-17","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.335Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-18","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.335Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-19","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.336Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1a","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.336Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1b","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.337Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1c","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T09:16:46.337Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1d","msg":"template_api_request"}
+    # Subtest: PUT /w/:workspaceId/templates/:id
+        ok 1 - should be equal
+        1..1
+    ok 9 - PUT /w/:workspaceId/templates/:id # time=22.71ms
+    
+    # Subtest: GET /w/:workspaceId/templates/default
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        ok 4 - should be equivalent
+        1..4
+    ok 10 - GET /w/:workspaceId/templates/default # time=66.914ms
+    
+    # Subtest: POST /w/:workspaceId/templates/default
+        ok 1 - should be equal
+        1..1
+    ok 11 - POST /w/:workspaceId/templates/default # time=30.333ms
+    
+    # Subtest: Templates Branch Coverage — Admin Checks & Error Cases
+        # Subtest: POST /w/:workspaceId/templates — returns 403 for non-admin
+            not ok 1 - should be equal
+              ---
+              compare: ===
+              at:
+                fileName: tests/templates.test.ts
+                lineNumber: 670
+                columnNumber: 11
+                typeName: Test
+              stack: |
+                Test.<anonymous> (tests/templates.test.ts:670:11)
+              source: >2
+                            payload: { name: 'Test', document_type: 'atp', layout_definition: {} }
+                        });
+                        t.equal(res.statusCode, 403);
+                ----------^
+                        await fastify.close();
+                    });
+              diff: |
+                --- expected
+                +++ actual
+                @@ -1,1 +1,1 @@
+                -403
+                +400
+              ...
+            
+            1..1
+        not ok 1 - POST /w/:workspaceId/templates — returns 403 for non-admin # time=52.268ms
+          ---
+          at:
+            fileName: tests/templates.test.ts
+            lineNumber: 651
+            columnNumber: 13
+            typeName: Test
+          source: >
+            test('Templates Branch Coverage — Admin Checks & Error Cases', async (t) => {
+          
+                await t.test('POST /w/:workspaceId/templates — returns 403 for non-admin', async (t) => {
+            ------------^
+                    const fastify = Fastify();
+                    fastify.decorate('db', {
+          ...
+        
+        # Subtest: PUT /w/:workspaceId/templates/:id — returns 404 for missing template
+            ok 1 - should be equal
+            1..1
+        ok 2 - PUT /w/:workspaceId/templates/:id — returns 404 for missing template # time=20.973ms
+        
+        # Subtest: POST /w/:workspaceId/templates/default — returns 400 for invalid template_id
+            ok 1 - should be equal
+            1..1
+        ok 3 - POST /w/:workspaceId/templates/default — returns 400 for invalid template_id # time=18.763ms
+        
+        # Subtest: POST /w/:workspaceId/templates — returns 500 on db error
+            not ok 1 - should be equal
+              ---
+              compare: ===
+              at:
+                fileName: tests/templates.test.ts
+                lineNumber: 741
+                columnNumber: 11
+                typeName: Test
+              stack: |
+                Test.<anonymous> (tests/templates.test.ts:741:11)
+              source: >2
+                            payload: { name: 'Test', document_type: 'atp', layout_definition: {} }
+                        });
+                        t.equal(res.statusCode, 500);
+                ----------^
+                        await fastify.close();
+                    });
+              diff: |
+                --- expected
+                +++ actual
+                @@ -1,1 +1,1 @@
+                -500
+                +400
+              ...
+            
+            1..1
+        not ok 4 - POST /w/:workspaceId/templates — returns 500 on db error # time=26.171ms
+          ---
+          at:
+            fileName: tests/templates.test.ts
+            lineNumber: 722
+            columnNumber: 13
+            typeName: Test
+          source: >2
+                });
+          
+                await t.test('POST /w/:workspaceId/templates — returns 500 on db error', async (t) => {
+            ------------^
+                    const fastify = Fastify();
+                    fastify.decorate('db', {
+          ...
+        
+        # Subtest: PUT /w/:workspaceId/templates/:id — returns 403 for non-admin
+            ok 1 - should be equal
+            1..1
+        ok 5 - PUT /w/:workspaceId/templates/:id — returns 403 for non-admin # time=17.088ms
+        
+        # Subtest: PUT /w/:workspaceId/templates/:id — returns 500 on db error
+            ok 1 - should be equal
+            1..1
+        ok 6 - PUT /w/:workspaceId/templates/:id — returns 500 on db error # time=19.418ms
+        
+        1..6
+    not ok 12 - Templates Branch Coverage — Admin Checks & Error Cases # time=166.299ms
+      ---
+      at:
+        fileName: tests/templates.test.ts
+        lineNumber: 649
+        columnNumber: 1
+        typeName: Object
+      source: >
+        });
+      
+      
+        test('Templates Branch Coverage — Admin Checks & Error Cases', async (t) => {
+      
+        ^
+      
+            await t.test('POST /w/:workspaceId/templates — returns 403 for non-admin', async (t) => {
+      ...
+    
+    1..12
+not ok 1 - tests/templates.test.ts # time=3061.555ms
+  ---
+  stdio: inherit
+  cwd: /home/kangza/workspace/modulajar/apps/api-ts
+  externalID: tests/templates.test.ts
+  command: /home/kangza/.nvm/versions/node/v24.11.1/bin/node
+  args:
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs
+    - --enable-source-maps
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs
+    - /home/kangza/workspace/modulajar/apps/api-ts/tests/templates.test.ts
+  exitCode: 1
+  signal: null
+  ...
+
+---------------------|---------|----------|---------|---------|-------------------------------------
+File                 | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                   
+---------------------|---------|----------|---------|---------|-------------------------------------
+All files            |    92.6 |    74.78 |    92.3 |    92.6 |                                     
+ plugins             |    86.2 |    72.22 |     100 |    86.2 |                                     
+  mock_auth.ts       |   85.18 |    83.33 |     100 |   85.18 | 20-23                               
+  schemas.ts         |   91.66 |       50 |     100 |   91.66 | 20-21                               
+  workspace-guard.ts |   84.61 |       70 |     100 |   84.61 | 31-35,45-49                         
+ routes              |   90.93 |    68.88 |     100 |   90.93 |                                     
+  templates.ts       |   90.93 |    68.88 |     100 |   90.93 | ...,218-220,306-307,328-330,356-358 
+ services            |     100 |    78.72 |     100 |     100 |                                     
+  templateService.ts |     100 |    78.72 |     100 |     100 | 26,54-56,66,121-128                 
+ utils               |   93.98 |    88.88 |      75 |   93.98 |                                     
+  rate-limit.ts      |   76.59 |     87.5 |   66.66 |   76.59 | 26-29,40-46                         
+---------------------|---------|----------|---------|---------|-------------------------------------
+# { total: 72, pass: 70, fail: 2 }
+# time=3146.919ms

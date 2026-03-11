@@ -142,7 +142,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 	// Atomic Acquire Query with Workspace Settings joined
 	query := `
 		WITH next_job AS (
-			SELECT id, workspace_id
+			SELECT id, workspace_id, template_id
 			FROM generation_jobs
 			WHERE status = 'queued'
 			  AND next_run_at <= NOW()
@@ -158,6 +158,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 			next_run_at = NOW() + (INTERVAL '1 second' * POWER(2, attempt_count + 1))
 		FROM next_job
 		LEFT JOIN workspace_settings ws ON next_job.workspace_id = ws.workspace_id
+        LEFT JOIN document_templates dt ON next_job.template_id = dt.id
 		WHERE j.id = next_job.id
 		RETURNING 
 			j.id, 
@@ -172,11 +173,13 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 			ws.letterhead_line3,
 			ws.letterhead_line4,
 			ws.letterhead_contact,
-			ws.logo_file_path
+			ws.logo_file_path,
+            dt.layout_definition
 	`
 
 	var job GenerationJob
 	var metadataJSON []byte
+	var layoutJSON []byte
 
 	// Letterhead Optional Fields
 	var l1, l2, l3, l4, contact, logo *string
@@ -195,6 +198,7 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 		&l4,
 		&contact,
 		&logo,
+		&layoutJSON,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -206,6 +210,15 @@ func AcquireJob(ctx context.Context) (*GenerationJob, error) {
 
 	if err := json.Unmarshal(metadataJSON, &job.Metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
+
+	if len(layoutJSON) > 0 {
+		var layout interface{}
+		if err := json.Unmarshal(layoutJSON, &layout); err == nil {
+			job.Metadata["layout_definition"] = layout
+		} else {
+			// log warn? For now ignore unmarshal error and just skip
+		}
 	}
 
 	// Merge Letterhead fields into Metadata if they exist

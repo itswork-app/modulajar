@@ -43,6 +43,10 @@ function buildApp(opts: {
                 return { rowCount: 0, rows: [] };
             }
 
+            if (sql.includes('document_templates') || sql.includes('workspace_default_templates')) {
+                return { rowCount: 1, rows: [{ id: 'tpl_123', layout_definition: { sections: [] } }] };
+            }
+
             // INSERT queries
             return { rowCount: 1, rows: [] };
         },

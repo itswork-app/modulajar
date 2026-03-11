@@ -37,9 +37,14 @@ interface CurriculumTopic {
     mata_pelajaran: string;
     semester: number;
     title: string;
-    display_order: number;
     cp_reference?: string;
     notes?: string;
+}
+
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
 }
 
 const STEPS: { key: BatchStep; label: string }[] = [
@@ -71,6 +76,9 @@ export default function BatchWizardPage() {
         fokusMateri: '',
     });
 
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
     const [topics, setTopics] = useState<string[]>(['']);
     const [progress, setProgress] = useState({ done: 0, total: 0 });
 
@@ -95,10 +103,11 @@ export default function BatchWizardPage() {
                 const headers = { Authorization: `Bearer ${token}` };
                 const opts = { headers, signal: ctrl.signal };
 
-                const [profileRes, schoolRes, usageRes] = await Promise.all([
+                const [profileRes, schoolRes, usageRes, tplRes] = await Promise.all([
                     fetch(`${API_BASE}/w/${workspace.id}/profile`, opts),
                     fetch(`${API_BASE}/w/${workspace.id}/school`, opts),
                     fetch(`${API_BASE}/w/${workspace.id}/wallet/summary`, opts),
+                    fetch(`${API_BASE}/w/${workspace.id}/templates?document_type=modul_ajar`, opts),
                 ]);
 
                 if (profileRes.status === 404 || schoolRes.status === 404) {
@@ -118,6 +127,11 @@ export default function BatchWizardPage() {
                 if (usageRes.ok) {
                     const uData: UsageSummary = await usageRes.json();
                     setUsageSummary(uData);
+                }
+
+                if (tplRes.ok) {
+                    const tData = await tplRes.json();
+                    if (isMounted) setTemplates(tData.templates || []);
                 }
 
                 if (pData) {
@@ -282,6 +296,7 @@ export default function BatchWizardPage() {
                         grade: parseInt(contextData.kelas, 10),
                         topic: topic,
                         semester: contextData.semester,
+                        template_id: selectedTemplate || undefined,
                     }),
                     signal: controller.signal
                 });
@@ -669,6 +684,21 @@ export default function BatchWizardPage() {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+
+                            {/* Template Override */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs space-y-3">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Format & Tata Letak Template</div>
+                                <select
+                                    value={selectedTemplate}
+                                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                                    className="w-full text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3"
+                                >
+                                    <option value="">(Otomatis berdasarkan pilihan Default Workspace)</option>
+                                    {templates.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} {t.workspace_id === null ? '(Standard ModulAjar)' : '(School Template)'}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className={cn(

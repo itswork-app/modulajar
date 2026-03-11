@@ -37,7 +37,7 @@ func setup(t *testing.T) *pgxpool.Pool {
 	}
 
 	// Also cleanup test tables used in new tests
-	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id IN ('ws-fail', 'ws-meta', 'ws-doc')")
+	p.Exec(ctx, "DELETE FROM generation_jobs WHERE workspace_id IN ('ws-fail', 'ws-meta', 'ws-doc', 'test-ws-done', 'test-ws-pkg')")
 	p.Exec(ctx, "DELETE FROM documents WHERE workspace_id IN ('ws-doc')")
 
 	return p

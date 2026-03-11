@@ -55,6 +55,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                         grade: { type: 'integer', minimum: 1, maximum: 12 },
                         topic: { type: 'string' },
                         template_id: { type: 'string' },
+                        layout_template_id: { type: 'string' },
                         semester: { type: 'string' }
                     }
                 },
@@ -76,7 +77,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
         }, async (request, reply) => {
             const workspaceId = request.workspaceId;
             const body = request.body;
-            const { mode, subject, grade, topic, template_id, semester } = body;
+            const { mode, subject, grade, topic, template_id, layout_template_id, semester } = body;
 
             if (!mode || !subject || !grade || (mode !== 'wizard' && !topic)) {
                 return reply.code(400).send({ error: 'Missing required fields: mode, subject, grade, topic' });
@@ -188,11 +189,22 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                 throw err;
             }
 
+            let templateIdToUse = layout_template_id || null;
+            if (!templateIdToUse) {
+                const defaultsRes = await fastify.db.query(
+                    `SELECT template_id FROM workspace_default_templates WHERE workspace_id = $1 AND document_type = 'modul_ajar'`,
+                    [workspaceId]
+                );
+                if (defaultsRes.rowCount && defaultsRes.rowCount > 0) {
+                    templateIdToUse = defaultsRes.rows[0].template_id;
+                }
+            }
+
             try {
                 await fastify.db.query(
-                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, metadata, next_run_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-                    [jobId, workspaceId, packageId, 'queued', packageKey + '-' + Date.now(), JSON.stringify(metadata)]
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, template_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+                    [jobId, workspaceId, packageId, 'queued', packageKey + '-' + Date.now(), templateIdToUse, JSON.stringify(metadata)]
                 );
             } catch (err) {
                 generateRequestsTotal.inc({ result: 'failed_wizard' });

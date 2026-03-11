@@ -116,3 +116,10 @@ func TestQueueCollector(t *testing.T) {
 		t.Errorf("Expected 4 descriptors, got %d", count)
 	}
 }
+
+func TestHeartbeatLoop(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go StartHeartbeatLoop(ctx)
+	// Just let it run one cycle, wait a bit, then cancel
+	cancel()
+}

@@ -39,6 +39,7 @@ export default async function bundleRoutes(fastify: FastifyInstance) {
                 topics: string[];
                 teacher_name?: string;
                 school_name?: string;
+                template_ids?: Record<string, string>;
             };
         }>('/:workspaceId/bundle', {
             preHandler: [fastify.workspaceGuard],
@@ -54,6 +55,10 @@ export default async function bundleRoutes(fastify: FastifyInstance) {
                         topics: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 30 },
                         teacher_name: { type: 'string' },
                         school_name: { type: 'string' },
+                        template_ids: {
+                            type: 'object',
+                            additionalProperties: { type: 'string' }
+                        }
                     },
                 },
             },
@@ -116,6 +121,16 @@ export default async function bundleRoutes(fastify: FastifyInstance) {
                 [packageId, workspaceId, bundleId, body.kelas, body.semester, body.tahun_ajaran, teacherName, schoolName]
             );
 
+            // Fetch default templates to fallback
+            const defaultsRes = await fastify.db.query(
+                `SELECT document_type, template_id FROM workspace_default_templates WHERE workspace_id = $1`,
+                [workspaceId]
+            );
+            const defaultTemplates: Record<string, string> = {};
+            defaultsRes.rows.forEach(r => defaultTemplates[r.document_type] = r.template_id);
+
+            const userTemplates = body.template_ids || {};
+
             // 5. Create generation jobs (ATP, Prota, Promes, + 1 per topic)
             const jobs: { id: string; doc_type: DocType; topic?: string; cost: number }[] = [];
 
@@ -138,10 +153,12 @@ export default async function bundleRoutes(fastify: FastifyInstance) {
                     trace_id: traceId,
                 };
 
+                const tmplId = userTemplates[docType] || defaultTemplates[docType] || null;
+
                 await fastify.db.query(
-                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, doc_type, bundle_id, metadata, next_run_at)
-                     VALUES ($1, $2, $3, 'queued', $4, $5, $6, $7, NOW())`,
-                    [jobId, workspaceId, packageId, idempotencyKey, docType, bundleId, JSON.stringify(metadata)]
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, doc_type, bundle_id, template_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, 'queued', $4, $5, $6, $7, $8, NOW())`,
+                    [jobId, workspaceId, packageId, idempotencyKey, docType, bundleId, tmplId, JSON.stringify(metadata)]
                 );
                 jobs.push({ id: jobId, doc_type: docType, cost: docCost(docType) });
             }
@@ -168,10 +185,12 @@ export default async function bundleRoutes(fastify: FastifyInstance) {
                     trace_id: traceId,
                 };
 
+                const tmplId = userTemplates['modul_ajar'] || defaultTemplates['modul_ajar'] || null;
+
                 await fastify.db.query(
-                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, doc_type, bundle_id, metadata, next_run_at)
-                     VALUES ($1, $2, $3, 'queued', $4, 'modul_ajar', $5, $6, NOW())`,
-                    [jobId, workspaceId, packageId, idempotencyKey, bundleId, JSON.stringify(metadata)]
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, doc_type, bundle_id, template_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, 'queued', $4, 'modul_ajar', $5, $6, $7, NOW())`,
+                    [jobId, workspaceId, packageId, idempotencyKey, bundleId, tmplId, JSON.stringify(metadata)]
                 );
                 jobs.push({ id: jobId, doc_type: 'modul_ajar', topic, cost: BUNDLE_MODUL_COST });
             }

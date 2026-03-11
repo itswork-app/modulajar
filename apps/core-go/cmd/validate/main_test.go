@@ -4,16 +4,16 @@ import (
 	"testing"
 )
 
-func TestRun(t *testing.T) {
-	// 1. Success case (default)
+func TestValidateExit(t *testing.T) {
+	// Success path
 	err := Run([]string{"validate"})
 	if err != nil {
-		t.Errorf("expected success, got %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// 2. File not found
-	err = Run([]string{"validate", "/nonexistent"})
+	// Error path
+	err = Run([]string{"validate", "nonexistentdir"})
 	if err == nil {
-		t.Error("expected error for nonexistent file, got nil")
+		t.Error("Expected error because target directory not exist")
 	}
 }

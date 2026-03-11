@@ -60,9 +60,7 @@ export function renderModuleHtml(input: RenderInput): string {
         '{{SEMESTER}}': input.semester,
         '{{TAHUN_AJARAN}}': input.tahunAjaran,
         '{{SUBJECT_NAME}}': input.subjectName,
-        '{{ATP_TABLE}}': '<p>Table content preview</p>', // ATP might be complex, keep minimal for preview
-        '{{ACTIVITY_SECTIONS}}': activityHtml,
-        '{{ASSESSMENT_SECTION}}': assessmentHtml,
+        '{{ALL_SECTIONS}}': activityHtml + assessmentHtml,
         '{{PID}}': input.pid,
         '{{DID}}': input.did,
         '{{VERIFY_URL}}': input.verifyUrl,

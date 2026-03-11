@@ -22,6 +22,12 @@ const SEMESTER_OPTIONS = ['1', '2'];
 
 type BundleStep = 'KONTEKS' | 'TOPIK' | 'ESTIMASI' | 'GENERATE';
 
+interface Template {
+    id: string;
+    name: string;
+    workspace_id: string | null;
+}
+
 const STEPS: { key: BundleStep; label: string }[] = [
     { key: 'KONTEKS', label: 'Konteks' },
     { key: 'TOPIK', label: 'Topik' },
@@ -58,15 +64,19 @@ export default function BundleWizardPage() {
     const [newTopic, setNewTopic] = useState('');
     const [fokusMateri, setFokusMateri] = useState('');
 
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
     // Pre-fill teacher/school from profile
     useEffect(() => {
         if (!workspace) return;
         async function prefill() {
             try {
                 const token = await getToken();
-                const [pr, sr] = await Promise.all([
+                const [pr, sr, tplRes] = await Promise.all([
                     fetch(`${API_BASE}/w/${workspace!.id}/profile`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE}/w/${workspace!.id}/school`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/w/${workspace!.id}/templates?document_type=modul_ajar`, { headers: { Authorization: `Bearer ${token}` } }),
                 ]);
                 if (pr.ok) {
                     const pd = await pr.json();
@@ -80,6 +90,10 @@ export default function BundleWizardPage() {
                 if (sr.ok) {
                     const sd = await sr.json();
                     setCtx(prev => ({ ...prev, school_name: sd.school_display_name || prev.school_name }));
+                }
+                if (tplRes.ok) {
+                    const tData = await tplRes.json();
+                    setTemplates(tData.templates || []);
                 }
             } catch { /* silent */ }
         }
@@ -143,6 +157,7 @@ export default function BundleWizardPage() {
                     topics,
                     teacher_name: ctx.teacher_name,
                     school_name: ctx.school_name,
+                    template_ids: selectedTemplate ? { modul_ajar: selectedTemplate } : undefined,
                 }),
             });
             if (res.status === 402) {
@@ -358,6 +373,22 @@ export default function BundleWizardPage() {
                                 <span className="text-sm font-bold text-slate-500">{topics.length} × {MODUL_COST} = {topics.length * MODUL_COST} kredit</span>
                             </div>
                         </div>
+
+                        {/* Template Override */}
+                        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs space-y-3">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Format & Tata Letak Modul Ajar</div>
+                            <select
+                                value={selectedTemplate}
+                                onChange={(e) => setSelectedTemplate(e.target.value)}
+                                className="w-full text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3"
+                            >
+                                <option value="">(Otomatis berdasarkan pilihan Default Workspace)</option>
+                                {templates.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name} {t.workspace_id === null ? '(Standard ModulAjar)' : '(School Template)'}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="flex items-center justify-between px-5 py-4 bg-violet-50 rounded-xl border border-violet-100">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-5 h-5 text-violet-600" />

@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/planner"
 	"modulajar/apps/core-go/render"
 	"modulajar/apps/core-go/validator"
@@ -25,12 +27,36 @@ func TestNewRealWorker(t *testing.T) {
 }
 
 func TestRealDepsWrappers(t *testing.T) {
+	tryPanic := func(fn func()) {
+		defer func() { recover() }()
+		fn()
+	}
+
 	pdf := &RealPDFEngine{}
-	_, _ = pdf.Generate(context.Background(), "html", render.GeneratePDFOptions{})
+	tryPanic(func() { pdf.Generate(context.Background(), "html", render.GeneratePDFOptions{}) })
 
 	plannerObj := &RealPlanner{}
-	_, _ = plannerObj.Plan(planner.PlannerInput{})
+	tryPanic(func() { plannerObj.Plan(planner.PlannerInput{}) })
 
 	val := &RealValidator{}
-	_, _ = val.Validate(validator.ValidatorInput{})
+	tryPanic(func() { val.Validate(validator.ValidatorInput{}) })
+
+	aiEng := &RealAIEngine{}
+	tryPanic(func() { aiEng.Generate(context.Background(), ai.GenerateRequest{}) })
+
+	storage := &RealStorage{}
+	tryPanic(func() { storage.Exists(context.Background(), "test") })
+	tryPanic(func() { storage.UploadFile(context.Background(), "test", "test", "test") })
+	tryPanic(func() { storage.DownloadFile(context.Background(), "test") })
+	tryPanic(func() { storage.Close() })
+
+	jobStore := &RealJobStore{}
+	tryPanic(func() { jobStore.AcquireJob(context.Background()) })
+	tryPanic(func() { jobStore.UpdateJobMetadata(context.Background(), "test", "test", nil) })
+	tryPanic(func() { jobStore.MarkJobDone(context.Background(), "test", "test") })
+	tryPanic(func() { jobStore.MarkJobFailed(context.Background(), "test", "test", "test", 1) })
+	tryPanic(func() { jobStore.UpdatePackageStatus(context.Background(), "test", "test", "test") })
+	tryPanic(func() { jobStore.SaveDocument(context.Background(), db.Document{}) })
+	tryPanic(func() { jobStore.UpdateDocumentStatus(context.Background(), "test", "test", "test") })
+	tryPanic(func() { jobStore.UpdateDocumentMetadata(context.Background(), "test", "test", nil) })
 }

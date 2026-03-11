@@ -14,9 +14,10 @@ const buildApp = () => {
         query: async (sql: string, values: any[]) => {
             if (sql.includes('SELECT 1 FROM workspace_members')) return { rowCount: 1, rows: [] };
             if (sql.includes('SELECT full_name, school_name')) return { rowCount: 1, rows: [{ full_name: 'Guru', school_name: 'SD' }] };
+            if (sql.includes('workspace_default_templates')) return { rowCount: 0, rows: [] };
             if (sql.includes("status IN ('queued', 'running')")) return { rowCount: 0, rows: [] };
             if (sql.includes("status = 'draft'")) return { rowCount: 0, rows: [] };
-            return { rowCount: 1, rows: [] };
+            return { rowCount: 1, rows: [{ id: 'mock_job' }] };
         },
         connect: async () => ({ query: async () => ({ rowCount: 1, rows: [] }), release: () => { } } as any),
         totalCount: 0, idleCount: 0, waitingCount: 0, end: async () => { },
