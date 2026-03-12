@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function WorkspacePage() {
+export default function WorkspaceRedirect() {
     redirect('/workspace/letterhead');
 }

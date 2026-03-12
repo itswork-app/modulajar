@@ -50,10 +50,21 @@ export default async function walletRoutes(fastify: FastifyInstance) {
             );
             const monthUsage = parseInt(monthUsageResult.rows[0]?.usage as string || '0', 10);
 
+            // Compute jobs_failed
+            const jobsFailedResult = await fastify.db.query(
+                `SELECT COUNT(*) AS count
+                 FROM generation_jobs
+                 WHERE workspace_id = $1 
+                 AND status = 'failed'`,
+                [workspaceId]
+            );
+            const jobsFailed = parseInt(jobsFailedResult.rows[0]?.count as string || '0', 10);
+
             return {
                 credits_remaining: creditsRemaining,
                 documents_generated: documentsGenerated,
-                month_usage: monthUsage
+                month_usage: monthUsage,
+                jobs_failed: jobsFailed
             };
         });
 

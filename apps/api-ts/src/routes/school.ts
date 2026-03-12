@@ -115,7 +115,14 @@ export default async function schoolRoutes(fastify: FastifyInstance) {
                 body.signature_location?.trim() || null
             ]);
 
-            request.log.info({ workspaceId, action: 'upsert_school_identity' }, "School identity updated");
+            // PR-L4: Mark onboarding as completed for the teacher in this workspace
+            await fastify.db.query(
+                `UPDATE teachers SET onboarding_completed = TRUE, updated_at = NOW()
+                 WHERE workspace_id = $1`,
+                [workspaceId]
+            );
+
+            request.log.info({ workspaceId, action: 'upsert_school_identity' }, "School identity updated and onboarding marked completed");
 
             return rows[0];
         });

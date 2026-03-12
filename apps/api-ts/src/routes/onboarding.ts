@@ -45,6 +45,18 @@ export default async function onboardingRoutes(fastify: FastifyInstance) {
                 [ulid(), workspaceId, fullName, nip, schoolName, province, city]
             );
 
+            // PR-L4: Sync with Workspace Identity/Letterhead
+            if (schoolName) {
+                await fastify.db.query(
+                    `UPDATE workspaces 
+                     SET school_name = $1, 
+                         location = $2,
+                         updated_at = NOW()
+                     WHERE id = $3`,
+                    [schoolName, city || province || '', workspaceId]
+                );
+            }
+
             onboardingStartedTotal.inc();
 
             logger.info({

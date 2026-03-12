@@ -67,17 +67,31 @@ export default function BundleWizardPage() {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
-    // Pre-fill teacher/school from profile
+    // 1. Prerequisite check & Prefill
     useEffect(() => {
         if (!workspace) return;
-        async function prefill() {
+        async function loadData() {
             try {
                 const token = await getToken();
-                const [pr, sr, tplRes] = await Promise.all([
-                    fetch(`${API_BASE}/w/${workspace!.id}/profile`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/w/${workspace!.id}/school`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/w/${workspace!.id}/templates?document_type=modul_ajar`, { headers: { Authorization: `Bearer ${token}` } }),
-                ]);
+                const headers = { Authorization: `Bearer ${token}` };
+
+                // Profile check
+                const pr = await fetch(`${API_BASE}/w/${workspace!.id}/profile`, { headers });
+                if (pr.status === 404) {
+                    router.replace('/onboarding');
+                    return;
+                }
+
+                // School check
+                const sr = await fetch(`${API_BASE}/w/${workspace!.id}/school`, { headers });
+                if (sr.status === 404) {
+                    router.replace('/onboarding');
+                    return;
+                }
+
+                // Templates
+                const tplRes = await fetch(`${API_BASE}/w/${workspace!.id}/templates?document_type=modul_ajar`, { headers });
+
                 if (pr.ok) {
                     const pd = await pr.json();
                     setCtx(prev => ({
@@ -95,10 +109,12 @@ export default function BundleWizardPage() {
                     const tData = await tplRes.json();
                     setTemplates(tData.templates || []);
                 }
-            } catch { /* silent */ }
+            } catch (err) {
+                console.error('Wizard prefill failed:', err);
+            }
         }
-        prefill();
-    }, [workspace, getToken]);
+        loadData();
+    }, [workspace, getToken, router]);
 
     const estimatedCost = ATP_COST + PROTA_COST + PROMES_COST + topics.length * MODUL_COST;
 

@@ -55,7 +55,7 @@ export default function JobsListPage() {
                 });
 
                 if (profileRes.status === 404) {
-                    router.replace('/profile-setup');
+                    router.replace('/onboarding');
                     return;
                 }
 
@@ -64,7 +64,7 @@ export default function JobsListPage() {
                 });
 
                 if (schoolRes.status === 404) {
-                    router.replace('/workspace/school-setup');
+                    router.replace('/onboarding');
                     return;
                 }
 

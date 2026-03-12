@@ -144,9 +144,7 @@ export default function WizardV2Page() {
                     setFormData(JSON.parse(draft));
                 } else if (pData) {
                     const grade = pData.primary_grade ?? 4;
-                    let jenjang: Jenjang = 'SD';
-                    if (grade >= 10) jenjang = 'SMA';
-                    else if (grade >= 7) jenjang = 'SMP';
+                    const jenjang: Jenjang = pData.primary_jenjang ?? (grade >= 10 ? 'SMA' : grade >= 7 ? 'SMP' : 'SD');
 
                     setFormData(prev => ({
                         ...prev,
