@@ -10,7 +10,7 @@ export default async function profileRoutes(fastify: FastifyInstance) {
             preHandler: [fastify.workspaceGuard]
         }, async (request, reply) => {
             const result = await fastify.db.query(
-                `SELECT full_name, primary_grade, primary_subject, nip 
+                `SELECT full_name, primary_grade, primary_subject, nip, primary_jenjang
                  FROM teachers 
                  WHERE workspace_id = $1`,
                 [request.workspaceId]
@@ -34,6 +34,7 @@ export default async function profileRoutes(fastify: FastifyInstance) {
                         full_name: { type: 'string', minLength: 1 },
                         primary_subject: { type: 'string', default: '' },
                         primary_grade: { type: 'integer', minimum: 1, maximum: 12, default: 4 },
+                        primary_jenjang: { type: 'string', enum: ['SD', 'SMP', 'SMA', 'SMK'], default: 'SD' },
                         nip: { type: ['string', 'null'] }
                     }
                 }
@@ -43,26 +44,29 @@ export default async function profileRoutes(fastify: FastifyInstance) {
                 full_name: string;
                 primary_subject?: string;
                 primary_grade?: number;
+                primary_jenjang?: string;
                 nip?: string | null;
             };
 
             const grade = body.primary_grade ?? 4;
+            const jenjang = body.primary_jenjang ?? 'SD';
             const nipVal = body.nip || null;
             const subject = body.primary_subject?.trim() || '';
 
             // Upsert profile
             const result = await fastify.db.query(
-                `INSERT INTO teachers (id, workspace_id, full_name, primary_grade, primary_subject, nip)
-                 VALUES ($1, $2, $3, $4, $5, $6)
+                `INSERT INTO teachers (id, workspace_id, full_name, primary_grade, primary_subject, nip, primary_jenjang)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                  ON CONFLICT (workspace_id) 
                  DO UPDATE SET 
                     full_name = EXCLUDED.full_name,
                     primary_grade = EXCLUDED.primary_grade,
                     primary_subject = CASE WHEN EXCLUDED.primary_subject != '' THEN EXCLUDED.primary_subject ELSE teachers.primary_subject END,
                     nip = EXCLUDED.nip,
+                    primary_jenjang = EXCLUDED.primary_jenjang,
                     updated_at = NOW()
-                 RETURNING full_name, primary_grade, primary_subject, nip`,
-                [ulid(), request.workspaceId, body.full_name, grade, subject, nipVal]
+                 RETURNING full_name, primary_grade, primary_subject, nip, primary_jenjang`,
+                [ulid(), request.workspaceId, body.full_name, grade, subject, nipVal, jenjang]
             );
 
             return result.rows[0];
