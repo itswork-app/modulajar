@@ -11,6 +11,13 @@ import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/co
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+function gradeToJenjang(grade: number): Jenjang {
+    if (grade <= 6) return 'SD';
+    if (grade <= 9) return 'SMP';
+    return 'SMA';
+}
+
+
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
 export default function OnboardingPage() {
@@ -368,55 +375,58 @@ export default function OnboardingPage() {
                                     </div>
                                 </div>
                             </motion.div>
-                        )}
+                        )
+                        }
 
-                        {currentStep === 'SIGNATURE' && (
-                            <motion.div
-                                key="step-signature"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="space-y-6"
-                            >
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Nama Kepala Sekolah</label>
-                                        <input
-                                            type="text"
-                                            value={data.principal_name}
-                                            onChange={e => setData(prev => ({ ...prev, principal_name: e.target.value }))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Nama Lengkap Kepala Sekolah"
-                                        />
+                        {
+                            currentStep === 'SIGNATURE' && (
+                                <motion.div
+                                    key="step-signature"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    className="space-y-6"
+                                >
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-slate-700 ml-1">Nama Kepala Sekolah</label>
+                                            <input
+                                                type="text"
+                                                value={data.principal_name}
+                                                onChange={e => setData(prev => ({ ...prev, principal_name: e.target.value }))}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                placeholder="Nama Lengkap Kepala Sekolah"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-slate-700 ml-1">NIP Kepala Sekolah (Opsional)</label>
+                                            <input
+                                                type="text"
+                                                value={data.principal_nip}
+                                                onChange={e => setData(prev => ({ ...prev, principal_nip: e.target.value }))}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                placeholder="Nomor Induk Pegawai"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-slate-700 ml-1">Kota Penandatanganan</label>
+                                            <input
+                                                type="text"
+                                                value={data.signature_location}
+                                                onChange={e => setData(prev => ({ ...prev, signature_location: e.target.value }))}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                placeholder="Contoh: Jakarta"
+                                            />
+                                            <p className="text-[11px] text-slate-400 font-medium mt-1 uppercase tracking-tighter">* Akan muncul di bagian bawah dokumen (Misal: Jakarta, 10 Maret 2026)</p>
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">NIP Kepala Sekolah (Opsional)</label>
-                                        <input
-                                            type="text"
-                                            value={data.principal_nip}
-                                            onChange={e => setData(prev => ({ ...prev, principal_nip: e.target.value }))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Nomor Induk Pegawai"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Kota Penandatanganan</label>
-                                        <input
-                                            type="text"
-                                            value={data.signature_location}
-                                            onChange={e => setData(prev => ({ ...prev, signature_location: e.target.value }))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Contoh: Jakarta"
-                                        />
-                                        <p className="text-[11px] text-slate-400 font-medium mt-1 uppercase tracking-tighter">* Akan muncul di bagian bawah dokumen (Misal: Jakarta, 10 Maret 2026)</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                </motion.div>
+                            )
+                        }
+                    </AnimatePresence >
 
                     {/* Navigation */}
-                    <div className="flex items-center justify-between mt-12 pt-8 border-t border-slate-100">
+                    < div className="flex items-center justify-between mt-12 pt-8 border-t border-slate-100" >
                         {currentStep !== 'PROFILE' ? (
                             <button
                                 onClick={handleBack}
@@ -426,34 +436,36 @@ export default function OnboardingPage() {
                             </button>
                         ) : <div />}
 
-                        {currentStep !== 'SIGNATURE' ? (
-                            <button
-                                onClick={handleNext}
-                                disabled={
-                                    (currentStep === 'PROFILE' && (!data.full_name || !data.primary_subject)) ||
-                                    (currentStep === 'SCHOOL' && !data.school_display_name)
-                                }
-                                className="flex items-center justify-center px-8 py-3.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-slate-200"
-                            >
-                                Selanjutnya <ChevronRight className="w-5 h-5" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSubmit}
-                                disabled={isSubmitting || !data.principal_name || !data.signature_location}
-                                className="flex items-center justify-center px-10 py-3.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-emerald-200"
-                            >
-                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Selesaikan Onboarding</>}
-                            </button>
-                        )}
-                    </div>
-                </div>
+                        {
+                            currentStep !== 'SIGNATURE' ? (
+                                <button
+                                    onClick={handleNext}
+                                    disabled={
+                                        (currentStep === 'PROFILE' && (!data.full_name || !data.primary_subject)) ||
+                                        (currentStep === 'SCHOOL' && !data.school_display_name)
+                                    }
+                                    className="flex items-center justify-center px-8 py-3.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-slate-200"
+                                >
+                                    Selanjutnya <ChevronRight className="w-5 h-5" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={isSubmitting || !data.principal_name || !data.signature_location}
+                                    className="flex items-center justify-center px-10 py-3.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-emerald-200"
+                                >
+                                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Selesaikan Onboarding</>}
+                                </button>
+                            )
+                        }
+                    </div >
+                </div >
 
                 {/* Footer Security Note */}
-                <div className="text-center">
+                < div className="text-center" >
                     <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Data Anda dienkripsi secara aman dan hanya digunakan untuk keperluan dokumen sekolah.</p>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }
