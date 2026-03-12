@@ -7,6 +7,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { Loader2, User, School, PenTool, CheckCircle2, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -26,6 +27,7 @@ export default function OnboardingPage() {
         // Profile
         full_name: user?.fullName || '',
         nip: '',
+        primary_jenjang: 'SD' as Jenjang,
         primary_subject: '',
         primary_grade: 4,
         // School
@@ -64,6 +66,7 @@ export default function OnboardingPage() {
                         ...prev,
                         full_name: pData.full_name || prev.full_name,
                         nip: pData.nip || prev.nip,
+                        primary_jenjang: (pData.primary_jenjang as Jenjang) || prev.primary_jenjang,
                         primary_subject: pData.primary_subject || prev.primary_subject,
                         primary_grade: pData.primary_grade || prev.primary_grade
                     }));
@@ -117,6 +120,7 @@ export default function OnboardingPage() {
                 },
                 body: JSON.stringify({
                     full_name: data.full_name,
+                    primary_jenjang: data.primary_jenjang,
                     primary_subject: data.primary_subject,
                     primary_grade: data.primary_grade,
                     nip: data.nip || null
@@ -245,14 +249,25 @@ export default function OnboardingPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Mata Pelajaran Utama</label>
-                                        <input
-                                            type="text"
-                                            value={data.primary_subject}
-                                            onChange={e => setData(prev => ({ ...prev, primary_subject: e.target.value }))}
+                                        <label className="text-sm font-bold text-slate-700 ml-1">Jenjang Pendidikan</label>
+                                        <select
+                                            value={data.primary_jenjang}
+                                            onChange={e => {
+                                                const newJenjang = e.target.value as Jenjang;
+                                                const defaultGrade = KELAS_OPTIONS[newJenjang][0];
+                                                setData(prev => ({
+                                                    ...prev,
+                                                    primary_jenjang: newJenjang,
+                                                    primary_grade: defaultGrade,
+                                                    primary_subject: ''
+                                                }));
+                                            }}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Contoh: Matematika"
-                                        />
+                                        >
+                                            {JENJANG_OPTIONS.map(j => (
+                                                <option key={j} value={j}>{j}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-slate-700 ml-1">Kelas Utama</label>
@@ -261,10 +276,29 @@ export default function OnboardingPage() {
                                             onChange={e => setData(prev => ({ ...prev, primary_grade: parseInt(e.target.value) }))}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
                                         >
-                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(g => (
+                                            {KELAS_OPTIONS[data.primary_jenjang].map(g => (
                                                 <option key={g} value={g}>Kelas {g}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <div className="space-y-2 col-span-full">
+                                        <label className="text-sm font-bold text-slate-700 ml-1">Mata Pelajaran Utama</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={data.primary_subject}
+                                                onChange={e => setData(prev => ({ ...prev, primary_subject: e.target.value }))}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                placeholder="Contoh: Matematika"
+                                                list="subject-suggestions"
+                                            />
+                                            <datalist id="subject-suggestions">
+                                                {MAPEL_OPTIONS[data.primary_jenjang].map(m => (
+                                                    <option key={m} value={m} />
+                                                ))}
+                                            </datalist>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-tight">Pilih dari saran atau ketik mata pelajaran khusus Anda.</p>
                                     </div>
                                 </div>
                             </motion.div>
