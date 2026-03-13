@@ -223,7 +223,7 @@ export default function RevenueDashboard() {
                                 <Tooltip 
                                     cursor={{stroke: '#6366f1', strokeWidth: 2}}
                                     contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '16px' }}
-                                    formatter={(value: number) => [formatIDR(value), 'Revenue']}
+                                    formatter={(value: any) => [formatIDR(value), 'Revenue']}
                                     labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                                 />
                                 <Area type="monotone" dataKey="rev" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
