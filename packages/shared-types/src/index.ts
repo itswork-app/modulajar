@@ -95,3 +95,24 @@ export interface ModuleVersion {
     created_at: string;
     created_by?: string;
 }
+
+export type Jenjang = 'SD' | 'SMP' | 'SMA' | 'SMK';
+
+export interface TeacherProfile {
+    full_name: string;
+    nip?: string;
+    primary_subject?: string;
+    primary_grade?: number;
+    primary_jenjang?: Jenjang;
+}
+
+export interface SchoolIdentity {
+    school_display_name?: string;
+    school_npsn?: string;
+    kab_kota?: string;
+    provinsi?: string;
+    alamat?: string;
+    principal_name?: string;
+    principal_nip?: string;
+    signature_location?: string;
+}

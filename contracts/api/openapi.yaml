@@ -73,6 +73,7 @@ components:
         full_name: { type: string }
         primary_grade: { type: integer }
         primary_subject: { type: string }
+        primary_jenjang: { type: string, enum: [SD, SMP, SMA, SMK] }
         nip: { type: string, nullable: true }
 
     SchoolIdentity:

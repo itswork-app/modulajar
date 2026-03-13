@@ -9,28 +9,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface TeacherProfile {
-    full_name: string;
-    nip: string;
-    primary_subject: string;
-    primary_grade: number;
-}
-
-interface SchoolIdentity {
-    school_display_name: string;
-    school_npsn: string;
-    alamat: string;
-    kab_kota: string;
-    provinsi: string;
-    principal_name: string;
-    principal_nip: string;
-    signature_location: string;
-}
 
 type Toast = { type: 'success' | 'error'; message: string } | null;
 
@@ -65,7 +48,7 @@ function SectionCard({
 
 function Field({ label, value, editing, children }: {
     label: string;
-    value: string | number;
+    value: string | number | undefined;
     editing: boolean;
     children?: React.ReactNode;
 }) {
@@ -97,7 +80,7 @@ export default function SettingsPage() {
 
     // Section data
     const [profile, setProfile] = useState<TeacherProfile>({
-        full_name: '', nip: '', primary_subject: '', primary_grade: 4,
+        full_name: '', nip: '', primary_subject: '', primary_grade: 4, primary_jenjang: 'SD',
     });
     const [school, setSchool] = useState<SchoolIdentity>({
         school_display_name: '', school_npsn: '', alamat: '',
