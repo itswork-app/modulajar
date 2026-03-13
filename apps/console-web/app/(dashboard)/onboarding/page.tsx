@@ -8,6 +8,7 @@ import { Loader2, User, School, PenTool, CheckCircle2, ChevronRight, ChevronLeft
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -68,7 +69,7 @@ export default function OnboardingPage() {
                 ]);
 
                 if (pRes.ok) {
-                    const pData = await pRes.json();
+                    const pData: TeacherProfile = await pRes.json();
                     setData(prev => ({
                         ...prev,
                         full_name: pData.full_name || prev.full_name,
@@ -80,7 +81,7 @@ export default function OnboardingPage() {
                 }
 
                 if (sRes.ok) {
-                    const sData = await sRes.json();
+                    const sData: SchoolIdentity = await sRes.json();
                     setData(prev => ({
                         ...prev,
                         school_display_name: sData.school_display_name || prev.school_display_name,

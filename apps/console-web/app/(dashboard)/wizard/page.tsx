@@ -8,6 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, Che
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
@@ -25,24 +26,6 @@ interface CurriculumTopic {
     display_order: number;
     cp_reference?: string;
     notes?: string;
-}
-
-interface TeacherProfile {
-    full_name: string;
-    nip?: string;
-    primary_subject?: string;
-    primary_grade?: number;
-}
-
-interface SchoolIdentity {
-    school_display_name?: string;
-    school_npsn?: string;
-    kab_kota?: string;
-    provinsi?: string;
-    alamat?: string;
-    principal_name?: string;
-    principal_nip?: string;
-    signature_location?: string;
 }
 
 interface UsageSummary {
@@ -144,9 +127,7 @@ export default function WizardV2Page() {
                     setFormData(JSON.parse(draft));
                 } else if (pData) {
                     const grade = pData.primary_grade ?? 4;
-                    let jenjang: Jenjang = 'SD';
-                    if (grade >= 10) jenjang = 'SMA';
-                    else if (grade >= 7) jenjang = 'SMP';
+                    const jenjang: Jenjang = pData.primary_jenjang ?? (grade >= 10 ? 'SMA' : grade >= 7 ? 'SMP' : 'SD');
 
                     setFormData(prev => ({
                         ...prev,

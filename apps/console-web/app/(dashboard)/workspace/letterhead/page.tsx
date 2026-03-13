@@ -476,7 +476,7 @@ export default function LetterheadSetupPage() {
                             <div className="pt-6 border-t border-slate-200 flex gap-4">
                                 <button
                                     type="button"
-                                    onClick={() => router.push('/generate')}
+                                    onClick={() => router.push('/settings')}
                                     className="flex-1 px-6 py-4 rounded-xl text-slate-700 bg-white border border-slate-200 font-semibold transition-all duration-200 hover:bg-slate-50"
                                 >
                                     Kembali

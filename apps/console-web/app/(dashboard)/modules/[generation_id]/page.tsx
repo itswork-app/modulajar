@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -39,24 +40,6 @@ interface JobDetail {
     public_id?: string;
     html_sha256?: string;
     pdf_sha256?: string;
-}
-
-interface TeacherProfile {
-    full_name: string;
-    nip?: string;
-    primary_subject?: string;
-    primary_grade?: number;
-}
-
-interface SchoolIdentity {
-    school_display_name?: string;
-    school_npsn?: string;
-    kab_kota?: string;
-    provinsi?: string;
-    alamat?: string;
-    principal_name?: string;
-    principal_nip?: string;
-    signature_location?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

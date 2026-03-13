@@ -99,12 +99,13 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
             // 1. Resolve Teacher Context from onboarding (or default)
             const teacherCtx = await fastify.db.query(
-                `SELECT full_name, school_name, province, city FROM teachers WHERE workspace_id = $1 LIMIT 1`,
+                `SELECT full_name, school_name, province, city, primary_jenjang FROM teachers WHERE workspace_id = $1 LIMIT 1`,
                 [workspaceId]
             );
 
             const teacherName = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].full_name : 'Guru';
             const schoolName = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].school_name : 'Sekolah Dasar';
+            const primaryJenjang = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].primary_jenjang : null;
 
             // 2. Compute canonical PID and Check idempotency
             const packageKey = computePackageKey(workspaceId, mode, subject, grade, effectiveTopic, template_id);
@@ -142,9 +143,9 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
             });
 
             await fastify.db.query(
-                `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [packageId, workspaceId, pid, grade.toString(), semester || '1', '2025/2026', teacherName, schoolName, 'draft']
+                `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status, jenjang)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [packageId, workspaceId, pid, grade.toString(), semester || '1', '2025/2026', teacherName, schoolName, 'draft', primaryJenjang]
             );
 
             const jobId = ulid();
@@ -161,6 +162,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
                 topic: effectiveTopic,
                 subject: subject,
                 grade: grade,
+                jenjang: primaryJenjang, // Explicit Jenjang!
                 semester: semester || '1',
                 kelas: grade.toString(),
                 tahun_ajaran: '2025/2026',

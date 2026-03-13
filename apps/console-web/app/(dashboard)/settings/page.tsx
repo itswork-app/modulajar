@@ -5,31 +5,15 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import {
     Loader2, User, School, PenTool, BookOpen,
-    CheckCircle2, AlertCircle, Pencil, X, Check
+    CheckCircle2, AlertCircle, Pencil, X, Check, LayoutTemplate
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface TeacherProfile {
-    full_name: string;
-    nip: string;
-    primary_subject: string;
-    primary_grade: number;
-}
-
-interface SchoolIdentity {
-    school_display_name: string;
-    school_npsn: string;
-    alamat: string;
-    kab_kota: string;
-    provinsi: string;
-    principal_name: string;
-    principal_nip: string;
-    signature_location: string;
-}
 
 type Toast = { type: 'success' | 'error'; message: string } | null;
 
@@ -64,7 +48,7 @@ function SectionCard({
 
 function Field({ label, value, editing, children }: {
     label: string;
-    value: string | number;
+    value: string | number | undefined;
     editing: boolean;
     children?: React.ReactNode;
 }) {
@@ -96,7 +80,7 @@ export default function SettingsPage() {
 
     // Section data
     const [profile, setProfile] = useState<TeacherProfile>({
-        full_name: '', nip: '', primary_subject: '', primary_grade: 4,
+        full_name: '', nip: '', primary_subject: '', primary_grade: 4, primary_jenjang: 'SD',
     });
     const [school, setSchool] = useState<SchoolIdentity>({
         school_display_name: '', school_npsn: '', alamat: '',
@@ -447,6 +431,34 @@ export default function SettingsPage() {
                 </div>
                 <p className="mt-3 text-[11px] text-slate-400 font-medium">
                     * Preferensi ini disimpan di browser dan dipakai sebagai nilai awal di Wizard Generasi.
+                </p>
+            </SectionCard>
+
+            {/* ─── 5. Pengaturan Dokumen (Kop Surat) ─────────────────────── */}
+            <SectionCard
+                icon={LayoutTemplate}
+                title="Kop Surat & Identitas Visual"
+                subtitle="Atur logo dan tata letak kop surat untuk dokumen PDF."
+            >
+                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center shadow-sm">
+                            <LayoutTemplate className="w-6 h-6 text-indigo-600" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-slate-900 text-sm">Editor Kop Surat</p>
+                            <p className="text-xs text-slate-500 font-medium">Logo, Nama Yayasan, dan Alamat Dokumen.</p>
+                        </div>
+                    </div>
+                    <Link
+                        href="/workspace/letterhead"
+                        className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+                    >
+                        Buka Editor
+                    </Link>
+                </div>
+                <p className="mt-4 text-[11px] text-slate-400 font-medium italic">
+                    * Perubahan pada kop surat akan langsung berdampak pada seluruh Modul Ajar yang diunduh.
                 </p>
             </SectionCard>
 

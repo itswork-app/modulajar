@@ -1,5 +1,7 @@
+import { Jenjang } from 'shared-types';
+export type { Jenjang };
+
 export const JENJANG_OPTIONS = ['SD', 'SMP', 'SMA', 'SMK'] as const;
-export type Jenjang = typeof JENJANG_OPTIONS[number];
 
 export const KELAS_OPTIONS: Record<Jenjang, number[]> = {
     SD: [1, 2, 3, 4, 5, 6],

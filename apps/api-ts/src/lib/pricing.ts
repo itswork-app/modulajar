@@ -17,9 +17,9 @@ export interface PricingTier {
  */
 export const PRICING_TABLE: PricingTier[] = [
     { product: 'sd_semester', label: 'SD Semester', amountIdr: 59000, credits: 20 },
-    // Future:
-    // { product: 'smp_mapel_semester', label: 'SMP Mapel Semester', amountIdr: 49000, credits: 15 },
-    // { product: 'sma_mapel_semester', label: 'SMA Mapel Semester', amountIdr: 59000, credits: 18 },
+    { product: 'pkg_10', label: 'Paket Basic 10', amountIdr: 49000, credits: 10 },
+    { product: 'pkg_50', label: 'Paket Regular 50', amountIdr: 199000, credits: 50 },
+    { product: 'pkg_200', label: 'Paket Premium 200', amountIdr: 699000, credits: 200 },
 ];
 
 /**

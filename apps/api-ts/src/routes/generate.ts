@@ -176,6 +176,12 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             const { ulid } = await import('ulid');
 
             // 4. Resolve or create package (identity-keyed)
+            const teacherCtx = await fastify.db.query(
+                `SELECT primary_jenjang FROM teachers WHERE workspace_id = $1 LIMIT 1`,
+                [workspaceId]
+            );
+            const primaryJenjang = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].primary_jenjang : null;
+
             const packageKey = computePackageKey(
                 workspaceId, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName
             );
@@ -208,9 +214,9 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
 
                 await fastify.db.query(
-                    `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                    [packageId, workspaceId, pid, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName, 'draft']
+                    `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status, jenjang)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                    [packageId, workspaceId, pid, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName, 'draft', primaryJenjang]
                 );
             }
 
@@ -232,6 +238,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 pack_path: packPath,
                 semester: body.semester,
                 kelas: kelas,
+                jenjang: primaryJenjang, // Explicit Jenjang!
                 tahun_ajaran: body.tahun_ajaran,
                 teacher_name: teacherName,
                 school_name: schoolName,

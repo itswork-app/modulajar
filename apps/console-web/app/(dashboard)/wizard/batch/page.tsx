@@ -8,22 +8,11 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Layers, ChevronRi
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
+import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 type BatchStep = 'KONTEKS' | 'TOPIK' | 'REVIEW' | 'GENERATING';
-
-interface TeacherProfile {
-    full_name: string;
-    nip?: string;
-    primary_subject?: string;
-    primary_grade?: number;
-}
-
-interface SchoolIdentity {
-    school_display_name?: string;
-    school_npsn?: string;
-}
 
 interface UsageSummary {
     credits_remaining: number;

@@ -52,10 +52,26 @@ fastify.register(cors, {
         'http://localhost:3000',
         'http://localhost:3001'
     ],
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PATCH'], // S2: Added PATCH
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: false, // Strict: No credentials unless required
     strictPreflight: true // Enforce strict preflight checks
+});
+
+// S3: Add security headers
+import helmet from '@fastify/helmet';
+fastify.register(helmet, {
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            scriptSrc: ["'self'", "'unsafe-inline'"]
+        }
+    },
+    hsts: true,
+    noSniff: true,
+    frameguard: { action: 'deny' }
 });
 
 // Helper to capture raw body for webhook verification
@@ -109,9 +125,19 @@ fastify.get('/metrics', async (_req, reply) => {
 const SERVICE_MODE = process.env.SERVICE_MODE || 'api';
 console.log(`[STARTUP] Starting Modulajar API in ${SERVICE_MODE} mode...`);
 
-// Health checks are always available
+// Health checks
 fastify.get('/healthz', async () => ({ status: 'ok' }));
-fastify.get('/readyz', async () => ({ status: 'ok' }));
+
+// S5: Improve readyz with DB ping
+fastify.get('/readyz', async (request, reply) => {
+    try {
+        await fastify.db.query('SELECT 1');
+        return { status: 'ok', db: 'connected' };
+    } catch (err) {
+        request.log.error(err, 'Readiness check failed: DB disconnected');
+        return reply.code(503).send({ status: 'error', reason: 'db_disconnected' });
+    }
+});
 
 // Core Plugins (Common to both modes)
 fastify.register(schemasPlugin);

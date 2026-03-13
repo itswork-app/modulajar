@@ -45,6 +45,7 @@ type TaskPayload struct {
 	TahunAjaran string `json:"tahun_ajaran"`
 	TeacherName string `json:"teacher_name"`
 	SchoolName  string `json:"school_name"`
+	Jenjang     string `json:"jenjang"` // Explicit Jenjang!
 	PID         string `json:"pid"`
 	TraceID     string `json:"trace_id"`
 
@@ -293,9 +294,10 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 					string(templateJSON),
 					templateExamples,
 				)
-			} else {
+			} else { // Fallback prompt
 				schemaPrompt = fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
 Subject: %s
+Jenjang: %s
 Class: %s
 Semester: %s
 Teacher: %s
@@ -304,7 +306,7 @@ School: %s
 STRICT RULE: Output must be valid JSON matching this schema:
 {
   "meta": {
-    "jenjang": "SD|SMP|SMA",
+    "jenjang": "%s",
     "kelas": "string",
     "mapel": "string",
     "semester": "1|2",
@@ -339,7 +341,7 @@ STRICT RULE: Output must be valid JSON matching this schema:
   }
 }
 No markdown formatting. Pure JSON.`,
-					subjectForTemplate, payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName)
+					subjectForTemplate, payload.Jenjang, payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName, payload.Jenjang)
 			}
 
 			req := ai.GenerateRequest{Prompt: schemaPrompt}
