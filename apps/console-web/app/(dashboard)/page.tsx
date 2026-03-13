@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, PlusCircle, AlertCircle, Wallet, FileText, XCircle, FileOutput, Clock, Eye, Download } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PlusCircle, AlertCircle, Wallet, FileText, XCircle, FileOutput, Clock, Eye, Download } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -25,6 +26,52 @@ interface UsageSummary {
     jobs_failed: number;
     recent_jobs: RecentJob[];
 }
+
+const DashboardSkeleton = () => (
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-2">
+                <Skeleton className="h-9 w-64" />
+                <Skeleton className="h-5 w-96" />
+            </div>
+            <Skeleton className="h-12 w-48 rounded-xl" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-xl" />
+                        <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-10 w-20" />
+                    <Skeleton className="h-4 w-40" />
+                </div>
+            ))}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-8">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-24" />
+            </div>
+            <div className="p-6 space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="w-10 h-10 rounded-xl" />
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-48" />
+                                <Skeleton className="h-3 w-32" />
+                            </div>
+                        </div>
+                        <Skeleton className="h-8 w-24 rounded-lg" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
 
 export default function DashboardPage() {
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
@@ -91,11 +138,7 @@ export default function DashboardPage() {
     };
 
     if (!isAuthLoaded || isLoadingWorkspace || isLoading) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     // Empty State (No jobs at all and 0 generated)

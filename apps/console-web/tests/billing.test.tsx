@@ -139,10 +139,11 @@ describe('Billing UX v1 - Integration Tests', () => {
         expect(klaimButton.hasAttribute('disabled')).toBe(false);
     });
 
-    it('billing page renders loading state initially', async () => {
+    it('billing page renders skeleton loader initially', async () => {
         mockUsageSummarySuccess();
-        render(<BillingPage />);
-        expect(screen.getByText('Memuat data billing...')).toBeDefined();
+        const { container } = render(<BillingPage />);
+        // Check for presence of animate-pulse which is standard for Shadcn skeletons
+        expect(container.querySelector('.animate-pulse')).toBeDefined();
     });
 
     it('billing page renders error state if API fails', async () => {

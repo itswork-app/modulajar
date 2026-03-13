@@ -6,6 +6,8 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { Sparkles, Loader2, Database, Search, BookOpen, Star } from 'lucide-react';
 
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface DatasetEntry {
@@ -17,6 +19,34 @@ interface DatasetEntry {
     usage_count: number;
     created_at: string;
 }
+
+const DatasetSkeleton = () => (
+    <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-3">
+                <Skeleton className="h-10 w-64" />
+                <Skeleton className="h-4 w-96" />
+            </div>
+            <Skeleton className="h-12 w-80 rounded-2xl" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
+                    <div className="flex gap-2">
+                        <Skeleton className="h-6 w-16 rounded-lg" />
+                        <Skeleton className="h-6 w-20 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-12 w-full" />
+                    <div className="flex gap-4 pt-4 border-t border-slate-50">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-20" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
 export default function DatasetPage() {
     const { getToken } = useAuth();
@@ -51,8 +81,12 @@ export default function DatasetPage() {
         d.topic.toLowerCase().includes(search.toLowerCase())
     );
 
+    if (loading) {
+        return <DatasetSkeleton />;
+    }
+
     return (
-        <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+        <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -74,12 +108,7 @@ export default function DatasetPage() {
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex flex-col items-center justify-center h-[50vh] text-slate-400">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-emerald-600" />
-                    <p className="font-bold animate-pulse">Menyelaraskan basis data...</p>
-                </div>
-            ) : filtered.length === 0 ? (
+            {filtered.length === 0 ? (
                 <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-20 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-6">
                         <Sparkles className="w-8 h-8 text-slate-300" />
