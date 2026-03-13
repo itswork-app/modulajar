@@ -152,7 +152,7 @@ export default function OnboardingPage() {
                     school_npsn: data.school_npsn || null,
                     principal_name: data.principal_name,
                     principal_nip: data.principal_nip || null,
-                    signature_location: data.signature_location
+                    signature_location: data.kab_kota // Derived from city
                 })
             });
 
@@ -395,7 +395,7 @@ export default function OnboardingPage() {
                                                 type="text"
                                                 value={data.principal_name}
                                                 onChange={e => setData(prev => ({ ...prev, principal_name: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900"
                                                 placeholder="Nama Lengkap Kepala Sekolah"
                                             />
                                         </div>
@@ -405,20 +405,9 @@ export default function OnboardingPage() {
                                                 type="text"
                                                 value={data.principal_nip}
                                                 onChange={e => setData(prev => ({ ...prev, principal_nip: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900"
                                                 placeholder="Nomor Induk Pegawai"
                                             />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">Kota Penandatanganan</label>
-                                            <input
-                                                type="text"
-                                                value={data.signature_location}
-                                                onChange={e => setData(prev => ({ ...prev, signature_location: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                                placeholder="Contoh: Jakarta"
-                                            />
-                                            <p className="text-[11px] text-slate-400 font-medium mt-1 uppercase tracking-tighter">* Akan muncul di bagian bawah dokumen (Misal: Jakarta, 10 Maret 2026)</p>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -443,7 +432,7 @@ export default function OnboardingPage() {
                                     onClick={handleNext}
                                     disabled={
                                         (currentStep === 'PROFILE' && (!data.full_name || !data.primary_subject)) ||
-                                        (currentStep === 'SCHOOL' && !data.school_display_name)
+                                        (currentStep === 'SCHOOL' && (!data.school_display_name || !data.kab_kota))
                                     }
                                     className="flex items-center justify-center px-8 py-3.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-slate-200"
                                 >
@@ -452,7 +441,7 @@ export default function OnboardingPage() {
                             ) : (
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={isSubmitting || !data.principal_name || !data.signature_location}
+                                    disabled={isSubmitting || !data.principal_name}
                                     className="flex items-center justify-center px-10 py-3.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-emerald-200"
                                 >
                                     {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Selesaikan Onboarding</>}
