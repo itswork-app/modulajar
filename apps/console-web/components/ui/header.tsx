@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { UserButton, useAuth, useClerk } from '@clerk/nextjs';
 import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, LogOut, Check, Menu, X } from 'lucide-react';
+
 import { useWorkspace, useWorkspaces } from '@/hooks/use-workspace';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
