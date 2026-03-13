@@ -38,18 +38,40 @@ function SupportSkeleton() {
     return (
         <div className="max-w-7xl mx-auto py-10 px-6 space-y-10">
             <div className="flex justify-between items-end">
-                <div className="space-y-2">
+                <div className="space-y-4">
                     <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-10 w-64" />
+                    <Skeleton className="h-12 w-64 rounded-xl" />
                 </div>
-                <Skeleton className="h-12 w-48 rounded-2xl" />
+                <Skeleton className="h-10 w-48 rounded-2xl" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-3xl" />)}
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-3">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="w-12 h-12 rounded-2xl" />
+                            <div className="space-y-2">
+                                <Skeleton className="h-3 w-20" />
+                                <Skeleton className="h-6 w-16" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Skeleton className="h-[400px] rounded-3xl" />
-                <Skeleton className="h-[400px] rounded-3xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm space-y-6">
+                    <div className="space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-[250px] w-full rounded-2xl" />
+                </div>
+                <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm space-y-6">
+                    <div className="space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-[250px] w-full rounded-2xl" />
+                </div>
             </div>
         </div>
     );
@@ -63,6 +85,14 @@ export default function SupportDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showManageNotice, setShowManageNotice] = useState(false);
+
+    useEffect(() => {
+        if (showManageNotice) {
+            const timer = setTimeout(() => setShowManageNotice(false), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [showManageNotice]);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -140,7 +170,14 @@ export default function SupportDashboard() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto py-10 px-6 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-7xl mx-auto py-10 px-6 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+            {showManageNotice && (
+                <div className="fixed top-4 right-4 z-50 bg-indigo-900 text-white px-6 py-4 rounded-3xl shadow-2xl border border-indigo-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+                    <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                    <p className="text-sm font-bold">Access Management Console is opening in a secure window...</p>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
@@ -300,7 +337,10 @@ export default function SupportDashboard() {
                                 </div>
                                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                                     <span className="text-xs text-white/50">{new Date(ws.created_at).toLocaleDateString()}</span>
-                                    <button className="flex items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-widest group-hover:text-indigo-300 transition-colors">
+                                    <button 
+                                        onClick={() => setShowManageNotice(true)}
+                                        className="flex items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-widest group-hover:text-indigo-300 transition-colors"
+                                    >
                                         Manage Access <ArrowRight className="w-3 h-3" />
                                     </button>
                                 </div>

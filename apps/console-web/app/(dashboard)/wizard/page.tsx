@@ -244,10 +244,10 @@ export default function WizardV2Page() {
         return (
             <div className="flex h-[65vh] items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-3xl bg-emerald-50 flex items-center justify-center">
                         <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
                     </div>
-                    <span className="text-slate-500 font-medium text-sm">Memuat profil ruang kerja...</span>
+                    <span className="text-slate-500 font-bold text-sm">Menyiapkan Ruang Kerja...</span>
                 </div>
             </div>
         );
@@ -271,7 +271,7 @@ export default function WizardV2Page() {
                                 else if (v === 'ai-planner') router.push('/wizard/batch?mode=ai-planner');
                                 else if (v === 'bundle') router.push('/wizard/bundle');
                             }}
-                            className="w-full appearance-none bg-white border border-slate-200 rounded-2xl px-5 py-3 pr-10 text-sm font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                            className="w-full appearance-none bg-white border border-slate-200 rounded-3xl px-6 py-4 pr-10 text-sm font-black text-slate-800 shadow-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 cursor-pointer transition-all"
                         >
                             <option value="single">📄 Single Modul</option>
                             <option value="batch">🗂️ Batch Semester</option>
@@ -401,7 +401,7 @@ export default function WizardV2Page() {
 
                         <button
                             onClick={() => setCurrentStep('TARGET')}
-                            className="w-full bg-slate-900 text-white rounded-[1.25rem] py-5 font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-2 group"
+                            className="w-full bg-slate-900 text-white rounded-3xl py-6 font-black text-lg hover:bg-slate-800 transition-all shadow-[0_20px_50px_-12px_rgba(15,23,42,0.15)] hover:-translate-y-1 flex items-center justify-center gap-2 group"
                         >
                             Lanjut ke Target Ajar <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </button>
@@ -424,7 +424,7 @@ export default function WizardV2Page() {
                                 <div className="space-y-3">
                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Jenjang <span className="text-emerald-500">*</span></label>
                                     <select
-                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        className="w-full rounded-2xl border border-slate-200 px-6 py-5 bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm outline-none"
                                         value={formData.jenjang}
                                         onChange={(e) => {
                                             const newJenjang = e.target.value as Jenjang;
@@ -442,7 +442,7 @@ export default function WizardV2Page() {
                                 <div className="space-y-3">
                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Fase / Kelas <span className="text-emerald-500">*</span></label>
                                     <select
-                                        className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                        className="w-full rounded-2xl border border-slate-200 px-6 py-5 bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm outline-none"
                                         value={formData.kelas}
                                         onChange={(e) => handleChange('kelas', e.target.value)}
                                     >
@@ -456,7 +456,7 @@ export default function WizardV2Page() {
                             <div className="space-y-3">
                                 <label className="text-sm font-bold text-slate-900 ml-1">Mata Pelajaran <span className="text-emerald-500">*</span></label>
                                 <select
-                                    className="w-full rounded-2xl border border-slate-200 px-5 py-4 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm"
+                                    className="w-full rounded-2xl border border-slate-200 px-6 py-5 bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 text-slate-900 font-bold transition-all shadow-sm outline-none"
                                     value={formData.mapel}
                                     onChange={(e) => handleChange('mapel', e.target.value)}
                                 >
@@ -497,7 +497,7 @@ export default function WizardV2Page() {
                             <button
                                 onClick={() => setCurrentStep('MATERI')}
                                 disabled={!formData.mapel}
-                                className="w-full mt-6 bg-slate-900 text-white rounded-[1.25rem] py-5 font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-200 group flex items-center justify-center gap-2"
+                                className="w-full mt-6 bg-slate-900 text-white rounded-3xl py-6 font-black text-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_20px_50px_-12px_rgba(15,23,42,0.15)] hover:-translate-y-1 group flex items-center justify-center gap-2"
                             >
                                 {formData.mapel ? 'Lanjut ke Materi' : 'Pilih Mata Pelajaran'} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
@@ -609,7 +609,7 @@ export default function WizardV2Page() {
                                                 placeholder="Tulis topik secara bebas (Contoh: Sejarah Kemerdekaan Era 90an)"
                                                 value={formData.tema}
                                                 onChange={(e) => handleChange('tema', e.target.value)}
-                                                className="w-full rounded-2xl border border-slate-200 px-5 py-4 font-bold text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
+                                                className="w-full rounded-2xl border border-slate-200 px-6 py-5 font-bold text-slate-900 placeholder:text-slate-300 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm outline-none"
                                                 autoFocus
                                             />
                                         )}
@@ -626,7 +626,7 @@ export default function WizardV2Page() {
                                     placeholder="misal: Memahami pembilang dan penyebut"
                                     value={formData.topik}
                                     onChange={(e) => handleChange('topik', e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 px-5 py-4 font-medium text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
+                                    className="w-full rounded-2xl border border-slate-200 px-6 py-5 font-bold text-slate-900 placeholder:text-slate-300 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm outline-none"
                                 />
                             </div>
 
@@ -637,14 +637,14 @@ export default function WizardV2Page() {
                                     placeholder="misal: Tekankan pada kegiatan berkelompok dengan kartu angka..."
                                     value={formData.catatan}
                                     onChange={(e) => handleChange('catatan', e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 px-5 py-4 font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm resize-none"
+                                    className="w-full rounded-3xl border border-slate-200 px-6 py-5 font-bold text-slate-900 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm resize-none outline-none"
                                 />
                             </div>
 
                             <button
                                 onClick={() => setCurrentStep('REVIEW')}
                                 disabled={!formData.tema}
-                                className="w-full mt-6 bg-slate-900 text-white rounded-[1.25rem] py-5 font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-200 group flex items-center justify-center gap-2"
+                                className="w-full mt-6 bg-slate-900 text-white rounded-3xl py-6 font-black text-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_20px_50px_-12px_rgba(15,23,42,0.15)] hover:-translate-y-1 group flex items-center justify-center gap-2"
                             >
                                 {formData.tema ? 'Review & Generate' : 'Isi Topik Terlebih Dulu'} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>

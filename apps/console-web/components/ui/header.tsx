@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { UserButton, useAuth, useClerk } from '@clerk/nextjs';
-import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, LogOut, Check } from 'lucide-react';
+import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, LogOut, Check, Menu, X } from 'lucide-react';
 import { useWorkspace, useWorkspaces } from '@/hooks/use-workspace';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,7 @@ import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export function Header() {
+export function Header({ onMenuToggle, isMobileMenuOpen }: { onMenuToggle?: () => void, isMobileMenuOpen?: boolean }) {
     const { workspace, setActiveWorkspace, isLoading: isWorkspaceLoading } = useWorkspace();
     const { workspaces, isLoading: isWorkspacesLoading } = useWorkspaces();
     const { getToken } = useAuth();
@@ -59,8 +59,16 @@ export function Header() {
     const workspaceName = isWorkspaceLoading ? 'Loading...' : (workspace?.school_name || workspace?.name || 'My Workspace');
 
     return (
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-8 shrink-0 relative z-30">
-            <div className="flex items-center gap-4">
+        <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-30">
+            <div className="flex items-center gap-2 lg:gap-4">
+                {/* Mobile Menu Toggle */}
+                <button 
+                    onClick={onMenuToggle}
+                    className="lg:hidden p-2 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-900 transition-colors"
+                >
+                    {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+
                 <div className="relative" ref={menuRef}>
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}

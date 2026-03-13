@@ -8,6 +8,8 @@ import { Loader2, AlertCircle, FileText, Download, Eye, Clock, CheckCircle2, XCi
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 type JobStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
@@ -27,6 +29,43 @@ interface Job {
     created_at: string;
     updated_at: string;
 }
+
+const ModulesSkeleton = () => (
+    <div className="max-w-6xl mx-auto py-8 lg:py-12 space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-64" />
+                <Skeleton className="h-4 w-96" />
+            </div>
+            <Skeleton className="h-12 w-40 rounded-2xl" />
+        </div>
+
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="p-6 space-y-6">
+                {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center justify-between gap-4 py-2 border-b border-slate-50 last:border-0">
+                        <div className="flex items-center gap-4 flex-1">
+                            <Skeleton className="w-12 h-12 rounded-2xl" />
+                            <div className="space-y-2 flex-1">
+                                <Skeleton className="h-5 w-1/3" />
+                                <Skeleton className="h-4 w-1/4" />
+                            </div>
+                        </div>
+                        <Skeleton className="h-8 w-24 rounded-full" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-10 w-24 rounded-xl" />
+                            <Skeleton className="h-10 w-24 rounded-xl" />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
 
 export default function JobsListPage() {
     const router = useRouter();
@@ -156,25 +195,23 @@ export default function JobsListPage() {
     };
 
 
-    // Core UI Wrappers
-    if (!isAuthLoaded || isLoadingWorkspace || isCheckingPrerequisites) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
-            </div>
-        );
+    if (!isAuthLoaded || isLoadingWorkspace || isCheckingPrerequisites || (isLoadingJobs && jobs.length === 0)) {
+        return <ModulesSkeleton />;
     }
 
     return (
-        <div className="max-w-6xl mx-auto py-8">
-            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto py-8 lg:py-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Riwayat Generasi</h1>
-                    <p className="text-slate-500 mt-1">Lacak dan unduh kurikulum AI yang telah dibuat oleh sekolah Anda.</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded uppercase tracking-widest h-fit">History</div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Riwayat Generasi</h1>
+                    </div>
+                    <p className="text-slate-500 font-bold">Lacak dan unduh kurikulum AI yang telah dibuat oleh sekolah Anda.</p>
                 </div>
                 <Link
                     href="/wizard"
-                    className="inline-flex items-center justify-center bg-slate-900 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors"
+                    className="inline-flex items-center justify-center bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 hover:-translate-y-1"
                 >
                     + Buat Baru
                 </Link>
@@ -253,14 +290,14 @@ export default function JobsListPage() {
                     </div>
                 ) : jobs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-                        <div className="w-16 h-16 bg-slate-50 flex items-center justify-center rounded-2xl mb-4 border border-slate-100 text-slate-400">
-                            <Search className="w-8 h-8" />
+                        <div className="w-20 h-20 bg-slate-50 flex items-center justify-center rounded-3xl mb-6 border border-slate-100 text-slate-300">
+                            <Search className="w-10 h-10" />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-1">Belum ada dokumen</h3>
-                        <p className="text-slate-500 max-w-sm mx-auto mb-6">Mulai rakit Modul Ajar dan RPP modern pertama Anda dalam hitungan menit.</p>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Belum ada dokumen</h3>
+                        <p className="text-slate-500 max-w-sm mx-auto mb-10 font-medium">Mulai rakit Modul Ajar dan RPP modern pertama Anda dalam hitungan menit.</p>
                         <Link
                             href="/wizard"
-                            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-blue-700 transition"
+                            className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all hover:-translate-y-1"
                         >
                             Buat Sekarang
                         </Link>
