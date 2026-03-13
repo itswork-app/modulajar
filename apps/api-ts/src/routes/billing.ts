@@ -212,7 +212,86 @@ export default async function billingRoutes(fastify: FastifyInstance) {
             });
         });
 
+        // ── POST /w/:workspaceId/subscription/upgrade ──
+        childServer.post('/:workspaceId/subscription/upgrade', {
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                body: {
+                    type: 'object',
+                    properties: {
+                        plan_slug: { type: 'string' }
+                    },
+                    required: ['plan_slug']
+                }
+            }
+        }, async (request, reply) => {
+            const workspaceId = request.workspaceId;
+            const { plan_slug } = request.body as { plan_slug: string };
+
+            // 1. Fetch plan
+            const planResult = await fastify.db.query(
+                'SELECT id, name, base_price_idr, base_credits FROM pricing_plans WHERE slug = $1',
+                [plan_slug]
+            );
+
+            if (planResult.rowCount === 0) {
+                return reply.code(400).send({ error: 'Invalid plan' });
+            }
+
+            const plan = planResult.rows[0];
+
+            // 2. Logic: If it's a paid plan, we initiate a Xendit invoice
+            if (plan.base_price_idr > 0) {
+                const externalRef = `UPGR-${request.workspaceId.slice(-6)}-${Date.now()}`;
+                
+                // Create Xendit invoice for upgrade
+                const userEmail = (request.auth as any)?.email;
+                let invoice;
+                try {
+                    invoice = await xendit.createInvoice({
+                        externalId: externalRef,
+                        amount: plan.base_price_idr,
+                        payerEmail: userEmail,
+                        description: `Upgrade to ${plan.name} - ModulAjar`
+                    });
+                } catch (err) {
+                    logger.error(err, 'Failed to create upgrade invoice');
+                    return reply.code(502).send({ error: 'Payment gateway error' });
+                }
+
+                // Create Receipt for upgrade
+                await fastify.db.query(
+                    `INSERT INTO receipts (id, workspace_id, external_ref, amount, status, payment_method)
+                     VALUES ($1, $2, $3, $4, 'pending', 'xendit_upgrade')`,
+                    [(await import('ulid')).ulid(), workspaceId, externalRef, plan.base_credits]
+                );
+
+                return {
+                    payment_url: invoice.invoice_url,
+                    intent_id: invoice.id,
+                    status: 'pending_payment'
+                };
+            }
+
+            // If free (e.g. personal), just update directly (though this is usually the default)
+            await fastify.db.query(
+                'UPDATE workspaces SET plan_id = $1, subscription_status = $2 WHERE id = $3',
+                [plan.id, 'active', workspaceId]
+            );
+
+            return { status: 'success', plan: plan.name };
+        });
+
     }, { prefix: '/w' });
+
+    // ── GET /plans ──
+    // Public/Authenticated access to available plans
+    fastify.get('/plans', async () => {
+        const result = await fastify.db.query(
+            'SELECT id, name, slug, base_price_idr, base_credits, features FROM pricing_plans ORDER BY base_price_idr ASC'
+        );
+        return { plans: result.rows };
+    });
 
     // ═══════════════════════════════════════════
     // Webhook routes (not workspace-scoped)
@@ -431,8 +510,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 await dbClient.query('BEGIN');
 
                 // 1. Update Receipt
-                await dbClient.query(
-                    `UPDATE receipts SET status = 'confirmed', updated_at = NOW() WHERE id = $1`,
+                const updatedReceipt = await dbClient.query(
+                    `UPDATE receipts SET status = 'confirmed', updated_at = NOW() WHERE id = $1 RETURNING workspace_id, amount, payment_method`,
                     [receipt.id]
                 );
 
@@ -451,7 +530,24 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                     );
                 }
 
-                // 4. Update Event Status
+                // 4. Handle Upgrade Logic
+                if (receipt.payment_method === 'xendit_upgrade') {
+                    // Find the institutional plan (logic matches the intent creation)
+                    // We assume the amount matches the plan's base credits
+                    const planResult = await dbClient.query(
+                        'SELECT id FROM pricing_plans WHERE base_credits = $1 AND slug != \'personal\' LIMIT 1',
+                        [receipt.amount]
+                    );
+                    if (planResult.rowCount && planResult.rowCount > 0) {
+                        await dbClient.query(
+                            'UPDATE workspaces SET plan_id = $1, subscription_status = \'active\' WHERE id = $2',
+                            [planResult.rows[0].id, receipt.workspace_id]
+                        );
+                        logger.info({ workspaceId: receipt.workspace_id, planId: planResult.rows[0].id }, 'Workspace upgraded successfully');
+                    }
+                }
+
+                // 5. Update Event Status
                 await dbClient.query(`UPDATE payment_events SET status = 'processed' WHERE id = $1`, [eventId]);
 
                 await dbClient.query('COMMIT');

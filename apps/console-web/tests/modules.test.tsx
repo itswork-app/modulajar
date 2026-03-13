@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import JobsListPage from '../app/(dashboard)/modules/page';
 import JobDetailPage from '../app/(dashboard)/modules/[generation_id]/page';
 
@@ -85,6 +85,7 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
                     status: 'DONE',
                     payload: { mapel: 'Bahasa Indonesia' },
                     pdf_url: 'https://storage/doc.pdf',
+                    pdf_sha256: 'deadbeef1234567890abcdef',
                     public_id: 'public-uri',
                     html_sha256: 'deadbeef123',
                     created_at: new Date().toISOString(),
@@ -94,9 +95,14 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
             if (url.includes('/modules/')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve({
                     id: 'doc-done',
+                    job_status: 'DONE',
+                    payload: { topic: 'Bahasa Indonesia', grade: '4' },
                     pdf: { download_url: 'https://storage/doc.pdf' },
+                    pdf_sha256: 'deadbeef1234567890abcdef',
                     public_id: 'public-uri',
-                    verify: { public_id: 'public-uri' }
+                    verify: { public_id: 'public-uri' },
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                 })
             });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
@@ -106,9 +112,15 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Unduh Dokumen (PDF)')).toBeDefined();
-            expect(screen.getByText('Copy Verify Link')).toBeDefined();
-            // Secure SHA-256 slice masking constraint 
-            expect(screen.getByText('deadbeef...')).toBeDefined();
+            expect(screen.getByText('Salin Verify Link')).toBeDefined();
+        });
+
+        // Click Technical Detail to see the hash
+        fireEvent.click(screen.getByText('Detail Teknis'));
+
+        await waitFor(() => {
+            // Secure SHA-256 slice masking constraint (16 chars)
+            expect(screen.getByText(/deadbeef12345678/i)).toBeDefined();
         });
     });
 
@@ -137,8 +149,8 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
 
         await waitFor(() => {
             expect(screen.getByText('AI hallucinated metadata format')).toBeDefined();
-            expect(screen.getByText('Proses Generasi Gagal')).toBeDefined();
-            expect(screen.getByText('Generate Lagi')).toBeDefined(); // CTA Retry assertion
+            expect(screen.getByText('Proses pembuatan dokumen gagal')).toBeDefined();
+            expect(screen.getByText('Coba Generate Ulang')).toBeDefined(); // CTA Retry assertion
         });
     });
 });

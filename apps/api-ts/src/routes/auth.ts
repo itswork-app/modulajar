@@ -56,6 +56,95 @@ export default async function authRoutes(fastify: FastifyInstance) {
         };
     });
 
+    // GET /workspaces
+    // List all workspaces for the authenticated user
+    fastify.get('/workspaces', {
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        workspaces: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    name: { type: 'string' },
+                                    role: { type: 'string' },
+                                    school_name: { type: 'string' }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }, async (request, reply) => {
+        const { clerk_user_id } = request.auth!;
+
+        const result = await fastify.db.query(
+            `SELECT w.id, w.name, w.school_name, m.role 
+             FROM workspaces w
+             JOIN workspace_members m ON w.id = m.workspace_id
+             WHERE m.clerk_user_id = $1
+             ORDER BY w.created_at ASC`,
+            [clerk_user_id]
+        );
+
+        return { workspaces: result.rows };
+    });
+
+    // POST /workspaces
+    // Create a new workspace manually
+    fastify.post('/workspaces', {
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            body: {
+                type: 'object',
+                required: ['name'],
+                properties: {
+                    name: { type: 'string', minLength: 3, maxLength: 50 }
+                }
+            }
+        }
+    }, async (request, reply) => {
+        const { clerk_user_id } = request.auth!;
+        const { name } = request.body as { name: string };
+
+        const workspaceId = ulid();
+        const refCode = generateReferralCode();
+
+        const client = await fastify.db.connect();
+        try {
+            await client.query('BEGIN');
+
+            await client.query(
+                `INSERT INTO workspaces (id, name, referral_code) VALUES ($1, $2, $3)`,
+                [workspaceId, name, refCode]
+            );
+
+            await client.query(
+                `INSERT INTO workspace_members (id, workspace_id, clerk_user_id, role)
+                 VALUES ($1, $2, $3, $4)`,
+                [ulid(), workspaceId, clerk_user_id, 'owner']
+            );
+
+            await client.query('COMMIT');
+
+            return {
+                status: 'created',
+                workspaceId
+            };
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    });
+
     // POST /bootstrap
     // Idempotent: Ensures user has at least one workspace (personal)
     fastify.post('/bootstrap', {

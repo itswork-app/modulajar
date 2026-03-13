@@ -22,6 +22,8 @@ import jobsRoutes from './routes/jobs';
 import walletRoutes from './routes/wallet';
 import curriculumRoutes from './routes/curriculum';
 import voucherRoutes from './routes/voucher';
+import platformRoutes from './routes/platform';
+import platformGuard from './plugins/platform-guard';
 import schemasPlugin from './plugins/schemas';
 import dotenv from 'dotenv';
 import multipart from '@fastify/multipart';
@@ -187,9 +189,13 @@ if (SERVICE_MODE === 'verify') {
         fastify.register(authPlugin);
     }
     fastify.register(workspaceGuardPlugin);
+    fastify.register(platformGuard);
+    
     fastify.register(storagePlugin);
     fastify.register(multipart, { limits: { fileSize: 512 * 1024 } });
 
+    fastify.register(platformRoutes);
+    
     fastify.register(authRoutes);
     fastify.register(workspaceRoutes);
     fastify.register(profileRoutes);

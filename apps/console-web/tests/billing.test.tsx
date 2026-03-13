@@ -133,7 +133,7 @@ describe('Billing UX v1 - Integration Tests', () => {
         expect(klaimButton.hasAttribute('disabled')).toBe(true);
 
         // Type in input enabling the button
-        const input = screen.getByPlaceholderText('M-AJAR-ABC');
+        const input = screen.getByPlaceholderText('VA-XXXX-XXXX');
         fireEvent.change(input, { target: { value: 'TESTVOUCHER' } });
 
         expect(klaimButton.hasAttribute('disabled')).toBe(false);

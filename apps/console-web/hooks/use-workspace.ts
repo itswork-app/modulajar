@@ -1,80 +1,91 @@
-'use client';
-
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
+import { useEffect, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-async function fetchWorkspace(token: string | null) {
-    if (!token) return null;
+async function fetchWorkspaces(token: string | null) {
+    if (!token) return [];
 
     try {
-        // 1. Try to get existing workspaces via /me (standard for Modulajar API)
-        const res = await fetch(`${API_BASE}/me`, {
+        const res = await fetch(`${API_BASE}/workspaces`, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
         if (!res.ok) {
-            const errBody = await res.text();
-            console.error("[useWorkspace] /me failed:", res.status, errBody);
-            throw new Error(`Failed to fetch workspaces: ${res.status}`);
+            console.error("[useWorkspaces] /workspaces failed:", res.status);
+            return [];
         }
 
         const data = await res.json();
-        if (data.workspaces && data.workspaces.length > 0) {
-            return data.workspaces[0];
-        }
-
-        // 2. If no workspace, call /bootstrap (idempotent init)
-        console.log("[useWorkspace] No workspace found, bootstrapping...");
-        const createRes = await fetch(`${API_BASE}/bootstrap`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ name: 'My Workspace' })
-        });
-
-        if (!createRes.ok) {
-            const errBody = await createRes.text();
-            console.error("[useWorkspace] /bootstrap failed:", createRes.status, errBody);
-            throw new Error(`Failed to create workspace: ${createRes.status}`);
-        }
-
-        // Fetch again to get the full list and set SWR state
-        const refreshRes = await fetch(`${API_BASE}/me`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const refreshData = await refreshRes.json();
-        return refreshData.workspaces?.[0] || null;
-
+        return data.workspaces || [];
     } catch (err) {
-        console.error("[useWorkspace] Error in fetchWorkspace:", err);
-        throw err;
+        console.error("[useWorkspaces] Error:", err);
+        return [];
     }
+}
+
+export function useWorkspaces() {
+    const { getToken, isLoaded } = useAuth();
+
+    const { data: workspaces, mutate, isLoading } = useSWR(
+        isLoaded ? 'user-workspaces' : null,
+        async () => {
+            const token = await getToken();
+            return fetchWorkspaces(token);
+        },
+        { revalidateOnFocus: false }
+    );
+
+    return { workspaces, mutate, isLoading };
 }
 
 export function useWorkspace() {
     const { getToken, isLoaded } = useAuth();
+    const { workspaces, isLoading: isListLoading } = useWorkspaces();
+    const [activeId, setActiveId] = useState<string | null>(null);
 
-    const { data: workspace, error, isLoading } = useSWR(
-        isLoaded ? 'user-workspace' : null,
-        async () => {
-            const token = await getToken();
-            return fetchWorkspace(token);
-        },
-        {
-            revalidateOnFocus: false,
-            shouldRetryOnError: false,
-            dedupingInterval: 10000 // Cache for 10s
+    // Persist active workspace ID in localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('modulajar_active_workspace');
+        if (saved) {
+            setTimeout(() => setActiveId(saved), 0);
         }
-    );
+    }, []);
+
+    const setActiveWorkspace = (id: string) => {
+        setActiveId(id);
+        localStorage.setItem('modulajar_active_workspace', id);
+    };
+
+    const workspace = workspaces?.find((w: { id: string }) => w.id === activeId) || workspaces?.[0] || null;
+
+    // Handle initial bootstrap if no workspaces exist
+    useEffect(() => {
+        async function bootstrapIfNeeded() {
+            if (isLoaded && !isListLoading && (!workspaces || workspaces.length === 0)) {
+                console.log("[useWorkspace] No workspace found, bootstrapping...");
+                const token = await getToken();
+                const createRes = await fetch(`${API_BASE}/bootstrap`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name: 'My Workspace' })
+                });
+                if (createRes.ok) {
+                    window.location.reload(); // Simplest way to refresh all state
+                }
+            }
+        }
+        bootstrapIfNeeded();
+    }, [isLoaded, isListLoading, workspaces, getToken]);
 
     return {
         workspace,
-        error,
-        isLoading: isLoading || (isLoaded && !workspace && !error)
+        setActiveWorkspace,
+        isLoading: isListLoading || (isLoaded && !workspace && (workspaces?.length ?? 0) > 0)
     };
 }
 

@@ -12,11 +12,7 @@ import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-function gradeToJenjang(grade: number): Jenjang {
-    if (grade <= 6) return 'SD';
-    if (grade <= 9) return 'SMP';
-    return 'SMA';
-}
+
 
 
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';

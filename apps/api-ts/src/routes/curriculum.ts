@@ -176,5 +176,54 @@ Propose the optimal ordered plan for this semester by returning a JSON array of 
             }
         });
 
+        // GET /w/:workspaceId/curriculum/dataset
+        // Fetch high-quality curated modules from the curriculum dataset
+        childServer.get<{
+            Params: { workspaceId: string };
+            Querystring: { subject?: string; grade?: string; limit?: string };
+        }>('/:workspaceId/curriculum/dataset', {
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        subject: { type: 'string' },
+                        grade: { type: 'string' },
+                        limit: { type: 'string' }
+                    }
+                }
+            }
+        }, async (request, reply) => {
+            const { subject, grade, limit } = request.query;
+            const limitNum = parseInt(limit || '20', 10);
+
+            let query = `
+                SELECT id, subject, grade, topic, quality_score, usage_count, created_at
+                FROM curriculum_dataset
+            `;
+            const params: any[] = [];
+            const conditions: string[] = [];
+
+            if (subject) {
+                params.push(`%${subject}%`);
+                conditions.push(`subject ILIKE $${params.length}`);
+            }
+            if (grade) {
+                params.push(parseInt(grade, 10));
+                conditions.push(`grade = $${params.length}`);
+            }
+
+            if (conditions.length > 0) {
+                query += ` WHERE ` + conditions.join(' AND ');
+            }
+
+            query += ` ORDER BY quality_score DESC, created_at DESC LIMIT $${params.length + 1}`;
+            params.push(limitNum);
+
+            const { rows } = await fastify.db.query(query, params);
+
+            return { dataset: rows };
+        });
+
     }, { prefix: '/w' });
 }

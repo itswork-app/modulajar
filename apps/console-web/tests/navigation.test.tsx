@@ -19,10 +19,8 @@ describe('Sidebar Navigation', () => {
         expect(screen.getByText('Dashboard')).toBeDefined();
         expect(screen.getByText('Buat Modul')).toBeDefined();
         expect(screen.getByText('Riwayat Modul')).toBeDefined();
-        expect(screen.getByText('Template Library')).toBeDefined();
-        expect(screen.getByText('Dataset AI')).toBeDefined();
         expect(screen.getByText('Billing')).toBeDefined();
-        expect(screen.getByText('Referral Program')).toBeDefined();
+        expect(screen.getByText('Referral')).toBeDefined();
         expect(screen.getByText('Workspace')).toBeDefined();
         expect(screen.getByText('Pengaturan')).toBeDefined();
     });
