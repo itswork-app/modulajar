@@ -52,7 +52,7 @@ function RevenueSkeleton() {
 
 function StatCard({ label, value, sub, icon: Icon, trend, colorClass }: { label: string; value: string | number; sub?: string; icon: React.ElementType; trend?: string; colorClass?: string }) {
     return (
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden relative border-b-4 border-slate-50 hover:border-indigo-500/20">
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden relative border-b-4 hover:border-indigo-500/20">
             <div className={cn("absolute -right-4 -top-4 w-24 h-24 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity rotate-12", colorClass)}>
                 <Icon className="w-full h-full" />
             </div>

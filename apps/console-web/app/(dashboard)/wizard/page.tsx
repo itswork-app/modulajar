@@ -428,7 +428,7 @@ export default function WizardV2Page() {
                                         value={formData.jenjang}
                                         onChange={(e) => {
                                             const newJenjang = e.target.value as Jenjang;
-                                            const newKelas = KELAS_OPTIONS[newJenjang][0].toString();
+                                            const newKelas = KELAS_OPTIONS[newJenjang]?.[0]?.toString() || '4';
                                             handleChange('jenjang', newJenjang);
                                             handleChange('kelas', newKelas);
                                             handleChange('mapel', ''); // reset mapel

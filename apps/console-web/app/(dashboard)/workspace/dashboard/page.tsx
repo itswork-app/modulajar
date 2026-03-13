@@ -85,7 +85,7 @@ function MetricCard({
     trend?: string;
 }) {
     return (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden relative border-b-4 hover:border-indigo-500/20">
             <div className={cn("absolute -right-4 -top-4 w-20 h-20 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity rotate-12", colorClass)}>
                 <Icon className="w-full h-full" />
             </div>
@@ -213,7 +213,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* 2. Credit Usage Bar */}
-            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-8">
+            <div className="bg-white rounded-4xl border border-slate-100 shadow-sm p-8">
                 <div className="flex items-center justify-between mb-4">
                     <div className="space-y-1">
                         <h2 className="text-lg font-black text-slate-900 tracking-tight">Kesehatan Kredit Workspace</h2>
