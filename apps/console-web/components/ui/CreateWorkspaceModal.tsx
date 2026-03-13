@@ -48,7 +48,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
                 const errData = await res.json();
                 setError(errData.message || 'Gagal membuat workspace');
             }
-        } catch (err) {
+        } catch {
             setError('Terjadi kesalahan koneksi');
         } finally {
             setIsSubmitting(false);

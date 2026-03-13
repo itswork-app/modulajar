@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Sparkles, Loader2, Database, Search, Filter, BookOpen, Star } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Sparkles, Loader2, Database, Search, BookOpen, Star } from 'lucide-react';
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { TopUpModal } from '@/components/billing/TopUpModal';
@@ -37,6 +38,7 @@ interface Transaction {
 
 
 export default function BillingPage() {
+    const router = useRouter();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();
 
@@ -123,6 +125,13 @@ export default function BillingPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    <button
+                        onClick={() => router.push('/upgrade')}
+                        className="inline-flex items-center justify-center px-5 py-2.5 bg-amber-50 border-2 border-amber-200 text-amber-700 rounded-xl hover:bg-amber-100 font-bold transition-all shadow-sm"
+                    >
+                        <ArrowUpRight className="w-4 h-4 mr-2" />
+                        Upgrade ke Institutional
+                    </button>
                     <button
                         onClick={() => setIsVoucherOpen(true)}
                         className="inline-flex items-center justify-center px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold transition-all shadow-sm"

@@ -547,7 +547,7 @@ test('GET /w/:workspaceId/admin/dashboard', async (t) => {
                 if (sql.includes('SELECT role FROM workspace_members')) return { rowCount: 1, rows: [{ role: 'admin' }] };
 
                 // 1. Teacher counter
-                if (sql.includes('SELECT COUNT(*) AS count FROM workspace_members')) return { rowCount: 1, rows: [{ count: '15' }] };
+                if (sql.includes('COUNT(DISTINCT clerk_user_id) AS count FROM workspace_members')) return { rowCount: 1, rows: [{ count: '15' }] };
 
                 // 2. Total modules
                 if (sql.includes('SELECT COUNT(*) AS count FROM generation_jobs') && sql.includes("status = 'done'")) return { rowCount: 1, rows: [{ count: '100' }] };

@@ -48,7 +48,9 @@ export function useWorkspace() {
     // Persist active workspace ID in localStorage
     useEffect(() => {
         const saved = localStorage.getItem('modulajar_active_workspace');
-        if (saved) setActiveId(saved);
+        if (saved) {
+            setTimeout(() => setActiveId(saved), 0);
+        }
     }, []);
 
     const setActiveWorkspace = (id: string) => {
@@ -56,7 +58,7 @@ export function useWorkspace() {
         localStorage.setItem('modulajar_active_workspace', id);
     };
 
-    const workspace = workspaces?.find((w: any) => w.id === activeId) || workspaces?.[0] || null;
+    const workspace = workspaces?.find((w: { id: string }) => w.id === activeId) || workspaces?.[0] || null;
 
     // Handle initial bootstrap if no workspaces exist
     useEffect(() => {
@@ -83,7 +85,7 @@ export function useWorkspace() {
     return {
         workspace,
         setActiveWorkspace,
-        isLoading: isListLoading || (isLoaded && !workspace && workspaces?.length! > 0)
+        isLoading: isListLoading || (isLoaded && !workspace && (workspaces?.length ?? 0) > 0)
     };
 }
 

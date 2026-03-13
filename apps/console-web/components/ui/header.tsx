@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { UserButton, useAuth, useClerk } from '@clerk/nextjs';
-import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, HelpCircle, LogOut, Check } from 'lucide-react';
+import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, LogOut, Check } from 'lucide-react';
 import { useWorkspace, useWorkspaces } from '@/hooks/use-workspace';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -96,7 +96,7 @@ export function Header() {
                                 <div className="space-y-0.5 px-1 max-h-48 overflow-y-auto custom-scrollbar">
                                     {isWorkspacesLoading ? (
                                         <div className="px-3 py-2 text-xs text-slate-400 italic">Memuat...</div>
-                                    ) : workspaces?.map((w: any) => (
+                                    ) : workspaces?.map((w: { id: string; name?: string; school_name?: string; role?: string; }) => (
                                         <button
                                             key={w.id}
                                             onClick={() => { setActiveWorkspace(w.id); setIsMenuOpen(false); }}

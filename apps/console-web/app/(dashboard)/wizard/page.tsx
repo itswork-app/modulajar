@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, ChevronRight, Layers } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
