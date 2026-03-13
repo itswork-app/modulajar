@@ -285,15 +285,15 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                 creditsResult,
                 teacherStatsResult,
                 activityFeedResult,
-                bySubjectResult,
+                byGradeResult,
                 dailyModulesResult,
             ] = await Promise.all([
-                // 1. Total teachers (members)
+                // 1. Total teachers (active unique clerk users in workspace)
                 fastify.db.query(
-                    `SELECT COUNT(*) AS count FROM workspace_members WHERE workspace_id = $1`,
+                    `SELECT COUNT(DISTINCT clerk_user_id) AS count FROM workspace_members WHERE workspace_id = $1`,
                     [workspaceId]
                 ),
-                // 2. Total modules generated
+                // 2. Total modules generated (done only)
                 fastify.db.query(
                     `SELECT COUNT(*) AS count FROM generation_jobs WHERE workspace_id = $1 AND status = 'done'`,
                     [workspaceId]
@@ -305,7 +305,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                      AND created_at >= date_trunc('month', NOW())`,
                     [workspaceId]
                 ),
-                // 4. Credits via wallet_ledger (type = 'credit' | 'debit', amount always positive)
+                // 4. Credits via wallet_ledger
                 fastify.db.query(
                     `SELECT
                         COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) AS credits_in,
@@ -314,42 +314,43 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                      FROM wallet_ledger WHERE workspace_id = $1`,
                     [workspaceId]
                 ),
-                // 5. Per-teacher stats (teachers table is 1-per-workspace, join on workspace_id only)
+                // 5. Per-teacher stats
                 fastify.db.query(
                     `SELECT
+                        wm.clerk_user_id,
                         COALESCE(tp.full_name, 'Guru') AS name,
                         COALESCE(tp.primary_subject, '\u2014') AS subject,
                         COUNT(gj.id) AS modules_generated,
                         MAX(gj.created_at) AS last_activity,
-                        COUNT(gj.id) AS credits_used
+                        SUM(CASE WHEN gj.id IS NOT NULL THEN 1 ELSE 0 END) AS credits_used
                      FROM workspace_members wm
-                     LEFT JOIN teachers tp ON tp.workspace_id = wm.workspace_id
-                     LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.status = 'done'
+                     LEFT JOIN teachers tp ON tp.clerk_user_id = wm.clerk_user_id AND tp.workspace_id = wm.workspace_id
+                     LEFT JOIN generation_jobs gj ON gj.workspace_id = wm.workspace_id AND gj.clerk_user_id = wm.clerk_user_id AND gj.status = 'done'
                      WHERE wm.workspace_id = $1
                      GROUP BY wm.clerk_user_id, tp.full_name, tp.primary_subject
                      ORDER BY modules_generated DESC`,
                     [workspaceId]
                 ),
-                // 6. Recent activity feed (last 20) — use packages table for subject/grade
+                // 6. Recent activity feed (last 20)
                 fastify.db.query(
                     `SELECT
                         COALESCE(tp.full_name, p.teacher_name, 'Guru') AS teacher_name,
-                        p.teacher_name AS subject,
+                        COALESCE(p.school_name, 'Modul Ajar') AS subject,
                         p.kelas AS grade,
                         'generate' AS action,
                         gj.created_at
                      FROM generation_jobs gj
                      JOIN packages p ON p.id = gj.package_id
-                     LEFT JOIN teachers tp ON tp.workspace_id = gj.workspace_id
+                     LEFT JOIN teachers tp ON tp.clerk_user_id = gj.clerk_user_id AND tp.workspace_id = gj.workspace_id
                      WHERE gj.workspace_id = $1 AND gj.status = 'done'
                      ORDER BY gj.created_at DESC
                      LIMIT 20`,
                     [workspaceId]
                 ),
-                // 7. Modules by grade (packages table has kelas)
+                // 7. Modules by grade
                 fastify.db.query(
                     `SELECT
-                        COALESCE(p.kelas, 'Lainnya') AS subject,
+                        p.kelas AS subject,
                         COUNT(*) AS count
                      FROM generation_jobs gj
                      JOIN packages p ON p.id = gj.package_id
@@ -362,13 +363,13 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                 // 8. Daily modules (last 14 days)
                 fastify.db.query(
                     `SELECT 
-                        date_trunc('day', created_at)::date AS date,
-                        COUNT(*) AS count
-                     FROM generation_jobs
-                     WHERE workspace_id = $1 AND status = 'done'
-                     AND created_at >= NOW() - INTERVAL '14 days'
-                     GROUP BY date
-                     ORDER BY date ASC`,
+                         date_trunc('day', created_at)::date AS date,
+                         COUNT(*) AS count
+                      FROM generation_jobs
+                      WHERE workspace_id = $1 AND status = 'done'
+                      AND created_at >= NOW() - INTERVAL '14 days'
+                      GROUP BY date
+                      ORDER BY date ASC`,
                     [workspaceId]
                 ),
             ]);
@@ -388,15 +389,15 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
                     credits_total: creditsIn,
                 },
                 teachers: teacherStatsResult.rows.map(r => ({
-                    name: r.name || 'Guru',
-                    subject: r.subject || '—',
+                    name: r.name,
+                    subject: r.subject,
                     modules_generated: parseInt(r.modules_generated || '0', 10),
                     last_activity: r.last_activity || null,
                     credits_used: parseInt(r.credits_used || '0', 10),
                 })),
                 activity_feed: activityFeedResult.rows,
-                modules_by_subject: bySubjectResult.rows.map(r => ({
-                    subject: r.subject,
+                modules_by_subject: byGradeResult.rows.map(r => ({
+                    subject: `Kelas ${r.subject}`,
                     count: parseInt(r.count || '0', 10),
                 })),
                 daily_modules: dailyModulesResult.rows.map(r => ({

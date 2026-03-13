@@ -51,26 +51,41 @@ function MetricCard({
     value,
     sub,
     accent,
+    trend,
 }: {
     icon: React.ElementType;
     label: string;
     value: string | number;
     sub?: string;
     accent?: string;
+    trend?: string;
 }) {
     return (
         <div className={cn(
-            'bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-3 hover:shadow-md transition-shadow',
+            'bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group',
             accent
         )}>
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-slate-50 rounded-xl">
-                    <Icon className="w-4 h-4 text-slate-500" />
-                </div>
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{label}</span>
+            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+                <Icon className="w-20 h-20 -rotate-12 translate-x-4 -translate-y-4" />
             </div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
-            {sub && <div className="text-xs text-slate-400 font-medium">{sub}</div>}
+            
+            <div className="flex items-center justify-between">
+                <div className="p-2.5 bg-slate-50 group-hover:bg-indigo-50 transition-colors rounded-2xl">
+                    <Icon className="w-5 h-5 text-slate-500 group-hover:text-indigo-600 transition-colors" />
+                </div>
+                {trend && (
+                    <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full tracking-widest uppercase">
+                        {trend}
+                    </span>
+                )}
+            </div>
+            
+            <div>
+                <div className="text-3xl font-black text-slate-900 tracking-tight mb-0.5">{value}</div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] shrink-0">{label}</span>
+            </div>
+            
+            {sub && <div className="text-xs text-slate-400 font-bold leading-relaxed">{sub}</div>}
         </div>
     );
 }
@@ -178,10 +193,10 @@ export default function AdminDashboardPage() {
             {/* 1. Overview Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <MetricCard icon={Users} label="Total Guru" value={overview.total_teachers} />
-                <MetricCard icon={BookOpen} label="Total Modul" value={overview.total_modules} />
+                <MetricCard icon={BookOpen} label="Total Modul" value={overview.total_modules} trend="Active" />
                 <MetricCard icon={TrendingUp} label="Modul Bulan Ini" value={overview.modules_this_month} sub="dalam 30 hari terakhir" />
                 <MetricCard icon={Zap} label="Kredit Tersisa" value={overview.credits_remaining} sub={`dari ${overview.credits_total} total`} />
-                <MetricCard icon={Zap} label="Kredit Bulan Ini" value={overview.credits_this_month} sub="dikonsumsi bulan ini" />
+                <MetricCard icon={Zap} label="Kredit Bulan Ini" value={overview.credits_this_month} sub="dikonsumsi bulan ini" trend="Latest" />
             </div>
 
             {/* 2. Credit Usage Bar */}
