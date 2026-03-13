@@ -2,20 +2,23 @@
 
 import Link from 'next/link';
 import { UserButton, useAuth, useClerk } from '@clerk/nextjs';
-import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, HelpCircle, LogOut } from 'lucide-react';
-import { useWorkspace } from '@/hooks/use-workspace';
+import { Zap, Building, ChevronDown, Settings, CreditCard, Plus, HelpCircle, LogOut, Check } from 'lucide-react';
+import { useWorkspace, useWorkspaces } from '@/hooks/use-workspace';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export function Header() {
-    const { workspace, isLoading: isWorkspaceLoading } = useWorkspace();
+    const { workspace, setActiveWorkspace, isLoading: isWorkspaceLoading } = useWorkspace();
+    const { workspaces, isLoading: isWorkspacesLoading } = useWorkspaces();
     const { getToken } = useAuth();
     const { signOut } = useClerk();
     const [balance, setBalance] = useState<number | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -32,7 +35,7 @@ export function Header() {
                     if (isMounted) setBalance(data.credits_remaining);
                 }
             } catch {
-                // non-fatal, badge stays at '...'
+                // non-fatal
             }
         }
         fetchBalance();
@@ -70,7 +73,7 @@ export function Header() {
                             <Building className="w-4 h-4" />
                         </div>
                         <div className="flex flex-col items-start leading-none gap-0.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Workspace</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Workspace Active</span>
                             <span className="text-sm font-bold text-slate-900 truncate max-w-[160px]">{workspaceName}</span>
                         </div>
                         <ChevronDown className={cn("ml-1 w-4 h-4 text-slate-400 transition-transform duration-200", isMenuOpen && "rotate-180")} />
@@ -89,17 +92,43 @@ export function Header() {
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Daftar Workspace</p>
                                 </div>
 
-                                {/* Current Workspace (Active) */}
-                                <div className="p-1">
-                                    <div className="flex items-center gap-3 px-3 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl">
-                                        <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs ring-2 ring-white">
-                                            {workspaceName.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-sm font-bold text-emerald-900 truncate">{workspaceName}</span>
-                                            <span className="text-[10px] font-medium text-emerald-600/70 truncate uppercase tracking-tighter">Active Workspace</span>
-                                        </div>
-                                    </div>
+                                {/* List all workspaces */}
+                                <div className="space-y-0.5 px-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {isWorkspacesLoading ? (
+                                        <div className="px-3 py-2 text-xs text-slate-400 italic">Memuat...</div>
+                                    ) : workspaces?.map((w: any) => (
+                                        <button
+                                            key={w.id}
+                                            onClick={() => { setActiveWorkspace(w.id); setIsMenuOpen(false); }}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-2 py-2 rounded-xl text-left transition-all group",
+                                                w.id === workspace?.id 
+                                                    ? "bg-emerald-50 border border-emerald-100" 
+                                                    : "hover:bg-slate-50 border border-transparent"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] transition-colors",
+                                                w.id === workspace?.id
+                                                    ? "bg-emerald-600 text-white"
+                                                    : "bg-slate-100 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-600"
+                                            )}>
+                                                {(w.school_name || w.name || 'W').charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <span className={cn(
+                                                    "text-xs font-bold truncate",
+                                                    w.id === workspace?.id ? "text-emerald-900" : "text-slate-700"
+                                                )}>
+                                                    {w.school_name || w.name || 'Workspace'}
+                                                </span>
+                                                <span className="text-[9px] text-slate-400 uppercase tracking-tighter">
+                                                    {w.role || 'Member'}
+                                                </span>
+                                            </div>
+                                            {w.id === workspace?.id && <Check className="w-3 h-3 text-emerald-500" />}
+                                        </button>
+                                    ))}
                                 </div>
 
                                 {/* Action Buttons */}
@@ -126,9 +155,10 @@ export function Header() {
                                     </Link>
                                 </div>
 
-                                {/* Placeholder: Create New Workspace */}
+                                {/* Create New Workspace */}
                                 <div className="mt-2 pt-2 border-t border-slate-50 px-1">
                                     <button
+                                        onClick={() => { setIsCreateModalOpen(true); setIsMenuOpen(false); }}
                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors group font-bold text-sm border-dashed border-2 border-emerald-100/50"
                                     >
                                         <div className="w-7 h-7 rounded-md bg-emerald-100/50 flex items-center justify-center group-hover:bg-white transition-all">
@@ -136,7 +166,6 @@ export function Header() {
                                         </div>
                                         Buat Workspace Baru
                                     </button>
-                                    <p className="px-3 py-2 text-[9px] font-medium text-slate-400 italic">Mendukung banyak institusi/sekolah segera.</p>
                                 </div>
 
                                 <div className="mt-2 pt-2 border-t border-slate-100 px-1">
@@ -157,7 +186,6 @@ export function Header() {
             </div>
 
             <div className="flex items-center gap-6">
-                {/* Credit balance — links to /billing */}
                 <Link href="/billing" className={cn(
                     'flex items-center gap-2 text-sm font-bold px-3 py-1.5 rounded-full border transition-all active:scale-95 shadow-sm',
                     isZero
@@ -170,12 +198,16 @@ export function Header() {
                     <span>{balance !== null ? `${balance} Token` : '...'}</span>
                 </Link>
 
-                {/* User menu */}
                 <UserButton
                     afterSignOutUrl="/"
                     appearance={{ elements: { avatarBox: 'w-8 h-8 rounded-full border border-slate-200 shadow-xs hover:border-emerald-500 transition-all' } }}
                 />
             </div>
+
+            <CreateWorkspaceModal 
+                isOpen={isCreateModalOpen} 
+                onClose={() => setIsCreateModalOpen(false)} 
+            />
         </header>
     );
 }
