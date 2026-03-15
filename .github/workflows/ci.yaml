@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: ./apps/console-web/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} npm run build
+      - run: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZXhjaXRpbmctc2hyZXctODguY2xlcmsuYWNjb3VudHMuZGV2JA npm run build
 
   api-ts:
     runs-on: ubuntu-latest
