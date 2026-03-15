@@ -20,6 +20,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useWorkspaceRole } from '@/hooks/use-workspace-role';
 import { usePlatformRole } from '@/hooks/use-platform-role';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { BadgeCheck, Sparkles } from 'lucide-react';
 
 const learningJourneyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -98,6 +100,10 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
     const pathname = usePathname();
     const { isAdmin } = useWorkspaceRole();
     const { isPlatformAdmin } = usePlatformRole();
+    const { workspace } = useWorkspace();
+
+    const isElite = workspace?.workspace_type === 'institution';
+    const isVerified = workspace?.is_verified;
 
     return (
         <div className={cn(
@@ -107,10 +113,19 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
             {/* Logo */}
             <div className="flex h-16 items-center px-6 shrink-0 border-b border-slate-50">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
-                        M
+                    <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-sm transition-colors",
+                        isElite ? "bg-indigo-600" : "bg-emerald-600"
+                    )}>
+                        {isElite ? <Sparkles className="w-4 h-4" /> : "M"}
                     </div>
-                    <span className="font-black text-lg text-slate-900 tracking-tight leading-none">Modulajar</span>
+                    <div className="flex flex-col">
+                        <span className="font-black text-lg text-slate-900 tracking-tight leading-none flex items-center gap-1">
+                            Modulajar
+                            {isVerified && <BadgeCheck className="w-4 h-4 text-blue-500" />}
+                        </span>
+                        {isElite && <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest leading-none mt-1">Elite Grade</span>}
+                    </div>
                 </div>
             </div>
 
@@ -199,7 +214,9 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
 
             {/* Footer hint */}
             <div className="px-6 py-4 border-t border-slate-50">
-                <p className="text-[10px] text-slate-300 font-medium uppercase tracking-widest">v0.4.1 · Professional</p>
+                <p className="text-[10px] text-slate-300 font-medium uppercase tracking-widest">
+                    v0.5.0 · {isElite ? 'Elite Grade' : 'Professional'}
+                </p>
             </div>
         </div>
     );

@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+  --radius-3xl: 2rem;
+  --radius-4xl: 2.5rem;
+}
+
+:root {
+  --background: oklch(0.1 0.02 240);
+  --foreground: oklch(0.95 0.01 240);
+  --card: oklch(0.12 0.03 240);
+  --card-foreground: oklch(0.95 0.01 240);
+  --primary: oklch(0.6 0.18 250);
+  --primary-foreground: oklch(0.98 0.01 240);
+  --muted: oklch(0.2 0.04 240);
+  --muted-foreground: oklch(0.7 0.02 240);
+  --accent: oklch(0.15 0.05 250);
+  --accent-foreground: oklch(0.98 0.01 240);
+  --border: oklch(0.2 0.04 240);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -51,8 +51,10 @@ fastify.register(cors, {
     origin: [
         'https://modulajar.app',
         'https://app.modulajar.app',
+        'https://ops.modulajar.app',
         'http://localhost:3000',
-        'http://localhost:3001'
+        'http://localhost:3001',
+        'http://localhost:3002'
     ],
     methods: ['GET', 'POST', 'PATCH'], // S2: Added PATCH
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
