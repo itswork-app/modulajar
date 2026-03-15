@@ -1,10 +1,8 @@
 import fp from 'fastify-plugin';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { FastifyRequest, FastifyReply } from 'fastify';
 
 const authPlugin = fp(async (fastify, options) => {
-    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-
     // Decorate request with auth object
     fastify.decorateRequest('auth', null);
 
@@ -17,11 +15,13 @@ const authPlugin = fp(async (fastify, options) => {
 
             const token = authHeader.split(' ')[1];
 
-            // Verify token using @clerk/backend verifyToken
-            const claims = await clerk.verifyToken(token);
+            // Verify token using @clerk/backend verifyToken helper
+            const claims = await verifyToken(token, {
+                secretKey: process.env.CLERK_SECRET_KEY,
+            });
 
             request.auth = {
-                clerk_user_id: claims.sub,
+                clerk_user_id: claims.sub!,
                 org_id: claims.org_id as string | undefined,
             };
 
