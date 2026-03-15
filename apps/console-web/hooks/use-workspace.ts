@@ -75,11 +75,22 @@ export function useWorkspace() {
                     body: JSON.stringify({ name: 'My Workspace' })
                 });
                 if (createRes.ok) {
-                    window.location.reload(); // Simplest way to refresh all state
+                    const data = await createRes.json();
+                    if (data.status === 'bootstrapped') {
+                        console.log("[useWorkspace] Bootstrap successful, reloading...");
+                        sessionStorage.setItem('modulajar_bootstrapped', 'true');
+                        window.location.reload();
+                    } else {
+                        console.log("[useWorkspace] Already bootstrapped, skipping reload.");
+                    }
                 }
             }
         }
-        bootstrapIfNeeded();
+        
+        // Prevent infinite loops by checking session storage
+        if (!sessionStorage.getItem('modulajar_bootstrapped')) {
+            bootstrapIfNeeded();
+        }
     }, [isLoaded, isListLoading, workspaces, getToken]);
 
     return {
