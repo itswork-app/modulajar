@@ -7,6 +7,7 @@ import {
   ShieldAlert, 
   LayoutDashboard, 
   Globe, 
+  Settings,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { label: 'Revenue', icon: BarChart3, href: '/revenue' },
   { label: 'Support & Ops', icon: ShieldAlert, href: '/support' },
   { label: 'Workspaces', icon: Globe, href: '/support' }, // Reuse search in support for now
+  { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 
 export function Sidebar() {
@@ -61,7 +63,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center gap-3 px-2">
-          <UserButton afterSignOutUrl="/" />
+          <UserButton afterSignOutUrl="https://modulajar.app" />
           {!isCollapsed && (
             <div className="flex flex-col">
               <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Operator</span>

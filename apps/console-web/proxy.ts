@@ -1,11 +1,11 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher, type ClerkMiddlewareAuth } from "@clerk/nextjs/server";
 import { NextRequest } from "next/server";
 
 // Protect all routes
 const isProtectedRoute = createRouteMatcher(['/(.*)']);
 const isPublicRoute = createRouteMatcher(['/test-wizard']);
 
-export default clerkMiddleware(async (auth: any, req: NextRequest) => {
+export default clerkMiddleware(async (auth: ClerkMiddlewareAuth, req: NextRequest) => {
     if (isProtectedRoute(req) && !isPublicRoute(req)) {
         await auth.protect();
     }
