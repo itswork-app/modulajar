@@ -7,8 +7,6 @@ import {
   ShieldAlert, 
   LayoutDashboard, 
   Globe, 
-  Settings, 
-  LogOut,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
