@@ -3,13 +3,16 @@ import { NextRequest } from "next/server";
 
 // Protect all routes
 const isProtectedRoute = createRouteMatcher(['/(.*)']);
-const isPublicRoute = createRouteMatcher(['/test-wizard']);
+const isPublicRoute = createRouteMatcher(['/test-wizard', '/sign-in(.*)', '/sign-up(.*)']);
 
-export default clerkMiddleware(async (auth: ClerkMiddlewareAuth, req: NextRequest) => {
+const proxy = clerkMiddleware(async (auth: ClerkMiddlewareAuth, req: NextRequest) => {
     if (isProtectedRoute(req) && !isPublicRoute(req)) {
         await auth.protect();
     }
 });
+
+export { proxy };
+export default proxy;
 
 export const config = {
     matcher: [
