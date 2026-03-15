@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Building, Loader2, Plus, Check } from 'lucide-react';
+import { X, Building, Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspaces } from '@/hooks/use-workspace';

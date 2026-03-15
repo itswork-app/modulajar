@@ -13,7 +13,6 @@ import {
     Clock,
     ArrowUpRight,
     Gift,
-    Loader2,
     AlertCircle,
     Receipt
 } from 'lucide-react';

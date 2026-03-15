@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Sparkles, Loader2, Database, Search, BookOpen, Star } from 'lucide-react';
+import { Sparkles, Database, Search, BookOpen, Star } from 'lucide-react';
 
 
 import { Skeleton } from '@/components/ui/skeleton';

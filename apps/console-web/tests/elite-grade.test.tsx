@@ -38,7 +38,7 @@ describe('CreateWorkspaceModal (Elite Grade)', () => {
     });
 
     it('switches to join tab and submits code', async () => {
-        (global.fetch as any).mockResolvedValueOnce({
+        (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
             ok: true,
             json: async () => ({ status: 'joined', workspaceId: 'ws-123' })
         });
@@ -66,7 +66,7 @@ describe('CreateWorkspaceModal (Elite Grade)', () => {
     });
 
     it('shows error if join fails', async () => {
-        (global.fetch as any).mockResolvedValueOnce({
+        (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
             ok: false,
             json: async () => ({ message: 'Kode tidak valid' })
         });
