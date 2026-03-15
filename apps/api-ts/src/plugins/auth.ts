@@ -1,10 +1,9 @@
 import fp from 'fastify-plugin';
-import { createClerkClient, verifyToken } from '@clerk/clerk-sdk-node';
+import { createClerkClient } from '@clerk/backend';
 import { FastifyRequest, FastifyReply } from 'fastify';
 
 const authPlugin = fp(async (fastify, options) => {
-    // We can initialize Clerk client here if we need backend API access
-    // const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
     // Decorate request with auth object
     fastify.decorateRequest('auth', null);
@@ -18,21 +17,12 @@ const authPlugin = fp(async (fastify, options) => {
 
             const token = authHeader.split(' ')[1];
 
-            // Verify token
-            // This will use CLERK_SECRET_KEY or JWKS automatically if configured correctly in env
-            // But verifyToken from @clerk/clerk-sdk-node is designed for backend verification
-            // It validates signature, exp, nbf, iss, aud
-
-            const claims = await verifyToken(token, {
-                secretKey: process.env.CLERK_SECRET_KEY,
-                issuer: null, // Bypassing issuer check for now as it varies by instance
-                // If using a custom JWT template or audience, add here
-                // audience: "..." 
-            });
+            // Verify token using @clerk/backend verifyToken
+            const claims = await clerk.verifyToken(token);
 
             request.auth = {
                 clerk_user_id: claims.sub,
-                org_id: claims.org_id as string | undefined, // Mapping optional org_id
+                org_id: claims.org_id as string | undefined,
             };
 
         } catch (err) {
@@ -50,7 +40,7 @@ declare module 'fastify' {
             clerk_user_id: string;
             org_id?: string;
         } | null;
-        rawBody?: Buffer; // Added for webhook signature verification
+        rawBody?: Buffer;
     }
     interface FastifyInstance {
         verifyClerk: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
