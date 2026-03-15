@@ -208,7 +208,7 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: { onMenuToggle?: () =
                 </Link>
 
                 <UserButton
-                    afterSignOutUrl="/"
+                    afterSignOutUrl="https://modulajar.app"
                     appearance={{ elements: { avatarBox: 'w-8 h-8 rounded-full border border-slate-200 shadow-xs hover:border-emerald-500 transition-all' } }}
                 />
             </div>
