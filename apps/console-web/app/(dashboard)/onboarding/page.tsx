@@ -181,13 +181,14 @@ export default function OnboardingPage() {
                     }));
 
                     // Intelligent Pre-fill: If we have a school name but missing regional data, try to auto-fill
-                    if (sData.school_display_name && (!sData.provinsi || !sData.kab_kota)) {
+                    const schoolName = sData.school_display_name;
+                    if (schoolName && (!sData.provinsi || !sData.kab_kota)) {
                         try {
-                            const searchRes = await fetch(`https://api-sekolah-indonesia.vercel.app/sekolah/s?sekolah=${encodeURIComponent(sData.school_display_name)}`);
+                            const searchRes = await fetch(`https://api-sekolah-indonesia.vercel.app/sekolah/s?sekolah=${encodeURIComponent(schoolName)}`);
                             const searchResult = await searchRes.json();
                             if (searchResult.status === 'success' && searchResult.data && searchResult.data.length > 0) {
                                 // Find best match (exact name match preferred)
-                                const match = searchResult.data.find((s: SchoolResult) => s.sekolah.toLowerCase() === sData.school_display_name.toLowerCase()) || searchResult.data[0];
+                                const match = searchResult.data.find((s: SchoolResult) => s.sekolah.toLowerCase() === schoolName.toLowerCase()) || searchResult.data[0];
                                 if (match) {
                                     setData(prev => ({
                                         ...prev,
