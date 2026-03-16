@@ -148,6 +148,21 @@ export default async function platformRoutes(fastify: FastifyInstance) {
             params.push(limit);
 
             const result = await fastify.db.query(query, params);
+
+            // PR-105: Persistent Audit Trail
+            await fastify.db.query(
+                `INSERT INTO platform_audit_logs (id, event_type, actor_id, actor_email, severity, action_details) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    `audit_${Math.random().toString(36).slice(2, 11)}`, 
+                    'WORKSPACE_LOOKUP', 
+                    request.auth?.userId || 'system',
+                    request.auth?.sessionClaims?.email || 'admin@modulajar.app',
+                    'info',
+                    JSON.stringify({ search, results_count: result.rows.length })
+                ]
+            );
+
             return { workspaces: result.rows };
         });
 
