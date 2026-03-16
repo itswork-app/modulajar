@@ -12,9 +12,19 @@ import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+function toTitleCase(str: string) {
+    if (!str) return '';
+    return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
 
-
-
+type Region = { id: string; name: string };
+type SchoolResult = {
+    npsn: string;
+    sekolah: string;
+    alamat: string;
+    propinsi: string;
+    kabupaten_kota: string;
+};
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
 export default function OnboardingPage() {
@@ -26,6 +36,17 @@ export default function OnboardingPage() {
     const [currentStep, setCurrentStep] = useState<Step>('PROFILE');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const [provinces, setProvinces] = useState<Region[]>([]);
+    const [regencies, setRegencies] = useState<Region[]>([]);
+    const [isLoadingRegions, setIsLoadingRegions] = useState(false);
+    const [selectedProvinceId, setSelectedProvinceId] = useState<string>('');
+
+    // School Search State
+    const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+    const [schoolSuggestions, setSchoolSuggestions] = useState<SchoolResult[]>([]);
+    const [isSearchingSchools, setIsSearchingSchools] = useState(false);
+    const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
 
     const [data, setData] = useState({
         // Profile
@@ -51,6 +72,75 @@ export default function OnboardingPage() {
             setData(prev => ({ ...prev, full_name: user.fullName || '' }));
         }
     }, [user, data.full_name]);
+
+    // Fetch Provinces
+    useEffect(() => {
+        async function fetchProvinces() {
+            try {
+                const res = await fetch('https://emsifa.github.io/api-wilayah-indonesia/api/provinces.json');
+                const pData: Region[] = await res.json();
+                setProvinces(pData);
+            } catch (err) {
+                console.error("Failed to fetch provinces", err);
+            }
+        }
+        fetchProvinces();
+    }, []);
+
+    // Fetch Regencies when province changes
+    useEffect(() => {
+        if (!selectedProvinceId) {
+            setRegencies([]);
+            return;
+        }
+
+        async function fetchRegencies() {
+            setIsLoadingRegions(true);
+            try {
+                const res = await fetch(`https://emsifa.github.io/api-wilayah-indonesia/api/regencies/${selectedProvinceId}.json`);
+                const rData: Region[] = await res.json();
+                setRegencies(rData);
+            } catch (err) {
+                console.error("Failed to fetch regencies", err);
+            } finally {
+                setIsLoadingRegions(false);
+            }
+        }
+        fetchRegencies();
+    }, [selectedProvinceId]);
+
+    // Pre-fill logic for regions
+    useEffect(() => {
+        if (data.provinsi && provinces.length > 0 && !selectedProvinceId) {
+            const found = provinces.find(p => p.name === data.provinsi.toUpperCase());
+            if (found) setSelectedProvinceId(found.id);
+        }
+    }, [data.provinsi, provinces, selectedProvinceId]);
+
+    // School Search Logic (Debounced)
+    useEffect(() => {
+        if (schoolSearchQuery.length < 3) {
+            setSchoolSuggestions([]);
+            return;
+        }
+
+        const handler = setTimeout(async () => {
+            setIsSearchingSchools(true);
+            try {
+                const res = await fetch(`https://api-sekolah-indonesia.vercel.app/sekolah/s?sekolah=${encodeURIComponent(schoolSearchQuery)}`);
+                const result = await res.json();
+                if (result.status === 'success') {
+                    setSchoolSuggestions(result.data || []);
+                }
+            } catch (err) {
+                console.error("Failed to search schools", err);
+            } finally {
+                setIsSearchingSchools(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(handler);
+    }, [schoolSearchQuery]);
 
     // Pre-fill existing data if any
     useEffect(() => {
@@ -157,6 +247,7 @@ export default function OnboardingPage() {
             router.push('/wizard');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem.');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setIsSubmitting(false);
         }
@@ -233,7 +324,9 @@ export default function OnboardingPage() {
                             >
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Nama Lengkap Guru</label>
+                                        <label className="text-sm font-bold text-slate-700 ml-1">
+                                            Nama Lengkap Guru <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
                                             value={data.full_name}
@@ -253,7 +346,9 @@ export default function OnboardingPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Jenjang Pendidikan</label>
+                                        <label className="text-sm font-bold text-slate-700 ml-1">
+                                            Jenjang Pendidikan <span className="text-red-500">*</span>
+                                        </label>
                                         <select
                                             value={data.primary_jenjang}
                                             onChange={e => {
@@ -274,7 +369,9 @@ export default function OnboardingPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Kelas Utama</label>
+                                        <label className="text-sm font-bold text-slate-700 ml-1">
+                                            Kelas Utama <span className="text-red-500">*</span>
+                                        </label>
                                         <select
                                             value={data.primary_grade}
                                             onChange={e => setData(prev => ({ ...prev, primary_grade: parseInt(e.target.value) }))}
@@ -286,7 +383,9 @@ export default function OnboardingPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2 col-span-full">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Mata Pelajaran Utama</label>
+                                        <label className="text-sm font-bold text-slate-700 ml-1">
+                                            Mata Pelajaran Utama <span className="text-red-500">*</span>
+                                        </label>
                                         <div className="relative">
                                             <input
                                                 type="text"
@@ -317,50 +416,125 @@ export default function OnboardingPage() {
                                 className="space-y-6"
                             >
                                 <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 ml-1">Nama Satuan Pendidikan (Sekolah)</label>
+                                    <div className="space-y-2 relative">
+                                        <label className="text-sm font-bold text-slate-700 ml-1">
+                                            Nama Satuan Pendidikan (Sekolah) <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
-                                            value={data.school_display_name}
-                                            onChange={e => setData(prev => ({ ...prev, school_display_name: e.target.value }))}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                            placeholder="Masukkan Nama Sekolah"
+                                            value={schoolSearchQuery || data.school_display_name}
+                                            onChange={e => {
+                                                setSchoolSearchQuery(e.target.value);
+                                                setData(prev => ({ ...prev, school_display_name: e.target.value }));
+                                                setShowSchoolSuggestions(true);
+                                            }}
+                                            onFocus={() => setShowSchoolSuggestions(true)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900"
+                                            placeholder="Cari Nama Sekolah Anda..."
                                         />
+                                        {isSearchingSchools && (
+                                            <div className="absolute right-4 top-[42px]">
+                                                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                            </div>
+                                        )}
+
+                                        {showSchoolSuggestions && schoolSuggestions.length > 0 && (
+                                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden p-2">
+                                                {schoolSuggestions.map((s: SchoolResult) => (
+                                                    <button
+                                                        key={s.npsn}
+                                                        onClick={() => {
+                                                            setData(prev => ({
+                                                                ...prev,
+                                                                school_display_name: s.sekolah,
+                                                                school_npsn: s.npsn,
+                                                                alamat: s.alamat,
+                                                                provinsi: toTitleCase(s.propinsi),
+                                                                kab_kota: toTitleCase(s.kabupaten_kota)
+                                                            }));
+                                                            setSchoolSearchQuery(s.sekolah);
+                                                            setShowSchoolSuggestions(false);
+                                                            
+                                                            // Try to find province ID to trigger regency load
+                                                            const foundProv = provinces.find(p => p.name === s.propinsi.toUpperCase());
+                                                            if (foundProv) setSelectedProvinceId(foundProv.id);
+                                                        }}
+                                                        className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-xl transition-colors group"
+                                                    >
+                                                        <div className="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">{s.sekolah}</div>
+                                                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                                                            <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold">{s.npsn}</span>
+                                                            <span className="truncate">{s.alamat}</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* Backdrop to close suggestions */}
+                                        {showSchoolSuggestions && (
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowSchoolSuggestions(false)} />
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">NPSN (Opsional)</label>
+                                            <label className="text-sm font-bold text-slate-700 ml-1">NPSN <span className="text-red-500">*</span></label>
                                             <input
                                                 type="text"
                                                 maxLength={8}
                                                 value={data.school_npsn}
                                                 onChange={e => setData(prev => ({ ...prev, school_npsn: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900"
                                                 placeholder="8 digit NPSN"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">Provinsi</label>
-                                            <input
-                                                type="text"
-                                                value={data.provinsi}
-                                                onChange={e => setData(prev => ({ ...prev, provinsi: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                                placeholder="Contoh: Jawa Tengah"
-                                            />
+                                            <label className="text-sm font-bold text-slate-700 ml-1">
+                                                Provinsi <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={selectedProvinceId}
+                                                onChange={e => {
+                                                    const id = e.target.value;
+                                                    setSelectedProvinceId(id);
+                                                    const province = provinces.find(p => p.id === id);
+                                                    setData(prev => ({ 
+                                                        ...prev, 
+                                                        provinsi: province ? toTitleCase(province.name) : '',
+                                                        kab_kota: '' // Reset city
+                                                    }));
+                                                }}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900"
+                                            >
+                                                <option value="">Pilih Provinsi</option>
+                                                {provinces.map(p => (
+                                                    <option key={p.id} value={p.id}>{toTitleCase(p.name)}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">Kabupaten / Kota</label>
-                                            <input
-                                                type="text"
-                                                value={data.kab_kota}
-                                                onChange={e => setData(prev => ({ ...prev, kab_kota: e.target.value }))}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden transition-all font-medium text-slate-900"
-                                                placeholder="Contoh: Semarang"
-                                            />
+                                            <label className="text-sm font-bold text-slate-700 ml-1">
+                                                Kabupaten / Kota <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={regencies.find(r => toTitleCase(r.name) === data.kab_kota)?.id || ''}
+                                                disabled={!selectedProvinceId || isLoadingRegions}
+                                                onChange={e => {
+                                                    const id = e.target.value;
+                                                    const regency = regencies.find(r => r.id === id);
+                                                    setData(prev => ({ ...prev, kab_kota: regency ? toTitleCase(regency.name) : '' }));
+                                                }}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-medium text-slate-900 disabled:opacity-50"
+                                            >
+                                                <option value="">{isLoadingRegions ? 'Memuat...' : 'Pilih Kabupaten/Kota'}</option>
+                                                {regencies.map(r => (
+                                                    <option key={r.id} value={r.id}>{toTitleCase(r.name)}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">Alamat Sekolah</label>
+                                            <label className="text-sm font-bold text-slate-700 ml-1">
+                                                Alamat Sekolah <span className="text-red-500">*</span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 value={data.alamat}
@@ -386,7 +560,9 @@ export default function OnboardingPage() {
                                 >
                                     <div className="space-y-6">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700 ml-1">Nama Kepala Sekolah</label>
+                                            <label className="text-sm font-bold text-slate-700 ml-1">
+                                                Nama Kepala Sekolah <span className="text-red-500">*</span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 value={data.principal_name}
@@ -409,10 +585,10 @@ export default function OnboardingPage() {
                                 </motion.div>
                             )
                         }
-                    </AnimatePresence >
+                    </AnimatePresence>
 
                     {/* Navigation */}
-                    < div className="flex items-center justify-between mt-12 pt-8 border-t border-slate-100" >
+                    <div className="flex items-center justify-between mt-12 pt-8 border-t border-slate-100">
                         {currentStep !== 'PROFILE' ? (
                             <button
                                 onClick={handleBack}
@@ -422,36 +598,34 @@ export default function OnboardingPage() {
                             </button>
                         ) : <div />}
 
-                        {
-                            currentStep !== 'SIGNATURE' ? (
-                                <button
-                                    onClick={handleNext}
-                                    disabled={
-                                        (currentStep === 'PROFILE' && (!data.full_name || !data.primary_subject)) ||
-                                        (currentStep === 'SCHOOL' && (!data.school_display_name || !data.kab_kota))
-                                    }
-                                    className="flex items-center justify-center px-8 py-3.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-slate-200"
-                                >
-                                    Selanjutnya <ChevronRight className="w-5 h-5" />
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={isSubmitting || !data.principal_name}
-                                    className="flex items-center justify-center px-10 py-3.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-emerald-200"
-                                >
-                                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Selesaikan Onboarding</>}
-                                </button>
-                            )
-                        }
-                    </div >
-                </div >
+                        {currentStep !== 'SIGNATURE' ? (
+                            <button
+                                onClick={handleNext}
+                                disabled={
+                                    (currentStep === 'PROFILE' && (!data.full_name || !data.primary_subject)) ||
+                                    (currentStep === 'SCHOOL' && (data.school_display_name.trim().length < 3 || !data.kab_kota || !data.alamat || !data.provinsi))
+                                }
+                                className="flex items-center justify-center px-8 py-3.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-slate-200"
+                            >
+                                Selanjutnya <ChevronRight className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={isSubmitting || !data.principal_name}
+                                className="flex items-center justify-center px-10 py-3.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold transition-all gap-2 shadow-lg shadow-emerald-200"
+                            >
+                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Selesaikan Onboarding</>}
+                            </button>
+                        )}
+                    </div>
+                </div>
 
                 {/* Footer Security Note */}
-                < div className="text-center" >
+                <div className="text-center">
                     <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Data Anda dienkripsi secara aman dan hanya digunakan untuk keperluan dokumen sekolah.</p>
-                </div >
-            </div >
-        </div >
+                </div>
+            </div>
+        </div>
     );
 }

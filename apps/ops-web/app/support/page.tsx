@@ -46,7 +46,7 @@ function SupportSkeleton() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-3">
+                    <div key={i} className="bg-slate-900/50 rounded-3xl p-6 border border-slate-800 shadow-sm space-y-3 backdrop-blur-sm">
                         <div className="flex items-center gap-4">
                             <Skeleton className="w-12 h-12 rounded-2xl" />
                             <div className="space-y-2">
@@ -182,12 +182,12 @@ export default function SupportDashboard() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black rounded uppercase tracking-widest h-fit">Technical Ops</div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">System Health</h1>
+                        <div className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[9px] font-black rounded uppercase tracking-widest h-fit border border-indigo-500/20">Technical Ops</div>
+                        <h1 className="text-4xl font-black text-white tracking-tight">System Health</h1>
                     </div>
-                    <p className="text-slate-500 font-bold">Real-time monitoring of generation pipelines and workspace distribution.</p>
+                    <p className="text-slate-400 font-bold">Real-time monitoring of generation pipelines and workspace distribution.</p>
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl border border-emerald-100">
+                <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-2xl border border-emerald-500/20">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                     <span className="text-xs font-black uppercase tracking-widest">Systems Nominal</span>
                 </div>
@@ -195,47 +195,47 @@ export default function SupportDashboard() {
 
             {/* Top Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 shadow-sm backdrop-blur-sm">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-red-50 text-red-600">
+                        <div className="p-3 rounded-2xl bg-slate-950 text-red-400">
                             <AlertCircle className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Errors (24h)</p>
-                            <h3 className="text-2xl font-black text-slate-900">{data.errors_24h}</h3>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Errors (24h)</p>
+                            <h3 className="text-2xl font-black text-white">{data.errors_24h}</h3>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 shadow-sm backdrop-blur-sm">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600">
+                        <div className="p-3 rounded-2xl bg-slate-950 text-indigo-400">
                             <Clock className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg Duration</p>
-                            <h3 className="text-2xl font-black text-slate-900">{data.avg_duration_s}s</h3>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Avg Duration</p>
+                            <h3 className="text-2xl font-black text-white">{data.avg_duration_s}s</h3>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 shadow-sm backdrop-blur-sm">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600">
+                        <div className="p-3 rounded-2xl bg-slate-950 text-emerald-400">
                             <Users className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Users (24h)</p>
-                            <h3 className="text-2xl font-black text-slate-900">{data.active_users_24h}</h3>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Users (24h)</p>
+                            <h3 className="text-2xl font-black text-white">{data.active_users_24h}</h3>
                         </div>
                     </div>
                 </div>
                 <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-amber-50 text-amber-600">
+                        <div className="p-3 rounded-2xl bg-slate-950 text-amber-400">
                             <Zap className="w-6 h-6 fill-current" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Job Success Rate</p>
-                            <h3 className="text-2xl font-black text-slate-900">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Job Success Rate</p>
+                            <h3 className="text-2xl font-black text-white">
                                 {Math.round((parseInt(data.job_distribution.find(j => j.status === 'done')?.count || '0') / 
                                 (data.job_distribution.reduce((acc, curr) => acc + parseInt(curr.count), 0) || 1)) * 100)}%
                             </h3>
@@ -246,19 +246,19 @@ export default function SupportDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Health Trends */}
-                <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-8 shadow-sm backdrop-blur-sm">
                     <div className="mb-8">
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Performance Trends</h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">7-Day Generation health</p>
+                        <h2 className="text-xl font-black text-white tracking-tight">Performance Trends</h2>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">7-Day Generation health</p>
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={data.job_trends_formatted}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} />
                                 <Tooltip 
-                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
                                 />
                                 <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
                                 <Line type="monotone" dataKey="failed" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444' }} />
@@ -268,20 +268,20 @@ export default function SupportDashboard() {
                 </div>
 
                 {/* Job Distribution Bar Chart */}
-                <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-8 shadow-sm backdrop-blur-sm">
                     <div className="mb-8">
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Status distribution</h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total jobs by current state</p>
+                        <h2 className="text-xl font-black text-white tracking-tight">Status distribution</h2>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Total jobs by current state</p>
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data.job_distribution}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="status" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} tickFormatter={(v) => v.toUpperCase()} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                                <XAxis dataKey="status" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} tickFormatter={(v) => v.toUpperCase()} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} />
                                 <Tooltip 
-                                    cursor={{fill: '#f8fafc'}}
-                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                                    cursor={{fill: '#1e293b'}}
+                                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
                                 />
                                 <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                                     {data.job_distribution.map((entry, index) => (
@@ -295,7 +295,7 @@ export default function SupportDashboard() {
             </div>
 
             {/* Global Workspace Lookup */}
-            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
+            <div className="bg-slate-900 rounded-4xl p-10 text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-10 opacity-10">
                     <Server className="w-64 h-64 rotate-12" />
                 </div>
