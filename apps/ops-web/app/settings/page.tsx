@@ -149,8 +149,77 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {activeTab === 'security' && (
+            <div className="space-y-8 animate-in fade-in duration-300 flex flex-col h-full">
+              <div className="border-b border-slate-50 pb-6 flex justify-between items-end">
+                <div>
+                  <h3 className="text-xl font-black text-white">Platform Audit Trail</h3>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Immutable record of mission-critical events</p>
+                </div>
+                <div className="flex gap-2">
+                   <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">Live Feed</span>
+                   </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="bg-slate-950/50 border border-slate-800 rounded-3xl overflow-hidden flex flex-col h-[500px]">
+                   <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-900/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <div className="col-span-3">Timestamp</div>
+                      <div className="col-span-3">Event</div>
+                      <div className="col-span-4">Actor</div>
+                      <div className="col-span-2 text-right">Severity</div>
+                   </div>
+                   <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1">
+                      {/* Simple mock logs for demonstration, in real app would use SWR to fetch /platform/audit-logs */}
+                      {[
+                        { date: '2026-03-16 16:21:12', event: 'MIGRATION_APPLIED', actor: 'System', severity: 'info', details: 'Applied 023_platform_audit_logs.sql' },
+                        { date: '2026-03-16 16:20:55', event: 'DB_SYNC_FIXED', actor: 'AI_AGENT', severity: 'warn', details: 'Manually marked migration 8-22 as applied' },
+                        { date: '2026-03-16 16:16:23', event: 'AUTH_SESSION_GEN', actor: 'user_2nPk9...', severity: 'info', details: 'Console Onboarding Access' },
+                        { date: '2026-03-16 16:14:55', event: 'DATA_PERSIST_SYNC', actor: 'System', severity: 'info', details: 'Workspace Settings Refined' }
+                      ].map((log, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-4 px-4 py-3 rounded-2xl hover:bg-slate-800/30 transition-all group items-center">
+                           <div className="col-span-3 text-[10px] font-bold text-slate-400 font-mono">{log.date}</div>
+                           <div className="col-span-3 flex items-center gap-2">
+                              <div className={cn("w-1.5 h-1.5 rounded-full", log.severity === 'critical' ? 'bg-red-500' : log.severity === 'warn' ? 'bg-amber-500' : 'bg-indigo-500')} />
+                              <span className="text-[11px] font-black text-white tracking-tight">{log.event}</span>
+                           </div>
+                           <div className="col-span-4 flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-[8px] font-black text-slate-400">
+                                 {log.actor[0]}
+                              </div>
+                              <div className="flex flex-col">
+                                 <span className="text-[10px] font-bold text-white leading-none">{log.actor}</span>
+                                 <span className="text-[8px] font-bold text-slate-500 leading-none mt-0.5 truncate max-w-[120px]">{log.details}</span>
+                              </div>
+                           </div>
+                           <div className="col-span-2 text-right">
+                              <span className={cn(
+                                "text-[9px] font-black px-2 py-0.5 rounded uppercase",
+                                log.severity === 'critical' ? "bg-red-500/10 text-red-400 border border-red-500/20" : 
+                                log.severity === 'warn' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : 
+                                "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                              )}>
+                                 {log.severity}
+                              </span>
+                           </div>
+                        </div>
+                      ))}
+                      
+                      <div className="flex flex-col items-center justify-center py-10 opacity-20 group">
+                         <ShieldCheck className="w-10 h-10 text-slate-600 mb-2 group-hover:animate-bounce" />
+                         <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">End of visible audit trail</p>
+                      </div>
+                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Placeholder for other tabs */}
-          {activeTab !== 'profile' && activeTab !== 'api' && (
+          {activeTab !== 'profile' && activeTab !== 'api' && activeTab !== 'security' && (
             <div className="flex flex-col items-center justify-center flex-1 text-center space-y-4 py-20">
               <div className="w-20 h-20 bg-slate-900/50 rounded-3xl flex items-center justify-center shadow-inner border border-slate-800">
                 <Settings className="w-8 h-8 text-slate-600 animate-spin-slow" />
