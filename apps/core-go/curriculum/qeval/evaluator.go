@@ -8,8 +8,9 @@ import (
 
 func Evaluate(input interface{}) (QualityResult, error) {
 	switch v := input.(type) {
-	case *curriculum.ModulAjarSD4:
-		return EvaluateSD4(v), nil
+	case *curriculum.ModulAjarMerdeka:
+		// EvaluateMerdeka now returns only QualityResult, no error
+		return EvaluateMerdeka(v), nil
 	case *curriculum.Curriculum:
 		return EvaluateLegacy(v), nil
 	default:

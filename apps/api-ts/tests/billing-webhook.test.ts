@@ -75,7 +75,7 @@ test('Billing Webhook Hardening', async (t) => {
                 }
 
                 // Receipts (read-only for webhook mostly, except status update)
-                if (sql.includes('SELECT id, workspace_id, amount, status FROM receipts')) {
+                if (sql.includes('SELECT id, workspace_id, amount, status') && sql.includes('FROM receipts')) {
                     const [extRef] = values;
                     const found = Object.values(receipts).find((r: any) => r.external_ref === extRef);
                     if (found) return { rowCount: 1, rows: [found] };
@@ -83,26 +83,50 @@ test('Billing Webhook Hardening', async (t) => {
                 }
 
                 if (sql.includes('UPDATE receipts SET status')) {
-                    if (values.length === 1) {
-                        const id = values[0];
-                        if (receipts[id]) receipts[id].status = 'confirmed';
+                    let status: string;
+                    let id: string;
+
+                    if (sql.includes("status = 'confirmed'") || sql.includes("status = 'rejected'")) {
+                        status = sql.includes("status = 'confirmed'") ? 'confirmed' : 'rejected';
+                        id = values[0];
                     } else {
-                        const [status, id] = values;
-                        if (receipts[id]) receipts[id].status = status;
+                        status = values[0];
+                        id = values[1];
                     }
+
+                    if (receipts[id]) {
+                        receipts[id].status = status;
+                        return { rowCount: 1, rows: [receipts[id]] };
+                    }
+                    return { rowCount: 0, rows: [] };
+                }
+
+                if (sql.includes('UPDATE receipts SET ledger_id')) {
+                    const [ledgerId, id] = values;
+                    if (receipts[id]) receipts[id].ledger_id = ledgerId;
                     return { rowCount: 1, rows: [] };
+                }
+
+                if (sql.includes('SELECT id FROM pricing_plans')) {
+                    return { rowCount: 1, rows: [{ id: 'plan_inst' }] };
                 }
 
                 // Ledger (Credit)
                 // INSERT INTO wallet_ledger
                 if (sql.includes('INSERT INTO wallet_ledger')) {
-                    // id, wid, amount, ref
-                    const [id, wid, amount, ref] = values;
+                    let id, wid, type, amount, ref;
+                    if (sql.includes("'credit'") || sql.includes("'debit'")) {
+                        type = sql.includes("'credit'") ? 'credit' : 'debit';
+                        [id, wid, amount, ref] = values;
+                    } else {
+                        [id, wid, type, amount, ref] = values;
+                    }
+
                     // Mock conflict if exists
-                    const exists = ledger.find(l => l.workspace_id === wid && l.reference_id === ref && l.type === 'credit');
+                    const exists = ledger.find(l => l.workspace_id === wid && l.reference_id === ref && l.type === type);
                     if (exists) return { rowCount: 0, rows: [] };
 
-                    ledger.push({ id, workspace_id: wid, amount, reference_id: ref, type: 'credit' });
+                    ledger.push({ id, workspace_id: wid, amount, reference_id: ref, type });
                     return { rowCount: 1, rows: [] };
                 }
 

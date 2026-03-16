@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const ValidSD4JSON = `
+const ValidMerdekaJSON = `
 {
 	"identitas": {
 		"sekolah": "SD Test",
@@ -38,6 +38,8 @@ const ValidSD4JSON = `
 	"sarana_prasarana": ["Buku Paket", "Papan Tulis"],
 	"target_peserta_didik": "Reguler",
 	"model_pembelajaran": "Problem Based Learning",
+	"pemahaman_bermakna": "Siswa memahami konsep pecahan dalam kehidupan sehari-hari.",
+	"pertanyaan_pemantik": ["Bagaimana membagi pizza menjadi dua bagian sama besar?"],
 	"tujuan_pembelajaran": "Siswa dapat membandingkan dua pecahan dengan pembilang satu.",
 	"materi_pembelajaran": "Konsep pecahan dasar dan perbandingan pecahan.",
 	"kegiatan_pembelajaran": {
@@ -49,6 +51,10 @@ const ValidSD4JSON = `
 		"sikap": "Observasi selama diskusi.",
 		"pengetahuan": "Tes tertulis membandingkan pecahan.",
 		"keterampilan": "Unjuk kerja mewarnai bagian pecahan."
+	},
+	"lampiran": {
+		"glosarium": "Pecahan: Bagian dari keseluruhan.",
+		"daftar_pustaka": "Buku Matematika Kelas 4."
 	},
 	"refleksi_guru": "Apakah semua siswa memahami konsep perbandingan?"
 }`
@@ -192,7 +198,7 @@ func TestWorker_ExecuteJob_Success(t *testing.T) {
 
 	mockAI := &MockAIEngine{
 		GenerateResponse: &ai.GenerateResponse{
-			Content:   ValidSD4JSON,
+			Content:   ValidMerdekaJSON,
 			ModelName: "gemini-1.5-flash",
 		},
 	}
@@ -236,7 +242,7 @@ func TestWorker_ExecuteJob_AIFailure_Retry(t *testing.T) {
 	mockAI := &MockAIEngine{
 		Responses: []*ai.GenerateResponse{
 			nil, // Fail 1
-			{Content: ValidSD4JSON, ModelName: "fixed"},
+			{Content: ValidMerdekaJSON, ModelName: "fixed"},
 		},
 		Errors: []error{
 			fmt.Errorf("AI down"),
@@ -325,7 +331,7 @@ func TestWorker_TemplateRankingInjection(t *testing.T) {
 	// 1. Setup Mock Data
 	mockAI := &MockAIEngine{
 		GenerateResponse: &ai.GenerateResponse{
-			Content:   ValidSD4JSON,
+			Content:   ValidMerdekaJSON,
 			ModelName: "gemini-1.5-flash",
 		},
 	}
@@ -542,7 +548,7 @@ func TestWorker_ExecuteJob_ErrorPaths(t *testing.T) {
 	}
 
 	// 2. GCS Upload Failure
-	mockAI := &MockAIEngine{GenerateResponse: &ai.GenerateResponse{Content: ValidSD4JSON}}
+	mockAI := &MockAIEngine{GenerateResponse: &ai.GenerateResponse{Content: ValidMerdekaJSON}}
 	mockStorage := &MockStorage{UploadError: fmt.Errorf("UPLOAD FAIL")}
 	mockStore := &MockJobStore{}
 	deps := WorkerDeps{
@@ -562,7 +568,7 @@ func TestWorker_ExecuteJob_ErrorPaths(t *testing.T) {
 
 	// 3. AI persist metadata failure
 	mockStore = &MockJobStore{UpdateMetaError: fmt.Errorf("DB FAIL")}
-	mockAI = &MockAIEngine{GenerateResponse: &ai.GenerateResponse{Content: ValidSD4JSON, ModelName: "test"}}
+	mockAI = &MockAIEngine{GenerateResponse: &ai.GenerateResponse{Content: ValidMerdekaJSON, ModelName: "test"}}
 	deps.AI = mockAI
 	deps.JobStore = mockStore
 	deps.Storage = &MockStorage{} // success upload

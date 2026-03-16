@@ -35,7 +35,7 @@ type ComposerInput struct {
 	LogoDataURI       string
 
 	// AI Generated Results (Optional)
-	ModulAjarSD4     *curriculum.ModulAjarSD4
+	ModulAjarMerdeka *curriculum.ModulAjarMerdeka
 	LegacyCurriculum *curriculum.Curriculum
 
 	// Smart Templates
@@ -109,15 +109,45 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
         {{ASSESSMENT_SECTION}}
     </section>`
 
+	bermaknaSectionHtml := `
+    <section class="section page-break-before">
+        <h2 class="section-title">Pemahaman Bermakna</h2>
+        <div class="activity-content">
+            <p>{{PEMAHAMAN_BERMAKNA}}</p>
+        </div>
+    </section>`
+
+	pemantikSectionHtml := `
+    <section class="section page-break-before">
+        <h2 class="section-title">Pertanyaan Pemantik</h2>
+        <div class="activity-content">
+            <ul>
+                {{PERTANYAAN_PEMANTIK}}
+            </ul>
+        </div>
+    </section>`
+
+	lampiranSectionHtml := `
+    <section class="section page-break-before">
+        <h2 class="section-title">Lampiran</h2>
+        <h3 class="assessment-type">Glosarium</h3>
+        <p>{{GLOSARIUM}}</p>
+        <h3 class="assessment-type">Daftar Pustaka</h3>
+        <p>{{DAFTAR_PUSTAKA}}</p>
+    </section>`
+
 	// 5. Build Ordered Sections
 	fragments := map[string]string{
-		"identitas": identitasSection,
-		"atp":       atpSectionHtml,
-		"kegiatan":  kegiatanSectionHtml,
-		"asesmen":   asesmenSectionHtml,
+		"identitas":          identitasSection,
+		"atp":                atpSectionHtml,
+		"bermakna":           bermaknaSectionHtml,
+		"pemantik":           pemantikSectionHtml,
+		"kegiatan":           kegiatanSectionHtml,
+		"asesmen":            asesmenSectionHtml,
+		"lampiran":           lampiranSectionHtml,
 	}
 
-	activeOrder := []string{"identitas", "atp", "kegiatan", "asesmen"}
+	activeOrder := []string{"identitas", "atp", "bermakna", "pemantik", "kegiatan", "asesmen", "lampiran"}
 	if input.LayoutDefinition != nil && input.LayoutDefinition["sections"] != nil {
 		if interfaceSlice, ok := input.LayoutDefinition["sections"].([]interface{}); ok {
 			var customOrder []string
@@ -179,14 +209,29 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 		"{{DID}}":                  input.DID,
 		"{{VERIFY_URL}}":           input.VerifyURL,
 		"{{KOP_SURAT}}":            kopSurat,
+		"{{PEMAHAMAN_BERMAKNA}}":   "",
+		"{{PERTANYAAN_PEMANTIK}}":  "",
+		"{{GLOSARIUM}}":            "",
+		"{{DAFTAR_PUSTAKA}}":       "",
 	}
 
 	// 7. Override with AI Content if present
-	if input.ModulAjarSD4 != nil {
-		m := input.ModulAjarSD4
+	if input.ModulAjarMerdeka != nil {
+		m := input.ModulAjarMerdeka
+		replacements["{{TITLE}}"] = m.Identitas.Topik
+		replacements["{{TAHUN_AJARAN}}"] = "2024/2025" // Fallback
 		replacements["{{SUBJECT_NAME}}"] = m.Identitas.MataPelajaran
 		replacements["{{KELAS}}"] = fmt.Sprintf("%d", m.Identitas.Kelas)
 		replacements["{{SEMESTER}}"] = m.Identitas.Semester
+		replacements["{{PEMAHAMAN_BERMAKNA}}"] = m.PemahamanBermakna
+		replacements["{{GLOSARIUM}}"] = m.Lampiran.Glosarium
+		replacements["{{DAFTAR_PUSTAKA}}"] = m.Lampiran.DaftarPustaka
+
+		var pemantikSb strings.Builder
+		for _, q := range m.PertanyaanPemantik {
+			pemantikSb.WriteString(fmt.Sprintf("<li>%s</li>", q))
+		}
+		replacements["{{PERTANYAAN_PEMANTIK}}"] = pemantikSb.String()
 
 		// Build Activity Sections from AI
 		var actSb strings.Builder
@@ -236,6 +281,7 @@ func ComposeModulAjarHTML(input ComposerInput) (string, error) {
 		"{{KELAS}}", "{{SEMESTER}}", "{{TAHUN_AJARAN}}", "{{SUBJECT_NAME}}",
 		"{{ATP_TABLE}}", "{{ACTIVITY_SECTIONS}}", "{{ASSESSMENT_SECTION}}",
 		"{{PID}}", "{{DID}}", "{{VERIFY_URL}}", "{{KOP_SURAT}}",
+		"{{PEMAHAMAN_BERMAKNA}}", "{{PERTANYAAN_PEMANTIK}}", "{{GLOSARIUM}}", "{{DAFTAR_PUSTAKA}}",
 	}
 	for _, placeholder := range keys {
 		html = strings.ReplaceAll(html, placeholder, replacements[placeholder])

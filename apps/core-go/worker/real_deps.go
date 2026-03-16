@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"modulajar/apps/core-go/adapters/ai"
@@ -104,19 +105,37 @@ func NewRealWorker(ctx context.Context) (*Worker, error) {
 	// AI
 	var aiEngine AIEngine
 	openAIKey := os.Getenv("OPENAI_API_KEY")
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+
+	var primary ai.Client
+	var secondary ai.Client
+
 	if openAIKey != "" {
 		openAIModel := os.Getenv("OPENAI_MODEL")
 		if openAIModel == "" {
 			openAIModel = "gpt-4o"
 		}
-		aiEngine = ai.NewOpenAIClient(openAIKey, openAIModel, 0, 0)
-	} else {
-		geminiKey := os.Getenv("GEMINI_API_KEY")
+		primary = ai.NewOpenAIClient(openAIKey, openAIModel, 0, 0)
+	}
+
+	if geminiKey != "" {
 		geminiModel := os.Getenv("GEMINI_MODEL")
 		if geminiModel == "" {
-			geminiModel = "gemini-1.5-flash-latest"
+			geminiModel = "gemini-2.0-flash"
 		}
-		aiEngine = ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
+		secondary = ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
+	}
+
+	if primary != nil && secondary != nil {
+		// Use Fallback (OpenAI -> Gemini)
+		aiEngine = ai.NewFallbackClient(primary, secondary, nil)
+	} else if primary != nil {
+		aiEngine = primary
+	} else if secondary != nil {
+		aiEngine = secondary
+	} else {
+		// Fallback to a default or error? NewRealWorker returns error.
+		return nil, fmt.Errorf("no AI provider configured (missing OPENAI_API_KEY or GEMINI_API_KEY)")
 	}
 
 	// GCS - Note: Client creation might fail if credentials missing

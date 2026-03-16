@@ -1,34 +1,63 @@
 package prompts
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-// BuildSystemPrompt returns the system-level prompt for Modul Ajar SD4 generation.
-func BuildSystemPrompt() string {
-	return `Anda adalah guru profesional Indonesia yang menyusun Modul Ajar berdasarkan Kurikulum Merdeka untuk Sekolah Dasar.
+// BuildSystemPrompt returns the system-level prompt for Modul Ajar generation.
+func BuildSystemPrompt(jenjang string) string {
+	return fmt.Sprintf(`Anda adalah guru profesional Indonesia yang menyusun Modul Ajar berdasarkan Kurikulum Merdeka untuk jenjang %s.
 
 Tulisan harus:
-- bahasa formal guru
+- bahasa formal guru Indonesia (KBBI)
 - praktis digunakan di kelas
-- tidak terlalu akademik
-- tidak menyebut AI
-
-Output HARUS berupa JSON valid.
-Jangan menambahkan teks di luar JSON.`
+- tidak terlalu akademik, fokus pada aktivitas siswa
+- tidak menyebut AI atau asisten virtual
+- memenuhi kriteria "Elite Grade": mendalam, kontekstual, dan inspiratif.`, jenjang)
 }
 
 // BuildInstructionPrompt returns the instruction with injected parameters.
-func BuildInstructionPrompt(school, subject, semester, topic string) string {
+func BuildInstructionPrompt(school, subject, jenjang, kelas, fase, semester, topic string) string {
 	return fmt.Sprintf(`Sekolah: %s
 Mata Pelajaran: %s
-Kelas: 4
-Fase: B
+Jenjang: %s
+Kelas: %s
+Fase: %s
 Semester: %s
 Topik: %s
 
 Instruction:
-Gunakan pendekatan pembelajaran aktif yang sesuai dengan siswa kelas 4 SD.
-Isi setiap field JSON dengan teks ringkas dan praktis.
-Setiap field maksimal 2-4 kalimat.`, school, subject, semester, topic)
+Gunakan pendekatan pembelajaran aktif (active learning) yang sesuai dengan karakteristik siswa jenjang %s kelas %s.
+Isi setiap field JSON dengan teks ringkas, praktis, dan berbobot.
+Pastikan konten mencerminkan standar Kurikulum Merdeka yang mutakhir.`, school, subject, jenjang, kelas, fase, semester, topic, jenjang, kelas)
+}
+
+// MapFase returns the Kurikulum Merdeka phase for a given level and grade.
+func MapFase(jenjang string, kelas string) string {
+	k := strings.TrimSpace(kelas)
+	j := strings.ToUpper(strings.TrimSpace(jenjang))
+
+	switch j {
+	case "SD":
+		if k == "1" || k == "2" {
+			return "A"
+		}
+		if k == "3" || k == "4" {
+			return "B"
+		}
+		if k == "5" || k == "6" {
+			return "C"
+		}
+	case "SMP":
+		return "D"
+	case "SMA", "SMK":
+		if k == "10" {
+			return "E"
+		}
+		return "F"
+	}
+	return "B" // Default fallback
 }
 
 // BuildSchemaPrompt returns the schema fill instruction with the template JSON.
@@ -59,7 +88,8 @@ func BuildFewShotPrompt(examples []string) string {
 }
 
 // BuildFullPrompt combines system, instruction, schema, and optional few-shot examples.
-func BuildFullPrompt(school, subject, semester, topic, templateJSON string, examples []string) string {
+func BuildFullPrompt(school, subject, jenjang, kelas, semester, topic, templateJSON string, examples []string) string {
+	fase := MapFase(jenjang, kelas)
 	fewShot := BuildFewShotPrompt(examples)
 
 	return fmt.Sprintf(`%s
@@ -72,5 +102,11 @@ func BuildFullPrompt(school, subject, semester, topic, templateJSON string, exam
 
 ---
 
-%s`, BuildSystemPrompt(), BuildInstructionPrompt(school, subject, semester, topic), fewShot, BuildSchemaPrompt(templateJSON))
+%s
+
+Output HARUS berupa JSON valid. JANGAN menambahkan markdown block atau teks penjelasan di luar JSON.`,
+		BuildSystemPrompt(jenjang),
+		BuildInstructionPrompt(school, subject, jenjang, kelas, fase, semester, topic),
+		fewShot,
+		BuildSchemaPrompt(templateJSON))
 }
