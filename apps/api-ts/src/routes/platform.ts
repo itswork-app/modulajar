@@ -157,7 +157,7 @@ export default async function platformRoutes(fastify: FastifyInstance) {
                     `audit_${Math.random().toString(36).slice(2, 11)}`, 
                     'WORKSPACE_LOOKUP', 
                     request.auth?.userId || 'system',
-                    request.auth?.sessionClaims?.email || 'admin@modulajar.app',
+                    request.auth?.email || 'admin@modulajar.app',
                     'info',
                     JSON.stringify({ search, results_count: result.rows.length })
                 ]

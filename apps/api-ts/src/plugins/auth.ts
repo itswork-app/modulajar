@@ -22,7 +22,10 @@ const authPlugin = fp(async (fastify, options) => {
 
             request.auth = {
                 clerk_user_id: claims.sub!,
+                userId: claims.sub!, // Compatibility with @clerk/fastify naming
                 org_id: claims.org_id as string | undefined,
+                email: (claims as any).email as string | undefined, // Populate email if present in claims
+                sessionClaims: claims
             };
 
         } catch (err) {
@@ -38,7 +41,10 @@ declare module 'fastify' {
     interface FastifyRequest {
         auth: {
             clerk_user_id: string;
+            userId: string;
             org_id?: string;
+            email?: string;
+            sessionClaims?: any;
         } | null;
         rawBody?: Buffer;
     }
