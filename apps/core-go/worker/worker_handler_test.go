@@ -40,7 +40,7 @@ func TestHandler_Success(t *testing.T) {
 	// 2. Setup Worker with Mocks
 	mockAI := &MockAIEngine{
 		GenerateResponse: &ai.GenerateResponse{
-			Content: ValidSD4JSON,
+			Content: ValidMerdekaJSON,
 		},
 	}
 	mockPDF := &MockPDFEngine{GenerateBytes: []byte("%PDF-1.4")}

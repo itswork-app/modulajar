@@ -23,7 +23,7 @@ func (s *ScoreBuilder) Penalty(points int, flag string) {
 	s.Flags = append(s.Flags, flag)
 }
 
-func EvaluateSD4(m *curriculum.ModulAjarSD4) QualityResult {
+func EvaluateMerdeka(m *curriculum.ModulAjarMerdeka) QualityResult {
 	sb := &ScoreBuilder{Score: 100, Flags: []string{}}
 
 	// 1. Completeness (25 points)

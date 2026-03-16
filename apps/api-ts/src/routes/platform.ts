@@ -148,7 +148,76 @@ export default async function platformRoutes(fastify: FastifyInstance) {
             params.push(limit);
 
             const result = await fastify.db.query(query, params);
+
+            // PR-105: Persistent Audit Trail
+            await fastify.db.query(
+                `INSERT INTO platform_audit_logs (id, event_type, actor_id, actor_email, severity, action_details) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    `audit_${Math.random().toString(36).slice(2, 11)}`, 
+                    'WORKSPACE_LOOKUP', 
+                    request.auth?.userId || 'system',
+                    request.auth?.email || 'admin@modulajar.app',
+                    'info',
+                    JSON.stringify({ search, results_count: result.rows.length })
+                ]
+            );
+
             return { workspaces: result.rows };
+        });
+
+        // GET /platform/audit-logs
+        // Industrial-grade security log retrieval
+        childServer.get('/audit-logs', {
+            schema: {
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        search: { type: 'string' },
+                        event_type: { type: 'string' },
+                        severity: { type: 'string' },
+                        limit: { type: 'integer', default: 50 },
+                        offset: { type: 'integer', default: 0 }
+                    }
+                }
+            }
+        }, async (request, reply) => {
+            const { search, event_type, severity, limit, offset } = request.query as any;
+            
+            let query = `SELECT * FROM platform_audit_logs WHERE 1=1`;
+            const params = [];
+            let pIdx = 1;
+
+            if (search) {
+                query += ` AND (actor_email ILIKE $${pIdx} OR event_type ILIKE $${pIdx} OR actor_id ILIKE $${pIdx})`;
+                params.push(`%${search}%`);
+                pIdx++;
+            }
+
+            if (event_type) {
+                query += ` AND event_type = $${pIdx}`;
+                params.push(event_type);
+                pIdx++;
+            }
+
+            if (severity) {
+                query += ` AND severity = $${pIdx}`;
+                params.push(severity);
+                pIdx++;
+            }
+
+            query += ` ORDER BY created_at DESC LIMIT $${pIdx} OFFSET $${pIdx + 1}`;
+            params.push(limit, offset);
+
+            const [result, countResult] = await Promise.all([
+                fastify.db.query(query, params),
+                fastify.db.query(`SELECT COUNT(*) FROM platform_audit_logs`)
+            ]);
+
+            return { 
+                logs: result.rows,
+                total: parseInt(countResult.rows[0].count, 10)
+            };
         });
 
     }, { prefix: '/platform' });

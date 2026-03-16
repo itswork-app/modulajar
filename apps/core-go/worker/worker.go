@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -217,7 +218,7 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 
 	// 6. AI INTEGRATION
 	var aiReceipt map[string]interface{}
-	var resultSD4 *curriculum.ModulAjarSD4
+	var resultMerdeka *curriculum.ModulAjarMerdeka
 	var resultLegacy *curriculum.Curriculum
 
 	if w.Deps.AI != nil {
@@ -228,14 +229,15 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 		}
 		subjectForTemplate := subjectName(pack, subjectCode)
 
-		useSD4Template := false
+		// Choose Schema Template
 		var templateJSON []byte
+		var useMerdekaTemplate bool
 
-		if curriculum.HasTemplateSD4(subjectCode) {
-			tmplData, err := curriculum.LoadTemplateSD4(subjectCode)
+		if curriculum.HasTemplateMerdeka(subjectCode) {
+			tmplData, err := curriculum.LoadTemplateMerdeka(subjectCode)
 			if err == nil {
 				templateJSON = tmplData
-				useSD4Template = true
+				useMerdekaTemplate = true
 			}
 		}
 
@@ -285,10 +287,12 @@ func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *sl
 			}
 
 			var schemaPrompt string
-			if useSD4Template {
+			if useMerdekaTemplate {
 				schemaPrompt = prompts.BuildFullPrompt(
 					payload.SchoolName,
 					subjectForTemplate,
+					payload.Jenjang,
+					payload.Kelas,
 					payload.Semester,
 					subjectForTemplate, // topic = subject for now
 					string(templateJSON),
@@ -358,14 +362,14 @@ No markdown formatting. Pure JSON.`,
 			}
 
 			// 2. Parse & Validate Schema
-			if useSD4Template {
-				var modulAjar curriculum.ModulAjarSD4
+			if useMerdekaTemplate {
+				var modulAjar curriculum.ModulAjarMerdeka
 				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &modulAjar); err != nil {
-					lastErr = fmt.Errorf("invalid JSON (SD4): %v", err)
+					lastErr = fmt.Errorf("invalid JSON (Merdeka): %v", err)
 					continue
 				}
 				if err := curriculum.ValidateModulAjar(&modulAjar); err != nil {
-					lastErr = fmt.Errorf("schema validation failed (SD4): %v", err)
+					lastErr = fmt.Errorf("schema validation failed (Merdeka): %v", err)
 					continue
 				}
 
@@ -383,14 +387,14 @@ No markdown formatting. Pure JSON.`,
 				}
 
 				curriculum.SanitizeModulAjar(&modulAjar)
-				resultSD4 = &modulAjar
+				resultMerdeka = &modulAjar
 
-				// PR-062: Dataset Collection (Non-blocking)
-				go func(c curriculum.ModulAjarSD4, s int) {
-					if err := dataset.CollectDataset(context.Background(), &c, s); err != nil {
-						logger.Error("failed to collect dataset (SD4)", "error", err)
+				// PR-062: Dataset			// 4. Collect for dataset (async)
+				go func(m *curriculum.ModulAjarMerdeka, s int) {
+					if err := dataset.CollectDataset(ctx, m, s); err != nil {
+						slog.Error("failed to collect dataset", "error", err)
 					}
-				}(modulAjar, qualityResult.Score)
+				}(&modulAjar, qualityResult.Score)
 			} else {
 				var c curriculum.Curriculum
 				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &c); err != nil {
@@ -417,13 +421,6 @@ No markdown formatting. Pure JSON.`,
 
 				c.Sanitize()
 				resultLegacy = &c
-
-				// PR-062: Dataset Collection (Non-blocking)
-				go func(curr curriculum.Curriculum, s int) {
-					if err := dataset.CollectDataset(context.Background(), &curr, s); err != nil {
-						logger.Error("failed to collect dataset (legacy)", "error", err)
-					}
-				}(c, qualityResult.Score)
 			}
 
 			// Success Path
@@ -495,7 +492,7 @@ No markdown formatting. Pure JSON.`,
 				"output_hash":   resp.OutputHash,
 				"duration_ms":   resp.DurationMs,
 				"generated_at":  time.Now().Format(time.RFC3339),
-				"template_mode": useSD4Template,
+				"template_mode": useMerdekaTemplate,
 			}
 
 			aiReceipt = innerAIReceipt
@@ -570,7 +567,7 @@ No markdown formatting. Pure JSON.`,
 				if strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpg") || strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpeg") {
 					mimeType = "image/jpeg"
 				}
-				logoDataURI = fmt.Sprintf("data:%s;base64,%s", mimeType, hex.EncodeToString(logoData)) // Quick base64 encode later? wait, simple base64 package is "encoding/base64". Wait standard encoding is base64.StdEncoding.EncodeToString(logoData)
+				logoDataURI = fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(logoData))
 			}
 		}
 
@@ -597,7 +594,7 @@ No markdown formatting. Pure JSON.`,
 
 			LayoutDefinition: payload.LayoutDefinition,
 
-			ModulAjarSD4:     resultSD4,
+			ModulAjarMerdeka: resultMerdeka,
 			LegacyCurriculum: resultLegacy,
 		})
 		if err != nil {

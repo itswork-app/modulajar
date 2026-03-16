@@ -128,7 +128,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
             // 1. Create Invoice in Xendit
             // Use clerk user email if available, otherwise fallback
-            const userEmail = (request.auth as any)?.email;
+            const userEmail = request.auth?.email;
 
             let invoice;
             try {
@@ -245,7 +245,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 const externalRef = `UPGR-${request.workspaceId.slice(-6)}-${Date.now()}`;
                 
                 // Create Xendit invoice for upgrade
-                const userEmail = (request.auth as any)?.email;
+                const userEmail = request.auth?.email;
                 let invoice;
                 try {
                     invoice = await xendit.createInvoice({
@@ -488,7 +488,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
             // Business Logic
             const receiptResult = await fastify.db.query(
-                `SELECT id, workspace_id, amount, status FROM receipts WHERE external_ref = $1`,
+                `SELECT id, workspace_id, amount, status, payment_method FROM receipts WHERE external_ref = $1`,
                 [externalRef]
             );
 

@@ -8,14 +8,14 @@ const originalReadFileSync = fs.readFileSync;
 
 tap.test('Render Service', async (t) => {
     t.beforeEach(() => {
-        (fs as any).readFileSync = (pathStr: string, enc: string) => {
+        (fs as any).readFileSync = (pathStr: string, encOrOptions?: any) => {
             if (pathStr.includes('modul-ajar.html')) {
                 return '<html>/* STYLES_PLACEHOLDER */<body>{{TITLE}} {{TEACHER_NAME}} {{SCHOOL_NAME}} {{ALL_SECTIONS}}</body></html>';
             }
             if (pathStr.includes('styles.css')) {
                 return 'body { color: black; }';
             }
-            return originalReadFileSync(pathStr, enc);
+            return originalReadFileSync(pathStr, encOrOptions);
         };
     });
 

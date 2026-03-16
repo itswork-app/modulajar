@@ -106,7 +106,7 @@ export default function UpgradePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
                 {plans.map((plan) => {
                     const isCurrent = workspace?.plan_id === plan.id;
-                    const isInstitutional = plan.slug === 'institutional';
+                    const isInstitutional = plan.slug === 'institution';
                     
                     return (
                         <motion.div
