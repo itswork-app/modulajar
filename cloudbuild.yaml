@@ -38,6 +38,8 @@ steps:
       - '--cpu'
       - '1'
       - '--allow-unauthenticated'
+      - '--env-vars-file'
+      - 'env-api.yaml'
 
   # 5. Deploy modulajar-worker (Authenticated only)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -61,6 +63,8 @@ steps:
       - '--concurrency'
       - '1'
       - '--no-allow-unauthenticated'
+      - '--env-vars-file'
+      - 'env-worker.yaml'
 
 images:
   - 'asia-southeast1-docker.pkg.dev/modulajar-487006/modulajar/api-ts:$COMMIT_SHA'
