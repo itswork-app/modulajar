@@ -52,24 +52,24 @@ function RevenueSkeleton() {
 
 function StatCard({ label, value, sub, icon: Icon, trend, colorClass }: { label: string; value: string | number; sub?: string; icon: React.ElementType; trend?: string; colorClass?: string }) {
     return (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden relative border-b-4 hover:border-indigo-500/20">
+        <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 flex flex-col gap-4 shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden relative border-b-4 hover:border-indigo-500/20 backdrop-blur-sm">
             <div className={cn("absolute -right-4 -top-4 w-24 h-24 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity rotate-12", colorClass)}>
                 <Icon className="w-full h-full" />
             </div>
             <div className="flex items-center justify-between">
-                <div className={cn("p-3 rounded-2xl bg-slate-50 group-hover:bg-opacity-10 transition-all", colorClass?.replace('text-', 'bg-'))}>
+                <div className={cn("p-3 rounded-2xl bg-slate-950 group-hover:bg-opacity-10 transition-all", colorClass?.replace('text-', 'bg-'))}>
                     <Icon className={cn("w-6 h-6", colorClass)} />
                 </div>
                 {trend && (
-                    <div className="flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                    <div className="flex items-center gap-1 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
                         <TrendingUp className="w-3 h-3" /> {trend}
                     </div>
                 )}
             </div>
             <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{label}</p>
-                <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
-                {sub && <p className="text-xs text-slate-400 font-bold mt-1 truncate">{sub}</p>}
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">{label}</p>
+                <h3 className="text-3xl font-black text-white tracking-tight">{value}</h3>
+                {sub && <p className="text-xs text-slate-500 font-bold mt-1 truncate">{sub}</p>}
             </div>
         </div>
     );
@@ -137,15 +137,15 @@ export default function RevenueDashboard() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase tracking-widest h-fit">Investor Grade</div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Revenue Analysis</h1>
+                        <div className="px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[9px] font-black rounded uppercase tracking-widest h-fit border border-amber-500/20">Investor Grade</div>
+                        <h1 className="text-4xl font-black text-white tracking-tight">Revenue Analysis</h1>
                     </div>
-                    <p className="text-slate-500 font-bold">Platform-wide financial metrics and 6-month growth indicators.</p>
+                    <p className="text-slate-400 font-bold">Platform-wide financial metrics and 6-month growth indicators.</p>
                 </div>
-                <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 shadow-sm backdrop-blur-sm">
                     <div className="flex flex-col items-end px-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Status</span>
-                        <span className="text-sm font-black text-emerald-600 flex items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Status</span>
+                        <span className="text-sm font-black text-emerald-400 flex items-center gap-1.5 pt-0.5">
                             <Activity className="w-3 h-3 animate-pulse" /> Live & Stable
                         </span>
                     </div>
@@ -187,13 +187,13 @@ export default function RevenueDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Growth Chart */}
-                <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+                <div className="lg:col-span-2 bg-slate-900/50 rounded-3xl border border-slate-800 p-8 shadow-sm backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-xl font-black text-slate-900 tracking-tight">Revenue Trends</h2>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Last 6 Months Visualization</p>
+                            <h2 className="text-xl font-black text-white tracking-tight">Revenue Trends</h2>
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Last 6 Months Visualization</p>
                         </div>
-                        <div className="px-3 py-1 bg-slate-50 rounded-full border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                        <div className="px-3 py-1 bg-slate-950 rounded-full border border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                             Currency in IDR
                         </div>
                     </div>
@@ -206,23 +206,23 @@ export default function RevenueDashboard() {
                                         <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                                 <XAxis 
                                     dataKey="month" 
-                                    tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 'bold'}} 
+                                    tick={{fontSize: 10, fill: '#64748b', fontWeight: 'bold'}} 
                                     tickFormatter={(val) => new Date(val).toLocaleDateString('id-ID', { month: 'short' })}
                                     axisLine={false}
                                     tickLine={false}
                                 />
                                 <YAxis 
-                                    tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 'bold'}} 
+                                    tick={{fontSize: 10, fill: '#64748b', fontWeight: 'bold'}} 
                                     tickFormatter={(val) => `Rp ${val/1e6}M`} 
                                     axisLine={false}
                                     tickLine={false}
                                 />
                                 <Tooltip 
                                     cursor={{stroke: '#6366f1', strokeWidth: 2}}
-                                    contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '16px' }}
+                                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '24px', border: '1px solid #1e293b', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)', padding: '16px' }}
                                     formatter={(value: unknown) => [formatIDR(Number(value) || 0), 'Revenue']}
                                     labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                                 />
@@ -233,21 +233,21 @@ export default function RevenueDashboard() {
                 </div>
 
                 {/* Top Workspaces */}
-                <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm flex flex-col">
+                <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-8 shadow-sm flex flex-col backdrop-blur-sm">
                     <div className="mb-6">
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Top Accounts</h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">By Performance contribution</p>
+                        <h2 className="text-xl font-black text-white tracking-tight">Top Accounts</h2>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">By Performance contribution</p>
                     </div>
                     <div className="flex-1 space-y-4 overflow-y-auto pr-2 scrollbar-hide">
                         {data.top_workspaces.length > 0 ? data.top_workspaces.map((ws, i) => (
-                            <div key={i} className="flex items-center justify-between group p-2 hover:bg-slate-50 rounded-2xl transition-all">
+                            <div key={i} className="flex items-center justify-between group p-2 hover:bg-slate-800/50 rounded-2xl transition-all">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-xs font-black text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                                         {i + 1}
                                     </div>
-                                    <span className="text-sm font-bold text-slate-700 truncate max-w-[120px]">{ws.name}</span>
+                                    <span className="text-sm font-bold text-slate-300 truncate max-w-[120px]">{ws.name}</span>
                                 </div>
-                                <span className="text-xs font-black text-slate-900">{formatIDR(parseInt(ws.revenue))}</span>
+                                <span className="text-xs font-black text-white">{formatIDR(parseInt(ws.revenue))}</span>
                             </div>
                         )) : (
                             <div className="flex flex-col items-center justify-center h-full text-center space-y-2 opacity-30">
@@ -256,8 +256,8 @@ export default function RevenueDashboard() {
                             </div>
                         )}
                     </div>
-                    <div className="mt-8 pt-6 border-t border-slate-50">
-                        <button className="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
+                    <div className="mt-8 pt-6 border-t border-slate-800">
+                        <button className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-900/20">
                             Global Workspace List <ArrowUpRight className="w-3 h-3" />
                         </button>
                     </div>
