@@ -179,6 +179,30 @@ export default function OnboardingPage() {
                         principal_nip: sData.principal_nip || prev.principal_nip,
                         signature_location: sData.signature_location || prev.signature_location
                     }));
+
+                    // Intelligent Pre-fill: If we have a school name but missing regional data, try to auto-fill
+                    if (sData.school_display_name && (!sData.provinsi || !sData.kab_kota)) {
+                        try {
+                            const searchRes = await fetch(`https://api-sekolah-indonesia.vercel.app/sekolah/s?sekolah=${encodeURIComponent(sData.school_display_name)}`);
+                            const searchResult = await searchRes.json();
+                            if (searchResult.status === 'success' && searchResult.data && searchResult.data.length > 0) {
+                                // Find best match (exact name match preferred)
+                                const match = searchResult.data.find((s: SchoolResult) => s.sekolah.toLowerCase() === sData.school_display_name.toLowerCase()) || searchResult.data[0];
+                                if (match) {
+                                    setData(prev => ({
+                                        ...prev,
+                                        school_npsn: prev.school_npsn || match.npsn,
+                                        alamat: prev.alamat || match.alamat,
+                                        provinsi: prev.provinsi || toTitleCase(match.propinsi),
+                                        kab_kota: prev.kab_kota || toTitleCase(match.kabupaten_kota)
+                                    }));
+                                    setSchoolSearchQuery(match.sekolah);
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Failed intelligent pre-fill search", err);
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("Failed to pre-fill data", err);
