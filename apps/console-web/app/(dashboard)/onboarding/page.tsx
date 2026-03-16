@@ -18,6 +18,13 @@ function toTitleCase(str: string) {
 }
 
 type Region = { id: string; name: string };
+type SchoolResult = {
+    npsn: string;
+    sekolah: string;
+    alamat: string;
+    propinsi: string;
+    kabupaten_kota: string;
+};
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
 export default function OnboardingPage() {
@@ -37,7 +44,7 @@ export default function OnboardingPage() {
 
     // School Search State
     const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
-    const [schoolSuggestions, setSchoolSuggestions] = useState<any[]>([]);
+    const [schoolSuggestions, setSchoolSuggestions] = useState<SchoolResult[]>([]);
     const [isSearchingSchools, setIsSearchingSchools] = useState(false);
     const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
 
@@ -433,7 +440,7 @@ export default function OnboardingPage() {
 
                                         {showSchoolSuggestions && schoolSuggestions.length > 0 && (
                                             <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden p-2">
-                                                {schoolSuggestions.map((s: any) => (
+                                                {schoolSuggestions.map((s: SchoolResult) => (
                                                     <button
                                                         key={s.npsn}
                                                         onClick={() => {
