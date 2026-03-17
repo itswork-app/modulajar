@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  ShieldCheck
+  Globe,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -20,7 +21,7 @@ const NAV_ITEMS = [
   { label: 'Overview', icon: LayoutDashboard, href: '/' },
   { label: 'Revenue', icon: BarChart3, href: '/revenue' },
   { label: 'Support & Ops', icon: ShieldAlert, href: '/support' },
-  { label: 'Workspaces', icon: Globe, href: '/support' },
+  { label: 'Workspaces', icon: Globe, href: '/workspaces' },
   { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 

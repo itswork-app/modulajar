@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -257,9 +258,9 @@ export default function RevenueDashboard() {
                         )}
                     </div>
                     <div className="mt-8 pt-6 border-t border-slate-800">
-                        <button className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-900/20">
+                        <Link href="/workspaces" className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-900/20">
                             Global Workspace List <ArrowUpRight className="w-3 h-3" />
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>
