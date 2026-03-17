@@ -46,12 +46,13 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
         const { name } = request.body as { name: string };
         const workspaceId = ulid();
         const refCode = generateReferralCode();
+        const clerkOrgId = `org_${workspaceId.toLowerCase()}`;
         const client = await fastify.db.connect();
         try {
             await client.query('BEGIN');
             await client.query(
-                `INSERT INTO workspaces (id, name, referral_code) VALUES ($1, $2, $3)`,
-                [workspaceId, name, refCode]
+                `INSERT INTO workspaces (id, clerk_org_id, name, referral_code) VALUES ($1, $2, $3, $4)`,
+                [workspaceId, clerkOrgId, name, refCode]
             );
             await client.query(
                 `INSERT INTO workspace_members (id, workspace_id, clerk_user_id, role)

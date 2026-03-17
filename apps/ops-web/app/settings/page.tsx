@@ -15,7 +15,8 @@ import {
   Eye,
   RefreshCw,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -78,6 +79,8 @@ export default function SettingsPage() {
   const [newAdmin, setNewAdmin] = useState({ clerk_user_id: '', role: 'support' });
   const [configFields, setConfigFields] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newWebhook, setNewWebhook] = useState({ target_url: '', secret_token: '', description: '' });
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
 
   useEffect(() => {
     if (configData?.config) {
@@ -133,6 +136,61 @@ export default function SettingsPage() {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (res.ok) mutateAdmins();
+  };
+
+  const handleDeleteKey = async (id: string) => {
+    if (!confirm('Permanently delete this infrastructure key?')) return;
+    const token = await getToken();
+    await fetch(`${API_BASE}/platform/keys/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    // Trigger SWR re-fetch if you had a mutate for keys, otherwise simple window.location.reload() for now
+    window.location.reload(); 
+  };
+
+  const handleRegisterWebhook = async () => {
+    if (!newWebhook.target_url) return;
+    setIsSubmitting(true);
+    try {
+      const token = await getToken();
+      await fetch(`${API_BASE}/platform/webhooks`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newWebhook)
+      });
+      setIsWebhookModalOpen(false);
+      setNewWebhook({ target_url: '', secret_token: '', description: '' });
+      window.location.reload();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    if (!confirm('Delete this webhook endpoint?')) return;
+    const token = await getToken();
+    await fetch(`${API_BASE}/platform/webhooks/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    window.location.reload();
+  };
+
+  const handleUpdatePlan = async (id: string, price: number, credits: number) => {
+    const token = await getToken();
+    await fetch(`${API_BASE}/platform/plans/${id}`, {
+      method: 'PATCH',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ base_price_idr: price, base_credits: credits })
+    });
+    alert('Plan updated successfully');
   };
 
   const tabs = [
@@ -258,7 +316,12 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[8px] font-black rounded uppercase border border-emerald-500/20">Active</span>
                        <button className="p-2 hover:bg-slate-800 rounded-lg transition-colors"><Eye className="w-4 h-4 text-slate-500 hover:text-indigo-400" /></button>
-                       <button className="p-2 hover:bg-slate-800 rounded-lg transition-colors"><RefreshCw className="w-4 h-4 text-slate-500 hover:text-indigo-400" /></button>
+                       <button 
+                         onClick={() => handleDeleteKey(item.id)}
+                         className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                       >
+                         <RefreshCw className="w-4 h-4 text-slate-500 hover:text-red-400" />
+                       </button>
                     </div>
                   </div>
                 ))}
@@ -454,18 +517,24 @@ export default function SettingsPage() {
                       <h4 className="text-lg font-black text-white mb-1 uppercase tracking-tighter">{plan.name}</h4>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">{plan.slug}</p>
                       
-                      <div className="flex items-baseline gap-1 mb-6">
-                        <span className="text-2xl font-black text-white">Rp{plan.base_price_idr.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">/ Month</span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                          <span className="text-slate-500">Base Credits</span>
-                          <span className="text-white">{plan.base_credits}</span>
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Base Price (IDR)</label>
+                          <input 
+                            type="number" 
+                            defaultValue={plan.base_price_idr}
+                            onBlur={(e) => handleUpdatePlan(plan.id, parseInt(e.target.value), plan.base_credits)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                          />
                         </div>
-                        <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-                          <div className="h-full bg-indigo-500 w-[60%]" />
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Base Credits</label>
+                          <input 
+                            type="number" 
+                            defaultValue={plan.base_credits}
+                            onBlur={(e) => handleUpdatePlan(plan.id, plan.base_price_idr, parseInt(e.target.value))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                          />
                         </div>
                       </div>
                     </div>
@@ -482,10 +551,52 @@ export default function SettingsPage() {
                   <h3 className="text-xl font-black text-white">Outbound Webhooks</h3>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Real-time Platform Event Export</p>
                 </div>
-                <button className="px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all">
+                <button 
+                  onClick={() => setIsWebhookModalOpen(true)}
+                  className="px-4 py-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all"
+                >
                   Register Endpoint
                 </button>
               </div>
+
+              {isWebhookModalOpen && (
+                <div className="p-6 bg-slate-950/80 border border-indigo-500/30 rounded-3xl animate-in fade-in zoom-in-95 duration-200">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest mb-4">Register New Webhook</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input 
+                      type="url" 
+                      placeholder="Target URL (https://...)"
+                      value={newWebhook.target_url}
+                      onChange={(e) => setNewWebhook({ ...newWebhook, target_url: e.target.value })}
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Secret Token"
+                      value={newWebhook.secret_token}
+                      onChange={(e) => setNewWebhook({ ...newWebhook, secret_token: e.target.value })}
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Description"
+                      value={newWebhook.description}
+                      onChange={(e) => setNewWebhook({ ...newWebhook, description: e.target.value })}
+                      className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 mt-4">
+                    <button onClick={() => setIsWebhookModalOpen(false)} className="px-4 py-2 text-[10px] font-black uppercase text-slate-500 hover:text-white transition-colors">Cancel</button>
+                    <button 
+                      onClick={handleRegisterWebhook}
+                      disabled={isSubmitting || !newWebhook.target_url}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Register'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {webhooksData?.webhooks?.map((webhook: { id: string; target_url: string; event_filters: string[]; status: string }) => (
@@ -499,7 +610,15 @@ export default function SettingsPage() {
                         <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{webhook.event_filters.join(', ') || 'All Events'}</p>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[8px] font-black rounded uppercase border border-indigo-500/20">{webhook.status}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[8px] font-black rounded uppercase border border-indigo-500/20">{webhook.status}</span>
+                      <button 
+                        onClick={() => handleDeleteWebhook(webhook.id)}
+                        className="p-2 hover:bg-red-500/10 rounded-lg transition-colors group"
+                      >
+                         <X className="w-4 h-4 text-slate-500 group-hover:text-red-400" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!webhooksData?.webhooks?.length && (

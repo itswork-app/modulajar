@@ -1,9 +1,16 @@
 import { FastifyInstance } from 'fastify';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily initialize OpenAI to prevent crash during server startup if API key is missing
+let openai: OpenAI | null = null;
+function getOpenAI() {
+    if (!openai && process.env.OPENAI_API_KEY) {
+        openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
+    }
+    return openai;
+}
 
 export default async function curriculumRoutes(fastify: FastifyInstance) {
     fastify.register(async (childServer) => {
@@ -123,7 +130,12 @@ Propose the optimal ordered plan for this semester by returning a JSON array of 
 `;
 
             try {
-                const aiResponse = await openai.chat.completions.create({
+                const client = getOpenAI();
+                if (!client) {
+                    throw new Error('OpenAI client not initialized (missing API key)');
+                }
+
+                const aiResponse = await client.chat.completions.create({
                     model: 'gpt-4o-mini',
                     messages: [
                         { role: 'system', content: systemPrompt },
