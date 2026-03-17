@@ -7,29 +7,68 @@
 }
 
 :root {
-  --background: oklch(0.1 0.02 240);
-  --foreground: oklch(0.95 0.01 240);
-  --card: oklch(0.12 0.03 240);
-  --card-foreground: oklch(0.95 0.01 240);
-  --primary: oklch(0.6 0.18 250);
+  /* Carbon/Onyx Palette */
+  --background: oklch(0.12 0.01 240);
+  --foreground: oklch(0.98 0.01 240);
+  
+  --card: oklch(0.14 0.02 240);
+  --card-foreground: oklch(0.98 0.01 240);
+  
+  --popover: oklch(0.14 0.02 240);
+  --popover-foreground: oklch(0.98 0.01 240);
+  
+  --primary: oklch(0.65 0.2 250); /* Vivid Indigo/Blue */
   --primary-foreground: oklch(0.98 0.01 240);
-  --muted: oklch(0.2 0.04 240);
-  --muted-foreground: oklch(0.7 0.02 240);
-  --accent: oklch(0.15 0.05 250);
+  
+  --secondary: oklch(0.2 0.03 240);
+  --secondary-foreground: oklch(0.98 0.01 240);
+  
+  --muted: oklch(0.18 0.02 240);
+  --muted-foreground: oklch(0.6 0.02 240);
+  
+  --accent: oklch(0.22 0.04 250);
   --accent-foreground: oklch(0.98 0.01 240);
-  --border: oklch(0.2 0.04 240);
+  
+  --destructive: oklch(0.6 0.18 20);
+  --destructive-foreground: oklch(0.98 0.01 240);
+  
+  --border: oklch(0.2 0.03 240);
+  --input: oklch(0.2 0.03 240);
+  --ring: oklch(0.65 0.2 250);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  background-image: 
+    radial-gradient(at 0% 0%, oklch(0.15 0.05 250 / 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, oklch(0.15 0.05 160 / 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: color-mix(in oklch, var(--card), transparent 20%);
+  backdrop-filter: blur(20px);
+  border: 1px solid oklch(1 0 0 / 0.05);
+  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.3);
+}
+
+.glow-border {
+  position: relative;
+}
+.glow-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(45deg, var(--primary), transparent, var(--primary));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0.1;
+  transition: opacity 0.3s;
+}
+.glow-border:hover::after {
+  opacity: 0.3;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

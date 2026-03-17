@@ -62,36 +62,17 @@ export function useWorkspace() {
 
     // Handle initial bootstrap if no workspaces exist
     useEffect(() => {
-        async function bootstrapIfNeeded() {
+        async function bootstrap() {
             if (isLoaded && !isListLoading && (!workspaces || workspaces.length === 0)) {
-                console.log("[useWorkspace] No workspace found, bootstrapping...");
-                const token = await getToken();
-                const createRes = await fetch(`${API_BASE}/bootstrap`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ name: 'My Workspace' })
-                });
-                if (createRes.ok) {
-                    const data = await createRes.json();
-                    if (data.status === 'bootstrapped') {
-                        console.log("[useWorkspace] Bootstrap successful, reloading...");
-                        sessionStorage.setItem('modulajar_bootstrapped', 'true');
-                        window.location.reload();
-                    } else {
-                        console.log("[useWorkspace] Already bootstrapped, skipping reload.");
-                    }
-                }
+               // Instead of background bootstrap, redirect to explicit creation
+               if (window.location.pathname !== '/create-workspace') {
+                   window.location.href = '/create-workspace';
+               }
             }
         }
         
-        // Prevent infinite loops by checking session storage
-        if (!sessionStorage.getItem('modulajar_bootstrapped')) {
-            bootstrapIfNeeded();
-        }
-    }, [isLoaded, isListLoading, workspaces, getToken]);
+        bootstrap();
+    }, [isLoaded, isListLoading, workspaces]);
 
     return {
         workspace,
