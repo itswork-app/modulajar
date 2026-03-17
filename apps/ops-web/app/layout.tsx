@@ -12,7 +12,8 @@ export const metadata: Metadata = {
   description: "Platform Operations and Revenue Intelligence",
 };
 
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
+
 
 export default function RootLayout({
   children,

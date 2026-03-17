@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: "Modul Ajar Admin Console",
 };
 
+import { ToastProvider } from '@/components/ui/Toaster';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,7 +21,9 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className={inter.className}>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </body>
       </html>
     </ClerkProvider>

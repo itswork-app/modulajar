@@ -4,9 +4,16 @@ import fp from 'fastify-plugin';
 export default fp(async (fastify: FastifyInstance) => {
     fastify.decorate('platformGuard', async (request: FastifyRequest, reply: FastifyReply) => {
         const clerkUserId = request.auth?.clerk_user_id;
+        const email = request.auth?.email;
 
         if (!clerkUserId) {
             return reply.code(401).send({ error: 'Unauthorized', message: 'User not authenticated' });
+        }
+
+        // Hardcoded Superadmin Override for Initial Setup
+        if (email === 'rejaputraperdana@gmail.com') {
+            request.platformRole = 'owner';
+            return;
         }
 
         // Check platform_roles table
@@ -16,8 +23,6 @@ export default fp(async (fastify: FastifyInstance) => {
         );
 
         if (result.rowCount === 0) {
-            // For production safety, we might want to allow a specific hardcoded ID if the table is empty
-            // But let's stick to the database for now.
             return reply.code(403).send({ error: 'Forbidden', message: 'Platform Admin access required' });
         }
 

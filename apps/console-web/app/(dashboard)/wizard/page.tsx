@@ -8,6 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, School, User, Che
 import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
+import { useToast } from '@/components/ui/Toaster';
 import { TeacherProfile, SchoolIdentity } from 'shared-types';
 
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
@@ -57,6 +58,7 @@ export default function WizardV2Page() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [jobId, setJobId] = useState<string | null>(null);
+    const { toast } = useToast();
 
     const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
     const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
@@ -231,7 +233,9 @@ export default function WizardV2Page() {
                 router.push('/modules');
             }
         } catch (err: unknown) {
-            setError((err as Error).message);
+            const msg = (err as Error).message;
+            setError(msg);
+            toast(msg, 'error');
             setIsSubmitting(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -753,9 +757,13 @@ export default function WizardV2Page() {
                         <ProgressStep
                             jobId={jobId}
                             workspaceId={workspace.id}
-                            onDone={(moduleId) => router.push(`/modules/${moduleId}`)}
+                            onDone={(moduleId) => {
+                                toast('Modul Ajar berhasil digenerate!', 'success');
+                                router.push(`/modules/${moduleId}`);
+                            }}
                             onError={(err) => {
                                 setError(err);
+                                toast(err, 'error');
                                 setCurrentStep('REVIEW');
                                 setIsSubmitting(false);
                             }}

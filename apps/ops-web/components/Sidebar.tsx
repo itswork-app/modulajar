@@ -6,11 +6,11 @@ import {
   BarChart3, 
   ShieldAlert, 
   LayoutDashboard, 
-  Globe, 
-  Settings,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Sparkles,
+  Globe,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { label: 'Overview', icon: LayoutDashboard, href: '/' },
   { label: 'Revenue', icon: BarChart3, href: '/revenue' },
   { label: 'Support & Ops', icon: ShieldAlert, href: '/support' },
-  { label: 'Workspaces', icon: Globe, href: '/support' },
+  { label: 'Workspaces', icon: Globe, href: '/workspaces' },
   { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 
@@ -36,8 +36,8 @@ export function Sidebar() {
     )}>
       {/* Branding */}
       <div className="p-8 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 glow-border">
-          <Activity className="w-6 h-6 text-white" />
+        <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 glow-border">
+          <Sparkles className="w-6 h-6 text-white" />
         </div>
         <AnimatePresence>
           {!isCollapsed && (
@@ -48,7 +48,7 @@ export function Sidebar() {
               className="flex flex-col"
             >
               <span className="font-black text-lg tracking-tighter leading-none">MODULAR</span>
-              <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-1">HQ OPS</span>
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-1">HQ COMMAND</span>
             </motion.div>
           )}
         </AnimatePresence>
