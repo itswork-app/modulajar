@@ -27,7 +27,7 @@ type SchoolResult = {
 };
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
-export default function OnboardingPage() {
+export default function OnboardingFlow({ onSuccess }: { onSuccess: () => void }) {
     const router = useRouter();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { user } = useUser();
@@ -269,7 +269,7 @@ export default function OnboardingPage() {
 
             if (!sRes.ok) throw new Error("Gagal menyimpan identitas sekolah.");
 
-            router.push('/wizard');
+            onSuccess();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem.');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -280,7 +280,7 @@ export default function OnboardingPage() {
 
     if (isLoadingWorkspace || !isAuthLoaded) {
         return (
-            <div className="flex h-screen items-center justify-center bg-slate-50">
+            <div className="flex h-64 items-center justify-center">
                 <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
             </div>
         );
@@ -293,8 +293,8 @@ export default function OnboardingPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-16 px-6">
-            <div className="max-w-2xl w-full space-y-8">
+        <div className="w-full flex flex-col items-center">
+            <div className="max-w-2xl w-full p-8 space-y-8">
                 {/* Header */}
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Siapkan Identitas Dokumen Anda</h1>
@@ -330,9 +330,9 @@ export default function OnboardingPage() {
                 </div>
 
                 {/* Form Content */}
-                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-12 mt-8 relative overflow-hidden backdrop-blur-xl">
-                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl opacity-40 pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-50/50 rounded-full blur-3xl opacity-40 pointer-events-none" />
+                <div className="relative overflow-hidden">
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-50/20 rounded-full blur-3xl opacity-40 pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-50/20 rounded-full blur-3xl opacity-40 pointer-events-none" />
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-center text-sm border border-red-100 animate-in fade-in slide-in-from-top-2">
                             <AlertCircle className="w-5 h-5 mr-3 shrink-0" />

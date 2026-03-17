@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import {
     Loader2, AlertCircle, FileText, Download, CheckCircle2, XCircle,
     ArrowLeft, RefreshCw, Copy, Clock, Sparkles, BookOpen,
@@ -69,12 +70,10 @@ export default function ModuleResultPage() {
 
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: wsLoading } = useWorkspace();
+    const { teacherProfile, schoolIdentity, isProfileLoading } = useWorkspaceStore();
 
     const [job, setJob] = useState<JobDetail | null>(null);
-    const [profile, setProfile] = useState<TeacherProfile | null>(null);
-    const [school, setSchool] = useState<SchoolIdentity | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [isBootstrapping, setIsBootstrapping] = useState(true);
     const [pollCount, setPollCount] = useState(0);
     const [stageIndex, setStageIndex] = useState(0);
     const [isCopied, setIsCopied] = useState(false);
@@ -90,38 +89,7 @@ export default function ModuleResultPage() {
         return () => clearInterval(t);
     }, [job?.status]);
 
-    // ── Bootstrap: auth guard + profile/school fetch ───────────────────────
-    useEffect(() => {
-        if (!isAuthLoaded || wsLoading || !workspace) return;
-        let isMounted = true;
-
-        async function bootstrap() {
-            try {
-                const token = await getToken();
-                const h = { Authorization: `Bearer ${token}` };
-
-                const [pRes, sRes] = await Promise.all([
-                    fetch(`${API_BASE}/w/${workspace.id}/profile`, { headers: h }),
-                    fetch(`${API_BASE}/w/${workspace.id}/school`, { headers: h }),
-                ]);
-
-                if (pRes.status === 404 || sRes.status === 404) {
-                    router.replace('/onboarding');
-                    return;
-                }
-                if (pRes.ok) { const d = await pRes.json(); if (isMounted) setProfile(d); }
-                if (sRes.ok) { const d = await sRes.json(); if (isMounted) setSchool(d); }
-            } catch {
-                // non-fatal, identity section just shows dashes
-            } finally {
-                if (isMounted) setIsBootstrapping(false);
-            }
-        }
-        bootstrap();
-        return () => { isMounted = false; };
-    }, [isAuthLoaded, wsLoading, workspace, getToken, router]);
-
-    // ── Load HTML preview once job is DONE ────────────────────────────────
+    // ── Fetch job detail ───────────────────────────────────────────────────
     useEffect(() => {
         if (job?.status !== 'DONE' || !workspace?.id || !generationId || htmlPreview !== null) return;
         let isMounted = true;
@@ -183,7 +151,7 @@ export default function ModuleResultPage() {
 
     // ── Polling (stops on terminal state) ─────────────────────────────────
     useEffect(() => {
-        if (isBootstrapping || !workspace || !generationId) return;
+        if (isProfileLoading || !workspace || !generationId) return;
         const isTerminal = job?.status === 'DONE' || job?.status === 'FAILED';
         if (isTerminal) return; // no more polling
 
@@ -193,7 +161,7 @@ export default function ModuleResultPage() {
             setPollCount(c => c + 1);
         }, delay);
         return () => clearTimeout(t);
-    }, [isBootstrapping, workspace, generationId, job?.status, pollCount, fetchJob]);
+    }, [isProfileLoading, workspace, generationId, job?.status, pollCount, fetchJob]);
 
     // ── Actions ────────────────────────────────────────────────────────────
     const handleCopyLink = () => {
@@ -212,7 +180,7 @@ export default function ModuleResultPage() {
     const semesterLabel = job?.payload?.semester === '2' ? 'Genap (2)' : 'Ganjil (1)';
 
     // ── Loading skeleton ───────────────────────────────────────────────────
-    if (!isAuthLoaded || wsLoading || isBootstrapping) {
+    if (!isAuthLoaded || wsLoading || isProfileLoading) {
         return (
             <div className="max-w-3xl mx-auto py-8 space-y-4">
                 <div className="h-6 w-32 bg-slate-100 rounded animate-pulse" />
@@ -401,8 +369,8 @@ export default function ModuleResultPage() {
                         <MetaItem label="Semester" value={semesterLabel} />
                         <MetaItem label="Kelas" value={job.payload?.grade ? `Kelas ${job.payload.grade}` : undefined} />
                         <MetaItem label="Topik" value={job.payload?.topic} />
-                        <MetaItem label="Nama Guru" value={profile?.full_name} />
-                        <MetaItem label="Nama Sekolah" value={school?.school_display_name} />
+                        <MetaItem label="Nama Guru" value={teacherProfile?.full_name} />
+                        <MetaItem label="Nama Sekolah" value={schoolIdentity?.school_display_name} />
                     </div>
                     {job.payload?.notes && (
                         <div className="mt-5 pt-5 border-t border-slate-50">
@@ -414,7 +382,7 @@ export default function ModuleResultPage() {
             )}
 
             {/* ─── D: Identitas Dokumen (Done only) ──────────────────────── */}
-            {isDone && (profile || school) && (
+            {isDone && (teacherProfile || schoolIdentity) && (
                 <div className="bg-white rounded-3xl border border-slate-100 p-6">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -429,8 +397,8 @@ export default function ModuleResultPage() {
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guru</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                <MetaItem label="Nama Guru" value={profile?.full_name} />
-                                <MetaItem label="NIP Guru" value={profile?.nip} />
+                                <MetaItem label="Nama Guru" value={teacherProfile?.full_name} />
+                                <MetaItem label="NIP Guru" value={teacherProfile?.nip} />
                             </div>
                         </div>
                         <div className="col-span-2 pt-4 border-t border-slate-50">
@@ -439,13 +407,13 @@ export default function ModuleResultPage() {
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sekolah</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                <MetaItem label="Nama Sekolah" value={school?.school_display_name} />
-                                <MetaItem label="NPSN" value={school?.school_npsn} />
-                                <MetaItem label="Kab/Kota" value={school?.kab_kota} />
-                                <MetaItem label="Provinsi" value={school?.provinsi} />
-                                <MetaItem label="Kepala Sekolah" value={school?.principal_name} />
-                                <MetaItem label="NIP Kepala Sekolah" value={school?.principal_nip} />
-                                <MetaItem label="Kota Tanda Tangan" value={school?.signature_location} />
+                                <MetaItem label="Nama Sekolah" value={schoolIdentity?.school_display_name} />
+                                <MetaItem label="NPSN" value={schoolIdentity?.school_npsn} />
+                                <MetaItem label="Kab/Kota" value={schoolIdentity?.kab_kota} />
+                                <MetaItem label="Provinsi" value={schoolIdentity?.provinsi} />
+                                <MetaItem label="Kepala Sekolah" value={schoolIdentity?.principal_name} />
+                                <MetaItem label="NIP Kepala Sekolah" value={schoolIdentity?.principal_nip} />
+                                <MetaItem label="Kota Tanda Tangan" value={schoolIdentity?.signature_location} />
                             </div>
                         </div>
                     </div>

@@ -9,8 +9,7 @@ import { cn } from '@/lib/utils';
 import { ProgressStep } from '@/components/wizard/ProgressStep';
 import { CreditPanel } from '@/components/wizard/CreditPanel';
 import { useToast } from '@/components/ui/Toaster';
-import { TeacherProfile, SchoolIdentity } from 'shared-types';
-
+import { useWorkspaceStore } from '@/store/workspace-store';
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -60,11 +59,14 @@ export default function WizardV2Page() {
     const [jobId, setJobId] = useState<string | null>(null);
     const { toast } = useToast();
 
-    const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
-    const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
-    const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+    const { 
+        teacherProfile, 
+        schoolIdentity, 
+        usageSummary, 
+        templates, 
+        isProfileLoading 
+    } = useWorkspaceStore();
 
-    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     const [formData, setFormData] = useState({
@@ -81,78 +83,42 @@ export default function WizardV2Page() {
     const [recommendedTopics, setRecommendedTopics] = useState<CurriculumTopic[]>([]);
     const [isLoadingTopics, setIsLoadingTopics] = useState(false);
 
-    // ── Load profile/school/usage data ──────────────────────────────────────
+    // ── Apply profile defaults ────────────────────────────────────────────────
     useEffect(() => {
         let isMounted = true;
-        const ctrl = new AbortController();
 
-        async function loadWizardData() {
-            if (!isAuthLoaded || isLoadingWorkspace) return;
-            if (!workspace) { setIsLoadingData(false); return; }
+        function initializeForm() {
+            if (!isAuthLoaded || isLoadingWorkspace || isProfileLoading) return;
+            if (!workspace || !teacherProfile) {
+                if (isMounted) setIsLoadingData(false);
+                return;
+            }
 
             try {
-                const token = await getToken();
-                const headers = { Authorization: `Bearer ${token}` };
-                const opts = { headers, signal: ctrl.signal };
-
-                // Profile
-                const profileRes = await fetch(`${API_BASE}/w/${workspace.id}/profile`, opts);
-                if (profileRes.status === 404) { if (isMounted) router.replace('/onboarding'); return; }
-                const pData: TeacherProfile = await profileRes.json();
-                if (!isMounted) return;
-                setTeacherProfile(pData);
-
-                // School
-                const schoolRes = await fetch(`${API_BASE}/w/${workspace.id}/school`, opts);
-                if (schoolRes.status === 404) { if (isMounted) router.replace('/onboarding'); return; }
-                const sData: SchoolIdentity = await schoolRes.json();
-                if (!isMounted) return;
-                setSchoolIdentity(sData);
-
-                // Usage / Credits
-                const usageRes = await fetch(`${API_BASE}/w/${workspace.id}/wallet/summary`, opts);
-                if (usageRes.ok) {
-                    const uData: UsageSummary = await usageRes.json();
-                    if (isMounted) setUsageSummary(uData);
-                }
-
-                // Templates
-                const tplRes = await fetch(`${API_BASE}/w/${workspace.id}/templates?document_type=modul_ajar`, opts);
-                if (tplRes.ok) {
-                    const tData = await tplRes.json();
-                    if (isMounted) setTemplates(tData.templates || []);
-                }
-
-                // Pre-fill form from profile or saved draft
                 const draft = localStorage.getItem('wizard_draft');
                 if (draft) {
                     setFormData(JSON.parse(draft));
-                } else if (pData) {
-                    const grade = pData.primary_grade ?? 4;
-                    const jenjang: Jenjang = pData.primary_jenjang ?? (grade >= 10 ? 'SMA' : grade >= 7 ? 'SMP' : 'SD');
+                } else if (teacherProfile) {
+                    const grade = teacherProfile.primary_grade ?? 4;
+                    const jenjang: Jenjang = (teacherProfile.primary_jenjang as Jenjang) ?? (grade >= 10 ? 'SMA' : grade >= 7 ? 'SMP' : 'SD');
 
                     setFormData(prev => ({
                         ...prev,
                         jenjang,
                         kelas: grade.toString(),
-                        mapel: pData.primary_subject || ''
+                        mapel: teacherProfile.primary_subject || ''
                     }));
                 }
-
-                if (isMounted) setIsLoadingData(false);
-            } catch (err: unknown) {
-                if (!isMounted) return;
-                if ((err as Error).name !== 'AbortError') {
-                    console.error('Wizard data load failed:', err);
-                    setError('Gagal memuat profil. Silakan muat ulang halaman.');
-                    setIsLoadingData(false);
-                }
+            } catch (err) {
+                console.error('Failed to parse wizard draft', err);
             }
+
+            if (isMounted) setIsLoadingData(false);
         }
 
-        loadWizardData();
-        return () => { isMounted = false; ctrl.abort(); };
-    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
+        initializeForm();
+        return () => { isMounted = false; };
+    }, [isAuthLoaded, isLoadingWorkspace, workspace, teacherProfile, isProfileLoading]);
 
     // ── Load Recommended Topics ──────────────────────────────────────────────
     useEffect(() => {

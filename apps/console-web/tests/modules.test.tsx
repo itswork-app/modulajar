@@ -21,19 +21,35 @@ vi.mock('@/hooks/use-workspace', () => ({
     useWorkspace: () => ({ workspace: { id: 'test-workspace-id' }, isLoading: false })
 }));
 
+const defaultStore = {
+    teacherProfile: { full_name: 'Mock', primary_subject: 'Bahasa Indonesia', primary_jenjang: 'SD', primary_grade: 4 },
+    schoolIdentity: { school_display_name: 'Mock School' },
+    usageSummary: { credits_remaining: 10 },
+    templates: [],
+    isProfileLoading: false,
+    isProfileLoaded: true,
+    loadProfileData: vi.fn(),
+    resetProfileData: vi.fn(),
+};
+
+const mockUseWorkspaceStore = vi.fn().mockReturnValue(defaultStore);
+
+vi.mock('@/store/workspace-store', () => ({
+    useWorkspaceStore: () => mockUseWorkspaceStore()
+}));
+
 describe('Jobs Tracking UX v1 - Integration Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockUseWorkspaceStore.mockReturnValue(defaultStore);
         global.fetch = vi.fn();
     });
 
     const mockGuardsPassed = () => {
+        mockUseWorkspaceStore.mockReturnValue(defaultStore);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile') || url.includes('/school')) {
-                return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
-            }
+        (global.fetch as any).mockImplementation(() => {
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve([]) });
         });
     };
@@ -48,11 +64,9 @@ describe('Jobs Tracking UX v1 - Integration Tests', () => {
     });
 
     it('jobs list renders chips correctly with queued payload rows', async () => {
+        mockUseWorkspaceStore.mockReturnValue(defaultStore);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile') || url.includes('/school')) {
-                return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
-            }
             // In the refactored code, the list page calls /documents
             if (url.includes('/documents')) return Promise.resolve({
                 status: 200, ok: true, json: () => Promise.resolve({

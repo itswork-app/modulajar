@@ -48,7 +48,7 @@ export default function CreateWorkspacePage() {
             localStorage.setItem('modulajar_active_workspace', data.workspaceId);
             
             await refreshWorkspaces();
-            router.push('/onboarding');
+            router.push('/wizard');
         } catch (err: unknown) {
             console.error(err);
             const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem.';

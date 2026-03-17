@@ -45,70 +45,73 @@ vi.mock('@/hooks/use-workspace', () => ({
     useWorkspace: () => mockWorkspaceResult
 }));
 
+vi.mock('@/components/ui/Toaster', () => ({
+    useToast: () => ({ toast: vi.fn() })
+}));
+
+const defaultStore = {
+    teacherProfile: { full_name: 'Mock', primary_subject: 'Bahasa Indonesia', primary_jenjang: 'SD', primary_grade: 4 },
+    schoolIdentity: { school_display_name: 'Mock School' },
+    usageSummary: { credits_remaining: 10 },
+    templates: [],
+    isProfileLoading: false,
+    isProfileLoaded: true,
+    loadProfileData: vi.fn(),
+    resetProfileData: vi.fn(),
+};
+
+const mockUseWorkspaceStore = vi.fn().mockReturnValue(defaultStore);
+
+vi.mock('@/store/workspace-store', () => ({
+    useWorkspaceStore: () => mockUseWorkspaceStore()
+}));
+
 describe('Onboarding Wizard Guard Logic (v1)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockUseWorkspaceStore.mockReturnValue(defaultStore);
         global.fetch = vi.fn().mockImplementation((url: string) => {
-            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Bahasa Indonesia', primary_jenjang: 'SD', primary_grade: 4 }) });
-            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
         });
     });
 
-    it('redirects to /profile-setup if teacher profile is missing (404)', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) {
-                return Promise.resolve({
-                    status: 404,
-                    ok: false,
-                    json: () => Promise.resolve({ error: 'Not found' })
-                });
-            }
-            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+    it('loads wizard successfully with empty states if teacher profile is missing', async () => {
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: null,
         });
 
         render(<OnboardingWizardPage />);
 
         await waitFor(() => {
-            expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+            expect(screen.getByText('Identitas Guru')).toBeDefined();
         });
+
+        expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('redirects to /workspace/school-setup if school identity is missing (404)', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) {
-                return Promise.resolve({
-                    status: 200,
-                    ok: true,
-                    json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' })
-                });
-            }
-            if (url.includes('/school')) {
-                return Promise.resolve({
-                    status: 404,
-                    ok: false,
-                    json: () => Promise.resolve({ error: 'Not found' })
-                });
-            }
-            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+    it('loads wizard successfully with empty states if school identity is missing', async () => {
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika' } as any,
+            schoolIdentity: null,
         });
 
         render(<OnboardingWizardPage />);
 
         await waitFor(() => {
-            expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+            expect(screen.getByText('Identitas Sekolah')).toBeDefined();
         });
+
+        expect(mockReplace).not.toHaveBeenCalled();
     });
 
     it('loads wizard successfully and renders identity step', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
-            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
-            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 } as any,
+            schoolIdentity: { school_display_name: 'Mock School' } as any,
         });
 
         render(<OnboardingWizardPage />);
@@ -121,11 +124,9 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('progresses through WizardV2Page flow correctly', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: '' }) });
-            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
-            return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: { full_name: 'Mock', primary_subject: '' } as any,
         });
 
         render(<OnboardingWizardPage />);
@@ -163,10 +164,13 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('submits the generation successfully in V2 flow', async () => {
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 } as any,
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'Matematika' }) });
-            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
             if (url.includes('/modules/generate')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ success: true, job_id: 'test-job' }) });
             if (url.includes('/jobs/test-job')) return Promise.resolve({ 
                 status: 200, 
@@ -212,10 +216,13 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     });
 
     it('handles generate validation errors in V2 flow', async () => {
+        mockUseWorkspaceStore.mockReturnValue({
+            ...defaultStore,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'IPAS', primary_jenjang: 'SD', primary_grade: 4 } as any,
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (global.fetch as any).mockImplementation((url: string) => {
-            if (url.includes('/profile')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ full_name: 'Mock', primary_subject: 'IPAS' }) });
-            if (url.includes('/school')) return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ school_display_name: 'Mock School' }) });
             if (url.includes('/modules/generate')) return Promise.resolve({ status: 400, ok: false, json: () => Promise.resolve({ error: 'AI Error: Rate Limit' }) });
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
         });

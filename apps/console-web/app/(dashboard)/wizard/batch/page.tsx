@@ -8,7 +8,7 @@ import { Loader2, Sparkles, BookOpen, AlertCircle, ArrowRight, Layers, ChevronRi
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { JENJANG_OPTIONS, Jenjang, KELAS_OPTIONS, MAPEL_OPTIONS } from '@/lib/constants';
-import { TeacherProfile, SchoolIdentity } from 'shared-types';
+import { useWorkspaceStore } from '@/store/workspace-store';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -53,9 +53,14 @@ export default function BatchWizardPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
-    const [schoolIdentity, setSchoolIdentity] = useState<SchoolIdentity | null>(null);
-    const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+    const { 
+        teacherProfile, 
+        schoolIdentity, 
+        usageSummary, 
+        templates, 
+        isProfileLoading,
+        isProfileLoaded
+    } = useWorkspaceStore();
 
     const [contextData, setContextData] = useState({
         jenjang: 'SD' as Jenjang,
@@ -65,7 +70,6 @@ export default function BatchWizardPage() {
         fokusMateri: '',
     });
 
-    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
     const [topics, setTopics] = useState<string[]>(['']);
@@ -78,79 +82,26 @@ export default function BatchWizardPage() {
     // AI Integration
     const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
-    // ── Load profile/school/usage data ──────────────────────────────────────
+    // ── Pre-fill context from Global Store ──────────────────────────────────
     useEffect(() => {
         let isMounted = true;
-        const ctrl = new AbortController();
+        if (!isAuthLoaded || isLoadingWorkspace || isProfileLoading || !isProfileLoaded) return;
 
-        async function loadWizardData() {
-            if (!isAuthLoaded || isLoadingWorkspace) return;
-            if (!workspace) { setIsLoadingData(false); return; }
+        if (teacherProfile) {
+            const grade = teacherProfile.primary_grade ?? 4;
+            const jenjang: Jenjang = (teacherProfile.primary_jenjang as Jenjang) ?? (grade >= 10 ? 'SMA' : grade >= 7 ? 'SMP' : 'SD');
 
-            try {
-                const token = await getToken();
-                const headers = { Authorization: `Bearer ${token}` };
-                const opts = { headers, signal: ctrl.signal };
-
-                const [profileRes, schoolRes, usageRes, tplRes] = await Promise.all([
-                    fetch(`${API_BASE}/w/${workspace.id}/profile`, opts),
-                    fetch(`${API_BASE}/w/${workspace.id}/school`, opts),
-                    fetch(`${API_BASE}/w/${workspace.id}/wallet/summary`, opts),
-                    fetch(`${API_BASE}/w/${workspace.id}/templates?document_type=modul_ajar`, opts),
-                ]);
-
-                if (profileRes.status === 404 || schoolRes.status === 404) {
-                    if (isMounted) router.replace('/onboarding');
-                    return;
-                }
-
-                const [pData, sData] = await Promise.all([
-                    profileRes.json(),
-                    schoolRes.json()
-                ]);
-
-                if (!isMounted) return;
-                setTeacherProfile(pData);
-                setSchoolIdentity(sData);
-
-                if (usageRes.ok) {
-                    const uData: UsageSummary = await usageRes.json();
-                    setUsageSummary(uData);
-                }
-
-                if (tplRes.ok) {
-                    const tData = await tplRes.json();
-                    if (isMounted) setTemplates(tData.templates || []);
-                }
-
-                if (pData) {
-                    const grade = pData.primary_grade ?? 4;
-                    let jenjang: Jenjang = 'SD';
-                    if (grade >= 10) jenjang = 'SMA';
-                    else if (grade >= 7) jenjang = 'SMP';
-
-                    setContextData(prev => ({
-                        ...prev,
-                        jenjang,
-                        kelas: grade.toString(),
-                        mapel: pData.primary_subject || ''
-                    }));
-                }
-
-                setIsLoadingData(false);
-            } catch (err: unknown) {
-                if (!isMounted) return;
-                if ((err as Error).name !== 'AbortError') {
-                    console.error('Wizard data load failed:', err);
-                    setError('Gagal memuat data. Silakan muat ulang halaman.');
-                    setIsLoadingData(false);
-                }
-            }
+            setContextData(prev => ({
+                ...prev,
+                jenjang,
+                kelas: grade.toString(),
+                mapel: teacherProfile.primary_subject || ''
+            }));
         }
-
-        loadWizardData();
-        return () => { isMounted = false; ctrl.abort(); };
-    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
+        
+        if (isMounted) setIsLoadingData(false);
+        return () => { isMounted = false; };
+    }, [isAuthLoaded, isLoadingWorkspace, isProfileLoading, isProfileLoaded, teacherProfile]);
 
     // ── Load Recommended Topics ──────────────────────────────────────────────
     useEffect(() => {
