@@ -56,7 +56,7 @@ fastify.register(cors, {
         'http://localhost:3001',
         'http://localhost:3002'
     ],
-    methods: ['GET', 'POST', 'PATCH'], // S2: Added PATCH
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: false, // Strict: No credentials unless required
     strictPreflight: true // Enforce strict preflight checks
