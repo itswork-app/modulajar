@@ -32,10 +32,12 @@ export default function UpgradePage() {
     const fetchPlans = useCallback(async () => {
         try {
             const res = await fetch(`${API_BASE}/plans`);
+            if (!res.ok) throw new Error('API returned an error');
             const json = await res.json();
-            setPlans(json.plans);
+            setPlans(json.plans || []);
         } catch (err) {
             console.error('Failed to fetch plans', err);
+            setPlans([]);
         } finally {
             setIsLoading(false);
         }
@@ -143,7 +145,7 @@ export default function UpgradePage() {
                             </div>
 
                             <ul className="space-y-4 mb-10 flex-1">
-                                {plan.features.map((feature, idx) => (
+                                {(plan.features || []).map((feature, idx) => (
                                     <li key={idx} className="flex items-start gap-3 text-slate-600 font-bold text-sm">
                                         <div className={cn(
                                             "mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0",
