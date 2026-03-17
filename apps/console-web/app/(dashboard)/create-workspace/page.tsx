@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspaces } from '@/hooks/use-workspace';
-import { Loader2, Plus, Sparkles, Building2, ArrowRight } from 'lucide-react';
+import { Loader2, Sparkles, Building2, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -49,9 +49,10 @@ export default function CreateWorkspacePage() {
             
             await refreshWorkspaces();
             router.push('/onboarding');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            setError(err.message || 'Terjadi kesalahan sistem.');
+            const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem.';
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }

@@ -41,7 +41,7 @@ export function useWorkspaces() {
 }
 
 export function useWorkspace() {
-    const { getToken, isLoaded } = useAuth();
+    const { isLoaded } = useAuth();
     const { workspaces, isLoading: isListLoading } = useWorkspaces();
     const [activeId, setActiveId] = useState<string | null>(null);
 
