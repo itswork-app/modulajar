@@ -385,6 +385,26 @@ export default async function platformRoutes(fastify: FastifyInstance) {
             return { status: 'ok', id };
         });
 
+        // DELETE /platform/keys/:id
+        childServer.delete('/keys/:id', async (request, reply) => {
+            if (request.platformRole !== 'owner') return reply.code(403).send({ error: 'Forbidden' });
+            const { id } = request.params as any;
+            await fastify.db.query(`DELETE FROM platform_keys WHERE id = $1`, [id]);
+            return { status: 'ok' };
+        });
+
+        // POST /platform/keys/:id/rotate
+        childServer.post('/keys/:id/rotate', async (request, reply) => {
+            if (request.platformRole !== 'owner') return reply.code(403).send({ error: 'Forbidden' });
+            const { id } = request.params as any;
+            const { key_value } = request.body as any; // New value
+            await fastify.db.query(
+                `UPDATE platform_keys SET key_value = $1, last_used_at = NULL, updated_at = NOW() WHERE id = $2`,
+                [key_value, id]
+            );
+            return { status: 'ok' };
+        });
+
         // GET /platform/webhooks
         childServer.get('/webhooks', async () => {
             const result = await fastify.db.query(`SELECT * FROM platform_webhooks ORDER BY created_at DESC`);
@@ -404,10 +424,30 @@ export default async function platformRoutes(fastify: FastifyInstance) {
             return { status: 'ok', id };
         });
 
+        // DELETE /platform/webhooks/:id
+        childServer.delete('/webhooks/:id', async (request, reply) => {
+            if (request.platformRole !== 'owner') return reply.code(403).send({ error: 'Forbidden' });
+            const { id } = request.params as any;
+            await fastify.db.query(`DELETE FROM platform_webhooks WHERE id = $1`, [id]);
+            return { status: 'ok' };
+        });
+
         // GET /platform/plans
         childServer.get('/plans', async () => {
             const result = await fastify.db.query(`SELECT * FROM pricing_plans ORDER BY base_price_idr ASC`);
             return { plans: result.rows };
+        });
+
+        // PATCH /platform/plans/:id
+        childServer.patch('/plans/:id', async (request, reply) => {
+            if (request.platformRole !== 'owner') return reply.code(403).send({ error: 'Forbidden' });
+            const { id } = request.params as any;
+            const { base_price_idr, base_credits } = request.body as any;
+            await fastify.db.query(
+                `UPDATE pricing_plans SET base_price_idr = $1, base_credits = $2, updated_at = NOW() WHERE id = $3`,
+                [base_price_idr, base_credits, id]
+            );
+            return { status: 'ok' };
         });
 
     }, { prefix: '/platform' });
