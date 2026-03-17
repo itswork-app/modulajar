@@ -7,34 +7,34 @@
 }
 
 :root {
-  /* Carbon/Onyx Palette */
-  --background: oklch(0.12 0.01 240);
-  --foreground: oklch(0.98 0.01 240);
+  /* Modulajar Brand Onyx Palette */
+  --background: oklch(0.12 0.02 160); /* Deep dark with a hint of emerald green */
+  --foreground: oklch(0.98 0.01 160);
   
-  --card: oklch(0.14 0.02 240);
-  --card-foreground: oklch(0.98 0.01 240);
+  --card: oklch(0.14 0.03 160);
+  --card-foreground: oklch(0.98 0.01 160);
   
-  --popover: oklch(0.14 0.02 240);
-  --popover-foreground: oklch(0.98 0.01 240);
+  --popover: oklch(0.14 0.03 160);
+  --popover-foreground: oklch(0.98 0.01 160);
   
-  --primary: oklch(0.65 0.2 250); /* Vivid Indigo/Blue */
-  --primary-foreground: oklch(0.98 0.01 240);
+  --primary: oklch(0.64 0.17 160); /* Signature Modulajar Emerald */
+  --primary-foreground: oklch(0.98 0.01 160);
   
-  --secondary: oklch(0.2 0.03 240);
+  --secondary: oklch(0.55 0.18 250); /* Brand Indigo for Elite accents */
   --secondary-foreground: oklch(0.98 0.01 240);
   
-  --muted: oklch(0.18 0.02 240);
-  --muted-foreground: oklch(0.6 0.02 240);
+  --muted: oklch(0.18 0.02 160);
+  --muted-foreground: oklch(0.6 0.03 160);
   
-  --accent: oklch(0.22 0.04 250);
-  --accent-foreground: oklch(0.98 0.01 240);
+  --accent: oklch(0.22 0.05 160);
+  --accent-foreground: oklch(0.98 0.01 160);
   
   --destructive: oklch(0.6 0.18 20);
   --destructive-foreground: oklch(0.98 0.01 240);
   
-  --border: oklch(0.2 0.03 240);
-  --input: oklch(0.2 0.03 240);
-  --ring: oklch(0.65 0.2 250);
+  --border: oklch(0.2 0.03 160);
+  --input: oklch(0.2 0.03 160);
+  --ring: oklch(0.64 0.17 160);
 }
 
 body {
@@ -48,9 +48,9 @@ body {
 }
 
 .glass-card {
-  background: color-mix(in oklch, var(--card), transparent 20%);
+  background: oklch(0.14 0.03 160 / 0.6);
   backdrop-filter: blur(20px);
-  border: 1px solid oklch(1 0 0 / 0.05);
+  border: 1px solid oklch(0.2 0.03 160 / 0.3);
   box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.3);
 }
 
@@ -61,14 +61,14 @@ body {
   content: '';
   position: absolute;
   inset: -1px;
-  background: linear-gradient(45deg, var(--primary), transparent, var(--primary));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   border-radius: inherit;
   z-index: -1;
-  opacity: 0.1;
+  opacity: 0.2;
   transition: opacity 0.3s;
 }
 .glow-border:hover::after {
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

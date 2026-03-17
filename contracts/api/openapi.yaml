@@ -224,6 +224,32 @@ paths:
                     properties:
                       message: { type: string, example: User already bootstrapped }
 
+  /workspaces:
+    get:
+      tags: [Workspace]
+      summary: List all workspaces for user
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Workspace]
+      summary: Create new workspace
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        201:
+          description: Created
+
   # ---------------------------------------------------------
   # Workspace Management
   # ---------------------------------------------------------
