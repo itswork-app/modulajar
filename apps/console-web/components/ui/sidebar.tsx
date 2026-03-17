@@ -22,6 +22,7 @@ import { useWorkspaceRole } from '@/hooks/use-workspace-role';
 import { usePlatformRole } from '@/hooks/use-platform-role';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { BadgeCheck, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const learningJourneyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -58,9 +59,9 @@ function SidebarLink({
     onClose?: () => void
 }) {
     const colorMap = {
-        emerald: 'bg-emerald-50 text-emerald-700 hover:bg-slate-50 hover:text-slate-900 border-emerald-500',
-        indigo: 'bg-indigo-50 text-indigo-700 hover:bg-slate-50 hover:text-slate-900 border-indigo-500',
-        amber: 'bg-amber-50 text-amber-700 hover:bg-slate-50 hover:text-slate-900 border-amber-500'
+        emerald: 'bg-emerald-50/50 text-emerald-700 hover:bg-slate-50 hover:text-slate-900',
+        indigo: 'bg-indigo-50/50 text-indigo-700 hover:bg-slate-50 hover:text-slate-900',
+        amber: 'bg-amber-50/50 text-amber-700 hover:bg-slate-50 hover:text-slate-900'
     };
 
     const iconColorMap = {
@@ -81,9 +82,12 @@ function SidebarLink({
             )}
         >
             {active && (
-                <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full", 
-                    color === 'emerald' ? 'bg-emerald-500' : color === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500'
-                )} />
+                <motion.span 
+                    layoutId="active-indicator"
+                    className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-r-full", 
+                        color === 'emerald' ? 'bg-emerald-500' : color === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500'
+                    )} 
+                />
             )}
             <Icon
                 className={cn(
@@ -107,7 +111,7 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
 
     return (
         <div className={cn(
-            "flex flex-col h-full bg-white border-r border-slate-100 w-64 shrink-0 transition-all duration-300",
+            "flex flex-col h-full bg-white/80 backdrop-blur-xl border-r border-slate-100 w-64 shrink-0 transition-all duration-300",
             className
         )}>
             {/* Logo */}
@@ -130,8 +134,8 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
             </div>
 
             {/* Nav */}
-            <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-0.5 scrollbar-hide">
-                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Learning Journey</p>
+            <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-0.5 scrollbar-hide">
+                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Master Journey</p>
                 {learningJourneyNav.map((item) => (
                     <SidebarLink
                         key={item.name}
@@ -144,7 +148,7 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
                     </SidebarLink>
                 ))}
 
-                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6">Professional Tools</p>
+                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 mt-8">Professional Tools</p>
                 {toolsNav.map((item) => (
                     <SidebarLink
                         key={item.name}
@@ -157,7 +161,7 @@ export function Sidebar({ className, onClose }: { className?: string, onClose?: 
                     </SidebarLink>
                 ))}
 
-                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6">Account & Settings</p>
+                <p className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 mt-8">Accounts</p>
                 {accountNav.map((item) => (
                     <SidebarLink
                         key={item.name}

@@ -306,23 +306,23 @@ export default function OnboardingPage() {
                     {steps.map((s, idx) => (
                         <div key={s.id} className="flex flex-col items-center relative flex-1">
                             <div className={cn(
-                                "z-10 w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                                currentStep === s.id ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200" :
-                                    steps.findIndex(x => x.id === currentStep) > idx ? "bg-emerald-100 border-emerald-200 text-emerald-600" :
-                                        "bg-white border-slate-200 text-slate-400"
+                                "z-10 w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
+                                currentStep === s.id ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200" :
+                                    steps.findIndex(x => x.id === currentStep) > idx ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                                        "bg-white border-slate-100 text-slate-300"
                             )}>
                                 {steps.findIndex(x => x.id === currentStep) > idx ? <CheckCircle2 className="w-6 h-6" /> : <s.icon className="w-5 h-5" />}
                             </div>
                             <span className={cn(
-                                "mt-3 text-[11px] font-bold uppercase tracking-widest transition-colors duration-300",
-                                currentStep === s.id ? "text-emerald-700" : "text-slate-400"
+                                "mt-3 text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-300",
+                                currentStep === s.id ? "text-slate-900" : "text-slate-300"
                             )}>
                                 {s.label}
                             </span>
                             {idx < steps.length - 1 && (
                                 <div className={cn(
-                                    "absolute top-5 left-[50%] right-[-50%] h-[2px] z-0",
-                                    steps.findIndex(x => x.id === currentStep) > idx ? "bg-emerald-200" : "bg-slate-200"
+                                    "absolute top-6 left-[50%] right-[-50%] h-px z-0",
+                                    steps.findIndex(x => x.id === currentStep) > idx ? "bg-emerald-100" : "bg-slate-100"
                                 )} />
                             )}
                         </div>
@@ -330,7 +330,9 @@ export default function OnboardingPage() {
                 </div>
 
                 {/* Form Content */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 p-10 mt-8 relative overflow-hidden">
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-12 mt-8 relative overflow-hidden backdrop-blur-xl">
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl opacity-40 pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-50/50 rounded-full blur-3xl opacity-40 pointer-events-none" />
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-center text-sm border border-red-100 animate-in fade-in slide-in-from-top-2">
                             <AlertCircle className="w-5 h-5 mr-3 shrink-0" />
