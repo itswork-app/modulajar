@@ -47,6 +47,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
         const workspaceId = ulid();
         const refCode = generateReferralCode();
         const clerkOrgId = `org_${workspaceId.toLowerCase()}`;
+
         const client = await fastify.db.connect();
         try {
             await client.query('BEGIN');

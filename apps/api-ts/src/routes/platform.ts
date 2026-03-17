@@ -426,7 +426,7 @@ export default async function platformRoutes(fastify: FastifyInstance) {
 
         // DELETE /platform/webhooks/:id
         childServer.delete('/webhooks/:id', async (request, reply) => {
-            if (request.platformRole !== 'owner') return reply.code(430).send({ error: 'Forbidden' });
+            if (request.platformRole !== 'owner') return reply.code(403).send({ error: 'Forbidden' });
             const { id } = request.params as any;
             await fastify.db.query(`DELETE FROM platform_webhooks WHERE id = $1`, [id]);
             return { status: 'ok' };
