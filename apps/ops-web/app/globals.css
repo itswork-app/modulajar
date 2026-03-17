@@ -48,9 +48,9 @@ body {
 }
 
 .glass-card {
-  background: color-mix(in oklch, var(--card), transparent 20%);
+  background: oklch(0.14 0.03 160 / 0.6);
   backdrop-filter: blur(20px);
-  border: 1px solid oklch(1 0 0 / 0.05);
+  border: 1px solid oklch(0.2 0.03 160 / 0.3);
   box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.3);
 }
 
@@ -61,14 +61,14 @@ body {
   content: '';
   position: absolute;
   inset: -1px;
-  background: linear-gradient(45deg, var(--primary), transparent, var(--primary));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   border-radius: inherit;
   z-index: -1;
-  opacity: 0.1;
+  opacity: 0.2;
   transition: opacity 0.3s;
 }
 .glow-border:hover::after {
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
