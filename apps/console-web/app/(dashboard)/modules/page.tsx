@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import { Loader2, AlertCircle, FileText, Download, Eye, Clock, CheckCircle2, XCircle, Search, Layers, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -68,56 +69,18 @@ const ModulesSkeleton = () => (
 );
 
 export default function JobsListPage() {
-    const router = useRouter();
+
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();
+    const { isProfileLoading } = useWorkspaceStore();
 
-    const [isCheckingPrerequisites, setIsCheckingPrerequisites] = useState(true);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isLoadingJobs, setIsLoadingJobs] = useState(true);
     const [activeBatch, setActiveBatch] = useState<BatchSession | null>(null);
 
-    // 1. Route Guards
+    // Load batch context if exists
     useEffect(() => {
-        async function checkPrerequisites() {
-            if (!isAuthLoaded || isLoadingWorkspace) return;
-            if (!workspace) {
-                setIsCheckingPrerequisites(false);
-                return;
-            }
-
-            try {
-                const token = await getToken();
-                const profileRes = await fetch(`${API_BASE}/w/${workspace.id}/profile`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-
-                if (profileRes.status === 404) {
-                    router.replace('/onboarding');
-                    return;
-                }
-
-                const schoolRes = await fetch(`${API_BASE}/w/${workspace.id}/school`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-
-                if (schoolRes.status === 404) {
-                    router.replace('/onboarding');
-                    return;
-                }
-
-                setIsCheckingPrerequisites(false);
-            } catch (err) {
-                console.error('Prereq check failed:', err);
-                setIsCheckingPrerequisites(false);
-                setError('Gagal memuat profil. Silakan muat ulang halaman.');
-            }
-        }
-
-        checkPrerequisites();
-
-        // Load batch context if exists
         const batchData = sessionStorage.getItem('modulajar_batch');
         if (batchData) {
             try {
@@ -126,7 +89,7 @@ export default function JobsListPage() {
                 sessionStorage.removeItem('modulajar_batch');
             }
         }
-    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken, router]);
+    }, []);
 
     // Run interval poll every 3 seconds IF there are active jobs
     useEffect(() => {
@@ -163,7 +126,7 @@ export default function JobsListPage() {
             }
         };
 
-        if (isCheckingPrerequisites || !workspace) return;
+        if (isProfileLoading || !workspace) return;
 
         doFetch(); // initial fetch
 
@@ -177,7 +140,7 @@ export default function JobsListPage() {
             abortController.abort();
             clearInterval(interval);
         };
-    }, [isCheckingPrerequisites, workspace, getToken]);
+    }, [isProfileLoading, workspace, getToken]);
 
 
     const renderStatusChip = (status: JobStatus) => {
@@ -195,7 +158,7 @@ export default function JobsListPage() {
     };
 
 
-    if (!isAuthLoaded || isLoadingWorkspace || isCheckingPrerequisites || (isLoadingJobs && jobs.length === 0)) {
+    if (!isAuthLoaded || isLoadingWorkspace || isProfileLoading || (isLoadingJobs && jobs.length === 0)) {
         return <ModulesSkeleton />;
     }
 

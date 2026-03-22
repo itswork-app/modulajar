@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import {
     Loader2, ChevronRight, ChevronLeft, Sparkles, BookOpen,
     AlertCircle, Plus, X, Zap, CheckCircle2
@@ -22,11 +23,7 @@ const SEMESTER_OPTIONS = ['1', '2'];
 
 type BundleStep = 'KONTEKS' | 'TOPIK' | 'ESTIMASI' | 'GENERATE';
 
-interface Template {
-    id: string;
-    name: string;
-    workspace_id: string | null;
-}
+
 
 const STEPS: { key: BundleStep; label: string }[] = [
     { key: 'KONTEKS', label: 'Konteks' },
@@ -42,6 +39,13 @@ export default function BundleWizardPage() {
     const router = useRouter();
     const { getToken } = useAuth();
     const { workspace, isLoading: isWorkspaceLoading } = useWorkspace();
+    const { 
+        teacherProfile, 
+        schoolIdentity, 
+        templates, 
+        isProfileLoaded,
+        isProfileLoading
+    } = useWorkspaceStore();
 
     const [step, setStep] = useState<BundleStep>('KONTEKS');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -64,57 +68,21 @@ export default function BundleWizardPage() {
     const [newTopic, setNewTopic] = useState('');
     const [fokusMateri, setFokusMateri] = useState('');
 
-    const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
-    // 1. Prerequisite check & Prefill
+    // 1. Prefill from Global Store
     useEffect(() => {
-        if (!workspace) return;
-        async function loadData() {
-            try {
-                const token = await getToken();
-                const headers = { Authorization: `Bearer ${token}` };
+        if (!isProfileLoaded || isProfileLoading || !teacherProfile) return;
 
-                // Profile check
-                const pr = await fetch(`${API_BASE}/w/${workspace!.id}/profile`, { headers });
-                if (pr.status === 404) {
-                    router.replace('/onboarding');
-                    return;
-                }
-
-                // School check
-                const sr = await fetch(`${API_BASE}/w/${workspace!.id}/school`, { headers });
-                if (sr.status === 404) {
-                    router.replace('/onboarding');
-                    return;
-                }
-
-                // Templates
-                const tplRes = await fetch(`${API_BASE}/w/${workspace!.id}/templates?document_type=modul_ajar`, { headers });
-
-                if (pr.ok) {
-                    const pd = await pr.json();
-                    setCtx(prev => ({
-                        ...prev,
-                        teacher_name: pd.full_name || prev.teacher_name,
-                        subject: pd.primary_subject || prev.subject,
-                        kelas: String(pd.primary_grade || prev.kelas),
-                    }));
-                }
-                if (sr.ok) {
-                    const sd = await sr.json();
-                    setCtx(prev => ({ ...prev, school_name: sd.school_display_name || prev.school_name }));
-                }
-                if (tplRes.ok) {
-                    const tData = await tplRes.json();
-                    setTemplates(tData.templates || []);
-                }
-            } catch (err) {
-                console.error('Wizard prefill failed:', err);
-            }
-        }
-        loadData();
-    }, [workspace, getToken, router]);
+        setCtx(prev => ({
+            ...prev,
+            teacher_name: teacherProfile.full_name || prev.teacher_name,
+            subject: teacherProfile.primary_subject || prev.subject,
+            kelas: String(teacherProfile.primary_grade || prev.kelas),
+            jenjang: (teacherProfile.primary_jenjang as Jenjang) || prev.jenjang,
+            school_name: schoolIdentity?.school_display_name || prev.school_name,
+        }));
+    }, [isProfileLoaded, isProfileLoading, teacherProfile, schoolIdentity]);
 
     const estimatedCost = ATP_COST + PROTA_COST + PROMES_COST + topics.length * MODUL_COST;
 
