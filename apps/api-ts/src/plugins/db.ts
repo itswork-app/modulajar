@@ -13,15 +13,18 @@ const dbPlugin = fp(async (fastify, options) => {
         // Optimal for Cloud Run + Neon (serverless)
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 5000,
     });
 
     // Test connection
     try {
+        console.log('[STARTUP] Testing database connection...');
         const client = await pool.connect();
+        console.log('[STARTUP] Database connection SUCCESS.');
         fastify.log.info('Connected to database');
         client.release();
     } catch (err) {
+        console.error('[STARTUP] Database connection FAILED:', err);
         fastify.log.error({ err }, 'Failed to connect to database');
         throw err;
     }

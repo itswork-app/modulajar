@@ -1,0 +1,2368 @@
+
+> api-ts@1.0.0 test
+> tap --allow-incomplete-coverage --allow-empty-coverage --node-arg=-r --node-arg=ts-node/register 'tests/**/*.test.ts' tests/*.test.ts
+
+TAP version 14
+1..38
+# Subtest: tests/auth.test.ts
+    # Subtest: GET /me
+        # Subtest: 200 — returns clerk_user_id and workspace list
+            ok 1 - should be equal
+            ok 2 - has clerk_user_id
+            ok 3 - should be equal
+            ok 4 - has workspaces array
+            ok 5 - should be equal
+            1..5
+        ok 1 - 200 — returns clerk_user_id and workspace list # time=400.418ms
+        
+        # Subtest: 200 — empty workspace list when user has no workspaces
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 2 - 200 — empty workspace list when user has no workspaces # time=70.561ms
+        
+        # Subtest: 401 — no auth header
+            ok 1 - should be equal
+            1..1
+        ok 3 - 401 — no auth header # time=59.739ms
+        
+        1..3
+    ok 1 - GET /me # time=561.965ms
+    
+    # Subtest: POST /bootstrap — already bootstrapped
+        ok 1 - should be equal
+        ok 2 - should be equal
+        1..2
+    ok 2 - POST /bootstrap — already bootstrapped # time=62.989ms
+    
+    # Subtest: POST /bootstrap — new user creates workspace
+        # Subtest: creates workspace with default name + personal org fallback
+            ok 1 - Expected 200, got 200: {"status":"bootstrapped","workspaceId":"01KKDXJX3C14PYE2P9S8QXMF96"}
+            ok 2 - should be equal
+            ok 3 - returns workspaceId
+            1..3
+        ok 1 - creates workspace with default name + personal org fallback # time=74.28ms
+        
+        # Subtest: custom name + clerk_org_id are accepted
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 2 - custom name + clerk_org_id are accepted # time=43.843ms
+        
+        # Subtest: existing workspace resolved via SELECT after ON CONFLICT DO NOTHING
+            ok 1 - Expected 200, got 200: {"status":"bootstrapped","workspaceId":"existing-ws-999"}
+            ok 2 - should be equal
+            ok 3 - should resolve existing workspace id
+            1..3
+        ok 3 - existing workspace resolved via SELECT after ON CONFLICT DO NOTHING # time=48.496ms
+        
+        1..3
+    ok 3 - POST /bootstrap — new user creates workspace # time=171.643ms
+    
+    # Subtest: POST /bootstrap — DB error triggers ROLLBACK
+        ok 1 - Expected 500 on DB error, got 500: {"statusCode":500,"error":"Internal Server Error","message":"Simulated DB insert failure"}
+        1..1
+    ok 4 - POST /bootstrap — DB error triggers ROLLBACK # time=44.034ms
+    
+    1..4
+ok 1 - tests/auth.test.ts # time=4536.926ms
+
+# Subtest: tests/billing-webhook.test.ts
+    {"level":"info","time":"2026-03-11T07:43:07.317Z","service":"api-ts","event_id":"evt_001","verified":true,"amount":20,"msg":"Payment processed"}
+    # Subtest: Billing Webhook Hardening
+        # Subtest: Valid signature -> Success
+            ok 1 - {"receipt_id":"rcpt_1","status":"confirmed","credits_posted":20}
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - Valid signature -> Success # time=289.619ms
+        
+    {"level":"warn","time":"2026-03-11T07:43:07.433Z","service":"api-ts","signature":"wrong_signature","computedSignature":"0f694606b09374c5fd8a9e23042a2126ad67d4aa81ad4074c3427828cd97c1b5","msg":"Invalid callback signature"}
+        # Subtest: Invalid signature -> 401
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - Invalid signature -> 401 # time=98.563ms
+        
+        # Subtest: Replay event -> 200 Idempotent
+            ok 1 - First call credits
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - Second call does NOT credit
+            1..4
+        ok 3 - Replay event -> 200 Idempotent # time=66.558ms
+        
+    {"level":"info","time":"2026-03-11T07:43:07.500Z","service":"api-ts","event_id":"evt_reuse","verified":true,"amount":20,"msg":"Payment processed"}
+    {"level":"info","time":"2026-03-11T07:43:07.504Z","service":"api-ts","provider_event_id":"evt_reuse","msg":"Duplicate webhook event (replay)"}
+        # Subtest: Invalid event type -> 200 Ignored
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - Invalid event type -> 200 Ignored # time=50.4ms
+        
+    {"level":"info","time":"2026-03-11T07:43:07.553Z","service":"api-ts","event":"invoice.created","msg":"Ignoring non-payment event"}
+        # Subtest: Missing external_ref -> 200 failed_malformed
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 5 - Missing external_ref -> 200 failed_malformed # time=57.231ms
+        
+    {"level":"warn","time":"2026-03-11T07:43:07.615Z","service":"api-ts","event_id":"evt_no_ref","msg":"Webhook missing external_ref"}
+        # Subtest: Unknown Receipt -> 200 failed_unknown_ref
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 6 - Unknown Receipt -> 200 failed_unknown_ref # time=79.05ms
+        
+        1..6
+    ok 1 - Billing Webhook Hardening # time=685.715ms
+    
+    {"level":"warn","time":"2026-03-11T07:43:07.693Z","service":"api-ts","event_id":"evt_bad_ref","external_ref":"RCPT-UNKNOWN-999","msg":"Webhook receipt not found"}
+    1..1
+ok 2 - tests/billing-webhook.test.ts # time=4706.644ms
+
+# Subtest: tests/billing.test.ts
+    # Subtest: Pricing Table
+        # Subtest: SD semester tier: 59000 IDR = 20 credits
+            ok 1 - tier should exist
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 1 - SD semester tier: 59000 IDR = 20 credits # time=13.785ms
+        
+        # Subtest: Unknown amount returns null
+            ok 1 - should be equal
+            1..1
+        ok 2 - Unknown amount returns null # time=1.457ms
+        
+        # Subtest: Default tier is sd_semester
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 3 - Default tier is sd_semester # time=0.89ms
+        
+        # Subtest: SD_FULL_SEMESTER_COST is 5
+            ok 1 - should be equal
+            1..1
+        ok 4 - SD_FULL_SEMESTER_COST is 5 # time=0.529ms
+        
+        1..4
+    ok 1 - Pricing Table # time=49.986ms
+    
+    # Subtest: Billing API
+        # Subtest: Create topup intent → pending receipt
+            ok 1 - Expected 201, got 201: {"receipt_id":"01KKDXJXEET8973JDG62F5ZTN3","external_ref":"RCPT-48A37FE19531FA44","amount_idr":59000,"credits":20,"status":"pending"}
+            ok 2 - has receipt_id
+            ok 3 - has external_ref
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - should be equal
+            1..6
+        ok 1 - Create topup intent → pending receipt # time=342.566ms
+        
+    {"level":"info","time":"2026-03-11T07:43:07.819Z","service":"api-ts","event_id":"evt_confirm_1","verified":true,"amount":20,"msg":"Payment processed"}
+        # Subtest: Confirm → receipt confirmed, wallet credited once
+            ok 1 - Expected 200, got 200: {"receipt_id":"01KKDXJXH3DHN161F2X7JG2PYQ","status":"confirmed","credits_posted":20}
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - Should have exactly 1 credit entry
+            1..4
+        ok 2 - Confirm → receipt confirmed, wallet credited once # time=73.983ms
+        
+    {"level":"info","time":"2026-03-11T07:43:07.886Z","service":"api-ts","event_id":"evt_retry_1","verified":true,"amount":20,"msg":"Payment processed"}
+    {"level":"info","time":"2026-03-11T07:43:07.890Z","service":"api-ts","provider_event_id":"evt_retry_1","msg":"Duplicate webhook event (replay)"}
+        # Subtest: Confirm retry → no double credit (idempotent)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - No double credit on retry
+            1..3
+        ok 3 - Confirm retry → no double credit (idempotent) # time=66.751ms
+        
+        # Subtest: Reject → no credit posted
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - No credit for rejected receipt
+            1..4
+        ok 4 - Reject → no credit posted # time=83.347ms
+        
+        # Subtest: Summary returns correct balance & sisa_generate
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 5 - Summary returns correct balance & sisa_generate # time=34.433ms
+        
+        1..5
+    ok 2 - Billing API # time=622.357ms
+    
+    1..2
+ok 3 - tests/billing.test.ts # time=4999.057ms
+
+# Subtest: tests/comprehensive_modules.test.ts
+    {"level":"info","time":"2026-03-11T07:43:08.266Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXJXZ9KRFEH5GEZ6SDYZRD","workspace_id":"ws_comp_001"}
+    # Subtest: Comprehensive Modules Routes
+        # Subtest: POST /generate — success (wizard)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 1 - POST /generate — success (wizard) # time=234.432ms
+        
+        # Subtest: POST /generate — handles rate limit (429)
+            ok 1 - should be equal
+            1..1
+        ok 2 - POST /generate — handles rate limit (429) # time=103.329ms
+        
+        # Subtest: POST /generate — handles invalid grade (400)
+            ok 1 - should be equal
+            1..1
+        ok 3 - POST /generate — handles invalid grade (400) # time=125.402ms
+        
+        # Subtest: GET /:id — success with GCS signed URL
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - GET /:id — success with GCS signed URL # time=73.216ms
+        
+        # Subtest: GET /editor — returns 404
+            ok 1 - should be equal
+            1..1
+        ok 5 - GET /editor — returns 404 # time=90.827ms
+        
+        1..5
+    ok 1 - Comprehensive Modules Routes # time=655.916ms
+    
+    1..1
+ok 4 - tests/comprehensive_modules.test.ts # time=5783.592ms
+
+# Subtest: tests/cors.test.ts
+    # Subtest: CORS Policy
+        # Subtest: Allowed Origin (modulajar.app)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 1 - Allowed Origin (modulajar.app) # time=33.858ms
+        
+        # Subtest: Allowed Origin (localhost:3000)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 2 - Allowed Origin (localhost:3000) # time=1.969ms
+        
+        # Subtest: Disallowed Origin (evil.com)
+            ok 1 - should be equal
+            ok 2 - Should not return Allow-Origin header
+            1..2
+        ok 3 - Disallowed Origin (evil.com) # time=1.237ms
+        
+        # Subtest: Preflight OPTIONS
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 4 - Preflight OPTIONS # time=2.568ms
+        
+        1..4
+    ok 1 - CORS Policy # time=144.745ms
+    
+    1..1
+ok 5 - tests/cors.test.ts # time=2986.855ms
+
+# Subtest: tests/download.test.ts
+    # Subtest: Download Endpoint
+        # Subtest: Success: Ready document owned by user
+            ok 1 - Status should be 200
+            ok 2 - URL should be correct
+            ok 3 - Expires in 600s
+            1..3
+        ok 1 - Success: Ready document owned by user # time=232.416ms
+        
+        # Subtest: Error: Document not found
+            ok 1 - Status should be 404
+            ok 2 - should match pattern
+            1..2
+        ok 2 - Error: Document not found # time=24.425ms
+        
+        # Subtest: Error: Forbidden (other workspace document)
+            ok 1 - Status should be 404 for cross-tenant doc
+            1..1
+        ok 3 - Error: Forbidden (other workspace document) # time=31.701ms
+        
+        # Subtest: Error: Valid document but not ready
+            ok 1 - Status should be 409 Conflict
+            ok 2 - should match pattern
+            1..2
+        ok 4 - Error: Valid document but not ready # time=16.28ms
+        
+        1..4
+    ok 1 - Download Endpoint # time=363.646ms
+    
+    # Subtest: Download endpoint — 500 branches
+        # Subtest: 500 when GCS_BUCKET env var is not set
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 1 - 500 when GCS_BUCKET env var is not set # time=41.578ms
+        
+        # Subtest: 500 when generateSignedUrl throws
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - 500 when generateSignedUrl throws # time=21.302ms
+        
+        1..2
+    ok 2 - Download endpoint — 500 branches # time=91.569ms
+    
+    1..2
+ok 6 - tests/download.test.ts # time=3835.671ms
+
+# Subtest: tests/generate_wizard_modes.test.ts
+    {"level":"info","time":"2026-03-11T07:43:10.539Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXK069D0S8CWTE1V37MN9S","workspace_id":"ws_smoke_001"}
+    # Subtest: SMOKE PHASE 1: Wizard Generate Flow
+        # Subtest: POST /generate — template mode (success)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - POST /generate — template mode (success) # time=236.891ms
+        
+    {"level":"info","time":"2026-03-11T07:43:10.656Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXK0A081B2FJ1HR6JH1605","workspace_id":"ws_smoke_001"}
+        # Subtest: POST /generate — edit_template mode (success)
+            ok 1 - should be equal
+            1..1
+        ok 2 - POST /generate — edit_template mode (success) # time=100.835ms
+        
+    {"level":"info","time":"2026-03-11T07:43:10.718Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXK0BXGPJTXY426Z10T7FV","workspace_id":"ws_smoke_001"}
+        # Subtest: POST /generate — from_scratch mode (success)
+            ok 1 - should be equal
+            1..1
+        ok 3 - POST /generate — from_scratch mode (success) # time=59.415ms
+        
+        # Subtest: POST /generate — FAILS if missing template_id in template mode
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 4 - POST /generate — FAILS if missing template_id in template mode # time=78.369ms
+        
+        # Subtest: POST /generate — FAILS if missing workspace_id in URL (404/Route not found)
+            ok 1 - should be equal
+            1..1
+        ok 5 - POST /generate — FAILS if missing workspace_id in URL (404/Route not found) # time=73.509ms
+        
+        # Subtest: POST /generate — FAILS if invalid grade (out of range 1-12)
+            ok 1 - Should reject grade 15
+            1..1
+        ok 6 - POST /generate — FAILS if invalid grade (out of range 1-12) # time=83.489ms
+        
+        # Subtest: POST /generate — FAILS if unauthenticated
+            ok 1 - should be equal
+            1..1
+        ok 7 - POST /generate — FAILS if unauthenticated # time=118.886ms
+        
+        1..7
+    ok 1 - SMOKE PHASE 1: Wizard Generate Flow # time=785.049ms
+    
+    1..1
+ok 7 - tests/generate_wizard_modes.test.ts # time=5184.821ms
+
+# Subtest: tests/generate.test.ts
+    # Subtest: PID Issuer
+        # Subtest: PID format matches regex
+            ok 1 - PID 'PKG-SD4-S1-2026-BJ6W4B-Y6XYDMY6' should match format
+            ok 2 - PID should start with PKG-SD4-S1-2026-, got: PKG-SD4-S1-2026-BJ6W4B-Y6XYDMY6
+            ok 3 - PID should be reasonably long
+            ok 4 - PID should not be excessively long
+            ok 5 - PID issued: PKG-SD4-S1-2026-BJ6W4B-Y6XYDMY6
+            1..5
+        ok 1 - PID format matches regex # time=11.401ms
+        
+        # Subtest: PID is deterministic (same input = same output)
+            ok 1 - Same input must produce same PID
+            1..1
+        ok 2 - PID is deterministic (same input = same output) # time=1.414ms
+        
+        # Subtest: Different package ULID produces different PID
+            ok 1 - Different ULIDs must produce different PIDs
+            1..1
+        ok 3 - Different package ULID produces different PID # time=1.126ms
+        
+        # Subtest: Different secret produces different PID
+            ok 1 - Different secrets must produce different PIDs
+            1..1
+        ok 4 - Different secret produces different PID # time=0.775ms
+        
+        # Subtest: workspaceShortCode is 6 chars
+            ok 1 - Short code should be 6 chars, got: L7SFFG
+            ok 2 - Short code should be base32, got: L7SFFG
+            1..2
+        ok 5 - workspaceShortCode is 6 chars # time=5.581ms
+        
+        # Subtest: Kelas and semester normalization
+            ok 1 - kelas '4' should normalize to SD4: PKG-SD4-S1-2026-7GYCG9-UP6EZJM6
+            ok 2 - kelas 'SD4' should stay SD4: PKG-SD4-S1-2026-7GYCG9-UHNVP9ZD
+            ok 3 - semester '1' should normalize to S1: PKG-SD4-S1-2026-7GYCG9-DMS6M82A
+            1..3
+        ok 6 - Kelas and semester normalization # time=6.552ms
+        
+        1..6
+    ok 1 - PID Issuer # time=71.825ms
+    
+    {"level":"info","time":"2026-03-11T07:43:11.415Z","service":"api-ts","msg":"Job enqueued","trace_id":"req-1","job_id":"01KKDXK11NRFBGQJNX2YY2066H","package_id":"01KKDXK11N6C27AKACYM178ZTC","pid":"PKG-SD4-S1-2026-PBD84N-Q96KJH6J","workspace_id":"ws_pid_001"}
+    # Subtest: Generate Semester with PID + Package
+        # Subtest: Create job returns package_id + pid
+            ok 1 - Expected 201, got 201: {"job_id":"01KKDXK11NRFBGQJNX2YY2066H","package_id":"01KKDXK11N6C27AKACYM178ZTC","pid":"PKG-SD4-S1-2026-PBD84N-Q96KJH6J","status":"pending","cost":5,"balance_after":5,"trace_id":"req-1"}
+            ok 2 - has job_id
+            ok 3 - has package_id
+            ok 4 - has pid
+            ok 5 - PID format valid: PKG-SD4-S1-2026-PBD84N-Q96KJH6J
+            ok 6 - PID starts correctly: PKG-SD4-S1-2026-PBD84N-Q96KJH6J
+            1..6
+        ok 1 - Create job returns package_id + pid # time=486.622ms
+        
+        # Subtest: Duplicate request returns same package_id + pid
+            ok 1 - should be equal
+            ok 2 - Same job_id
+            ok 3 - Same package_id
+            ok 4 - Same pid
+            ok 5 - should be equal
+            1..5
+        ok 2 - Duplicate request returns same package_id + pid # time=91.53ms
+        
+        # Subtest: Different teacher_name creates new package
+            ok 1 - Requests returned 200 and 200 — different identity paths
+            1..1
+        ok 3 - Different teacher_name creates new package # time=57.231ms
+        
+        1..3
+    ok 2 - Generate Semester with PID + Package # time=647.453ms
+    
+    # Subtest: Generate endpoint branch coverage
+        # Subtest: 400 when pack_id is missing
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 1 - 400 when pack_id is missing # time=44.199ms
+        
+        # Subtest: 400 when semester is missing
+            ok 1 - should be equal
+            1..1
+        ok 2 - 400 when semester is missing # time=35.639ms
+        
+        # Subtest: 400 when tahun_ajaran is missing
+            ok 1 - should be equal
+            1..1
+        ok 3 - 400 when tahun_ajaran is missing # time=39.146ms
+        
+        # Subtest: 409 when active job exists
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 4 - 409 when active job exists # time=50.15ms
+        
+        # Subtest: 402 when balance is insufficient
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 5 - 402 when balance is insufficient # time=41.199ms
+        
+    {"level":"info","time":"2026-03-11T07:43:11.842Z","service":"api-ts","msg":"Job enqueued","trace_id":"req-1","job_id":"01KKDXK1F1CBC14479MQ7J46WF","package_id":"pkg-existing","pid":"PKG-SD4-S1-2026-REUSED","workspace_id":"ws_bc_001"}
+        # Subtest: reuses existing package when found
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 6 - reuses existing package when found # time=51.107ms
+        
+    {"level":"info","time":"2026-03-11T07:43:11.916Z","service":"api-ts","msg":"Job enqueued","trace_id":"req-1","job_id":"01KKDXK1HBQCQDG8QRQM98EBER","package_id":"01KKDXK1HAR6CBPBMPNG0HK9EW","pid":"PKG-SD4-S1-2026-44PJXV-M6STGBZT","workspace_id":"ws_bc_001"}
+        # Subtest: uses flat pack path for pack_id with less than 3 parts
+            ok 1 - should not crash: 201
+            1..1
+        ok 7 - uses flat pack path for pack_id with less than 3 parts # time=67.613ms
+        
+        1..7
+    ok 3 - Generate endpoint branch coverage # time=339.951ms
+    
+    1..3
+ok 8 - tests/generate.test.ts # time=5015.314ms
+
+# Subtest: tests/integration.test.ts
+    [dotenv@17.3.1] injecting env (9) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+    # Subtest: Workspace Auth & Guard
+        # Subtest: Accessing /w/:id/ping without token should fail
+            ok 1 - should be equal
+            1..1
+        ok 1 - Accessing /w/:id/ping without token should fail # time=29.089ms
+        
+        # Subtest: Bootstrap user and access workspace
+            ok 1 - Bootstrap failed
+            ok 2 - Workspace ID returned
+            ok 3 - Ping failed
+            ok 4 - should be equal
+            1..4
+        ok 2 - Bootstrap user and access workspace # time=26.356ms
+        
+        # Subtest: Another user cannot access workspace
+            ok 1 - should be equal
+            1..1
+        ok 3 - Another user cannot access workspace # time=14.879ms
+        
+        1..3
+    ok 1 - Workspace Auth & Guard # time=343.146ms
+    
+    1..1
+ok 9 - tests/integration.test.ts # time=4286.338ms
+
+# Subtest: tests/job_status_flow.test.ts
+    # Subtest: SMOKE PHASE 2: Job Polling Reliability
+        # Subtest: GET /jobs/:id — returns queued status correctly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - GET /jobs/:id — returns queued status correctly # time=240.285ms
+        
+        # Subtest: GET /jobs/:id — returns running/ai status correctly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 2 - GET /jobs/:id — returns running/ai status correctly # time=14.243ms
+        
+        # Subtest: GET /jobs/:id — returns completed/done status correctly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - GET /jobs/:id — returns completed/done status correctly # time=12.925ms
+        
+        # Subtest: GET /jobs/:id — FAIL 404 for invalid job_id
+            ok 1 - should be equal
+            1..1
+        ok 4 - GET /jobs/:id — FAIL 404 for invalid job_id # time=7.526ms
+        
+        # Subtest: GET /jobs/:id — Workspace Isolation (cannot access other workspace job)
+            ok 1 - should be equal
+            1..1
+        ok 5 - GET /jobs/:id — Workspace Isolation (cannot access other workspace job) # time=11.994ms
+        
+        1..5
+    ok 1 - SMOKE PHASE 2: Job Polling Reliability # time=360.779ms
+    
+    1..1
+ok 10 - tests/job_status_flow.test.ts # time=3565.222ms
+
+# Subtest: tests/jobs.status.test.ts
+    # Subtest: GET /w/:workspaceId/jobs/:jobId
+        # Subtest: 200 — running job returns progress
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 1 - 200 — running job returns progress # time=339.012ms
+        
+        # Subtest: 200 — running job checks documents API for precise pct
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 2 - 200 — running job checks documents API for precise pct # time=16.597ms
+        
+        # Subtest: 200 — completed job
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 3 - 200 — completed job # time=17.921ms
+        
+        # Subtest: 404 — job not found
+            ok 1 - should be equal
+            1..1
+        ok 4 - 404 — job not found # time=9.94ms
+        
+        1..4
+    ok 1 - GET /w/:workspaceId/jobs/:jobId # time=415.857ms
+    
+    1..1
+ok 11 - tests/jobs.status.test.ts # time=3543.143ms
+
+# Subtest: tests/letterhead.test.ts
+    # Subtest: Letterhead API (Kop Surat)
+        # Subtest: GET /w/:workspaceId/letterhead — success
+            ok 1 - should return 200
+            ok 2 - should be equal
+            ok 3 - should have preview url
+            1..3
+        ok 1 - GET /w/:workspaceId/letterhead — success # time=29.019ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead — updates text
+            ok 1 - should return 200
+            1..1
+        ok 2 - POST /w/:workspaceId/letterhead — updates text # time=21.55ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead — logo upload logic reaches branch
+            ok 1 - logic reached
+            1..1
+        ok 3 - POST /w/:workspaceId/letterhead — logo upload logic reaches branch # time=1543.64ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead/clear-logo — success
+            ok 1 - should return 200
+            1..1
+        ok 4 - POST /w/:workspaceId/letterhead/clear-logo — success # time=1.808ms
+        
+        # Subtest: Security — Access Denied (Other Workspace)
+            ok 1 - should return 403
+            1..1
+        ok 5 - Security — Access Denied (Other Workspace) # time=2.008ms
+        
+        # Subtest: Security — Access Denied (No Auth)
+            ok 1 - should return 401
+            1..1
+        ok 6 - Security — Access Denied (No Auth) # time=3.395ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead — all text fields
+            ok 1 - should handle all text fields
+            1..1
+        ok 7 - POST /w/:workspaceId/letterhead — all text fields # time=5.151ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead — rejects field > 120 chars
+            ok 1 - should reject field exceeding 120 chars
+            1..1
+        ok 8 - POST /w/:workspaceId/letterhead — rejects field > 120 chars # time=10.155ms
+        
+        # Subtest: POST /w/:workspaceId/letterhead — rejects invalid logo mimetype
+            ok 1 - should reject non PNG/JPG logo
+            1..1
+        ok 9 - POST /w/:workspaceId/letterhead — rejects invalid logo mimetype # time=2.382ms
+        
+        1..9
+    ok 1 - Letterhead API (Kop Surat) # time=1760.47ms
+    
+    1..1
+ok 12 - tests/letterhead.test.ts # time=6755.783ms
+
+# Subtest: tests/lib/pid.test.ts
+    # Subtest: PID Utility — workspaceShortCode
+        ok 1 - should be equal
+        ok 2 - different workspaces should have different codes
+        ok 3 - should be deterministic
+        1..3
+    ok 1 - PID Utility — workspaceShortCode # time=7.595ms
+    
+    # Subtest: PID Utility — issuePID formatting branches
+        ok 1 - should format class and semester with prefixes
+        ok 2 - should match PID_REGEX
+        ok 3 - should not double-prefix
+        ok 4 - should normalize casing
+        1..4
+    ok 2 - PID Utility — issuePID formatting branches # time=6.396ms
+    
+    1..2
+ok 13 - tests/lib/pid.test.ts # time=2139.533ms
+
+# Subtest: tests/metrics.test.ts
+    # Subtest: GET /metrics returns prometheus metrics
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 1 - GET /metrics returns prometheus metrics # time=110.353ms
+    
+    1..1
+ok 14 - tests/metrics.test.ts # time=2316.496ms
+
+# Subtest: tests/module_download.test.ts
+    # Subtest: SMOKE PHASE 3: Module Detail Integrity
+        # Subtest: GET /modules/:id — returns signed URL for PDF
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            ok 3 - should be equal
+            1..3
+        ok 1 - GET /modules/:id — returns signed URL for PDF # time=165.045ms
+        
+        # Subtest: GET /modules/:id — FAIL 404 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 2 - GET /modules/:id — FAIL 404 for wrong workspace # time=61.207ms
+        
+        1..2
+    ok 1 - SMOKE PHASE 3: Module Detail Integrity # time=244.491ms
+    
+    1..1
+ok 15 - tests/module_download.test.ts # time=3496.975ms
+
+# Subtest: tests/module_editor/editor_flow.test.ts
+    # Subtest: Module Editor Integration Flow
+        # Subtest: GET /editor — returns latest version data and preview
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            1..5
+        ok 1 - GET /editor — returns latest version data and preview # time=186.494ms
+        
+    {"level":"info","time":"2026-03-11T07:43:15.353Z","service":"api-ts","msg":"Module version updated","module_id":"mod_editor_123","version":6,"workspace_id":"ws_editor_001"}
+        # Subtest: PATCH /modules/:id — creates new version
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 2 - PATCH /modules/:id — creates new version # time=86.234ms
+        
+        # Subtest: GET /preview — returns rendered HTML
+            ok 1 - <!DOCTYPE html> <html lang="id">  <head>     <meta charset="UTF-8">     <meta name="viewport" content="width=device-width, initial-scale=1.0">     <title>Modul Ajar — IPA | 4 1 2025</title>     <style>         /* ═══════════════════════════════════════════    Modulajar Template v1.0 — A4 Print CSS    ═══════════════════════════════════════════ */  /* ── A4 Page Setup ── */ @page {     size: A4;     margin: 20mm 18mm 25mm 18mm; }  @media print {     body {         -webkit-print-color-adjust: exact;         print-color-adjust: exact;     } }  /* ── Reset & Base ── */ *, *::before, *::after {     box-sizing: border-box;     margin: 0;     padding: 0; }  body {     font-family: 'Segoe UI', 'Noto Sans', Arial, Helvetica, sans-serif;     font-size: 11pt;     line-height: 1.6;     color: \#1a1a2e;     background: \#ffffff;     max-width: 210mm;     margin: 0 auto;     padding: 15mm; }  /* ── Typography ── */ h1 {     font-size: 22pt;     font-weight: 700;     color: \#0d1b2a; }  h2 {     font-size: 15pt;     font-weight: 700;     color: \#1b263b; }  h3 {     font-size: 13pt;     font-weight: 600;     color: \#415a77; }  h4 {     font-size: 11pt;     font-weight: 600;     color: \#415a77; }  p {     margin-bottom: 0.6em; }  /* ── Kop Surat (Letterhead) ── */ .kop-surat {     display: flex;     align-items: center;     justify-content: center;     border-bottom: 3px solid \#0d1b2a;     padding-bottom: 12px;     margin-bottom: 25px;     position: relative; }  .kop-logo {     position: absolute;     left: 0;     top: 50%;     transform: translateY(-50%);     max-width: 80px;     max-height: 80px; }  .kop-content {     text-align: center;     flex: 1; }  .kop-line1 {     font-size: 14pt;     font-weight: 700;     text-transform: uppercase;     margin-bottom: 2px; }  .kop-line2 {     font-size: 16pt;     font-weight: 800;     text-transform: uppercase;     margin-bottom: 2px; }  .kop-line3 {     font-size: 12pt;     font-weight: 600;     margin-bottom: 2px; }  .kop-line4 {     font-size: 11pt;     font-style: italic; }  .kop-contact {     font-size: 9pt;     margin-top: 4px;     border-top: 1px solid \#ddd;     padding-top: 4px;     display: inline-block; }  /* ── Cover Page ── */ .cover-page {     display: flex;     flex-direction: column;     align-items: center;     justify-content: center;     min-height: 85vh;     text-align: center;     page-break-after: always; }  .cover-logo {     margin-bottom: 2em; }  .cover-logo-icon {     font-size: 48pt; }  .cover-title {     font-size: 26pt;     margin-bottom: 0.3em;     color: \#0d1b2a; }  .cover-subtitle {     font-size: 13pt;     color: \#778da9;     margin-bottom: 2em;     font-weight: 400; }  .cover-info {     border-collapse: collapse;     text-align: left;     width: auto;     min-width: 300px; }  .cover-info td {     padding: 6px 14px;     font-size: 11pt;     border: none; }  .cover-label {     font-weight: 600;     color: \#415a77;     width: 160px; }  .cover-value {     color: \#1a1a2e; }  /* ── Section Layout ── */ .section {     margin-bottom: 2em; }  .section-title {     border-bottom: 2px solid \#415a77;     padding-bottom: 0.3em;     margin-bottom: 0.8em; }  .section-desc {     color: \#555;     font-size: 10pt;     margin-bottom: 1em; }  /* ── Page Break Utilities ── */ .page-break-before {     page-break-before: always; }  .page-break-after {     page-break-after: always; }  .avoid-break {     page-break-inside: avoid; }  /* ── Info Table (identity) ── */ .info-table {     width: 100%;     border-collapse: collapse;     margin-bottom: 1.5em; }  .info-table td {     padding: 8px 12px;     border: 1px solid \#ddd;     font-size: 10.5pt;     vertical-align: top; }  .info-label {     font-weight: 600;     color: \#415a77;     width: 180px;     background: \#f8f9fa; }  /* ── ATP Table ── */ .atp-table {     width: 100%;     border-collapse: collapse;     margin-bottom: 1.5em;     font-size: 10pt; }  .atp-table th {     background: \#1b263b;     color: \#ffffff;     padding: 8px 10px;     text-align: left;     font-weight: 600;     border: 1px solid \#1b263b; }  .atp-table td {     padding: 7px 10px;     border: 1px solid \#ddd;     vertical-align: top; }  .atp-table tr:nth-child(even) {     background: \#f8f9fa; }  .atp-table tr {     page-break-inside: avoid; }  /* ── Activity Sections ── */ .activity-unit {     margin-bottom: 1.5em;     page-break-inside: avoid; }  .activity-unit-title {     background: \#e8ecf1;     padding: 8px 12px;     border-left: 4px solid \#415a77;     margin-bottom: 0.5em; }  .activity-content {     padding: 8px 12px;     border: 1px solid \#eee;     border-left: 4px solid \#ddd;     font-size: 10.5pt; }  /* ── Assessment ── */ .assessment-block {     margin-bottom: 1em;     page-break-inside: avoid; }  .assessment-type {     font-weight: 600;     color: \#415a77;     margin-bottom: 0.3em; }  /* ── Footer Watermark ── */ .watermark-footer {     margin-top: 3em;     padding-top: 1em;     border-top: 1px solid \#ddd;     font-size: 8pt;     color: \#999;     text-align: center;     page-break-inside: avoid; }  .watermark-line {     margin-bottom: 2px; }  .watermark-label {     font-weight: 600;     color: \#aaa; }  .watermark-value {     font-family: 'Courier New', monospace;     letter-spacing: 0.5px; }  .watermark-sep {     margin: 0 8px;     color: \#ccc; }  .watermark-link {     color: \#778da9;     text-decoration: none; }  .watermark-link:hover {     text-decoration: underline; }  .watermark-powered {     margin-top: 4px;     font-style: italic;     color: \#bbb; }     </style> </head>  <body>      <!-- ═══════════════════════════════════════════ -->     <!-- COVER PAGE                                 -->     <!-- ═══════════════════════════════════════════ -->     <section class="cover-page">                  <div class="cover-logo">             <div class="cover-logo-icon">📘</div>         </div>         <h1 class="cover-title">Modul Ajar IPA</h1>         <div class="cover-subtitle">Modul Ajar — Kurikulum Merdeka</div>         <table class="cover-info">             <tr>                 <td class="cover-label">Mata Pelajaran</td>                 <td class="cover-value">IPA</td>             </tr>             <tr>                 <td class="cover-label">Kelas</td>                 <td class="cover-value">4</td>             </tr>             <tr>                 <td class="cover-label">Semester</td>                 <td class="cover-value">1</td>             </tr>             <tr>                 <td class="cover-label">Tahun Ajaran</td>                 <td class="cover-value">2025</td>             </tr>             <tr>                 <td class="cover-label">Guru Pengajar</td>                 <td class="cover-value">Guru</td>             </tr>             <tr>                 <td class="cover-label">Sekolah</td>                 <td class="cover-value">SD</td>             </tr>         </table>     </section>      <!-- ═══════════════════════════════════════════ -->     <!-- DYNAMIC SECTIONS                           -->     <!-- ═══════════════════════════════════════════ -->     <div class="activity-unit"><h3 class="activity-unit-title">Tujuan Pembelajaran</h3><div class="activity-content"><p>Siswa dapat menjelaskan energi</p></div><h3 class="activity-unit-title">Materi Pembelajaran</h3><div class="activity-content"><p></p></div></div>      <!-- ═══════════════════════════════════════════ -->     <!-- FOOTER WATERMARK                           -->     <!-- ═══════════════════════════════════════════ -->     <footer class="watermark-footer">         <div class="watermark-line">             <span class="watermark-label">PID:</span>             <span class="watermark-value">PID</span>             <span class="watermark-sep">|</span>             <span class="watermark-label">DID:</span>             <span class="watermark-value">PID</span>         </div>         <div class="watermark-line">             <span class="watermark-label">Verify:</span>             <a href="https://verify.modulajar.app/verify/PID" class="watermark-link">https://verify.modulajar.app/verify/PID</a>         </div>         <div class="watermark-line watermark-powered">             Digenerate oleh Modulajar — modulajar.com         </div>     </footer>  </body>  </html>
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 3 - GET /preview — returns rendered HTML # time=42.811ms
+        
+        # Subtest: POST /ai-assist — proxies request to worker
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - POST /ai-assist — proxies request to worker # time=41.928ms
+        
+        # Subtest: GET /versions — returns history
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 5 - GET /versions — returns history # time=48.882ms
+        
+        # Subtest: GET /preview — returns 404 if not found
+            ok 1 - should be equal
+            1..1
+        ok 6 - GET /preview — returns 404 if not found # time=53.813ms
+        
+        1..6
+    ok 1 - Module Editor Integration Flow # time=491.818ms
+    
+    1..1
+ok 16 - tests/module_editor/editor_flow.test.ts # time=3726.492ms
+
+# Subtest: tests/module_editor/security.test.ts
+    # Subtest: Module Editor Security — Workspace Isolation
+        # Subtest: GET /w/ws_sec_002/modules/mod_sec_123/editor — should return 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 1 - GET /w/ws_sec_002/modules/mod_sec_123/editor — should return 403 for wrong workspace # time=174.768ms
+        
+        # Subtest: PATCH /w/ws_sec_002/modules/mod_sec_123 — should return 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 2 - PATCH /w/ws_sec_002/modules/mod_sec_123 — should return 403 for wrong workspace # time=56.663ms
+        
+        # Subtest: POST /w/ws_sec_002/modules/mod_sec_123/ai-assist — should return 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 3 - POST /w/ws_sec_002/modules/mod_sec_123/ai-assist — should return 403 for wrong workspace # time=42.698ms
+        
+        # Subtest: GET /w/ws_sec_002/modules/mod_sec_123/preview — should return 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 4 - GET /w/ws_sec_002/modules/mod_sec_123/preview — should return 403 for wrong workspace # time=47.544ms
+        
+        # Subtest: GET /w/ws_sec_002/modules/mod_sec_123/versions — should return 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 5 - GET /w/ws_sec_002/modules/mod_sec_123/versions — should return 403 for wrong workspace # time=71.974ms
+        
+        1..5
+    ok 1 - Module Editor Security — Workspace Isolation # time=417.917ms
+    
+    # Subtest: Module Editor Security — Unauthenticated
+        # Subtest: GET /w/ws_sec_001/modules/mod_sec_123/editor — should return 401 without auth
+            ok 1 - should be equal
+            1..1
+        ok 1 - GET /w/ws_sec_001/modules/mod_sec_123/editor — should return 401 without auth # time=62.057ms
+        
+        1..1
+    ok 2 - Module Editor Security — Unauthenticated # time=65.027ms
+    
+    1..2
+ok 17 - tests/module_editor/security.test.ts # time=3741.248ms
+
+# Subtest: tests/modules.detail.test.ts
+    # Subtest: GET /w/:workspaceId/modules/:moduleId
+        # Subtest: 200 — returns module details with pdf
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should match pattern
+            ok 6 - should be equal
+            1..6
+        ok 1 - 200 — returns module details with pdf # time=189.574ms
+        
+        # Subtest: 200 — returns null pdf if not yet rendered
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 2 - 200 — returns null pdf if not yet rendered # time=94.489ms
+        
+        # Subtest: 404 — module not found
+            ok 1 - should be equal
+            1..1
+        ok 3 - 404 — module not found # time=54.97ms
+        
+        1..3
+    ok 1 - GET /w/:workspaceId/modules/:moduleId # time=361.631ms
+    
+    # Subtest: GET /w/:workspaceId/modules/:moduleId/preview
+        # Subtest: 200 — returns module preview html
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - 200 — returns module preview html # time=55.348ms
+        
+        # Subtest: 404 — preview module not found
+            ok 1 - should be equal
+            1..1
+        ok 2 - 404 — preview module not found # time=69.987ms
+        
+        1..2
+    ok 2 - GET /w/:workspaceId/modules/:moduleId/preview # time=136.763ms
+    
+    1..2
+ok 18 - tests/modules.detail.test.ts # time=3899.245ms
+
+# Subtest: tests/modules.generate.test.ts
+    {"level":"info","time":"2026-03-11T07:43:17.164Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXK6NAE7AA4JAANYDSTMGB","workspace_id":"ws_modules_001"}
+    # Subtest: POST /w/:workspaceId/modules/generate
+        # Subtest: 201 — successful generation from_scratch
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - 201 — successful generation from_scratch # time=196.301ms
+        
+        # Subtest: 400 — missing template_id for template mode
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - 400 — missing template_id for template mode # time=96.537ms
+        
+        # Subtest: 400 — missing topic
+            ok 1 - should be equal
+            1..1
+        ok 3 - 400 — missing topic # time=45.924ms
+        
+        # Subtest: 429 — rate limited (max active jobs)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - 429 — rate limited (max active jobs) # time=51.98ms
+        
+        # Subtest: 401 — unauthenticated
+            ok 1 - should be equal
+            1..1
+        ok 5 - 401 — unauthenticated # time=53.986ms
+        
+        1..5
+    ok 1 - POST /w/:workspaceId/modules/generate # time=469.272ms
+    
+    1..1
+ok 19 - tests/modules.generate.test.ts # time=3910.845ms
+
+# Subtest: tests/onboarding.test.ts
+    {"level":"info","time":"2026-03-11T07:43:18.265Z","service":"api-ts","event":"onboarding_profile_saved","workspace_id":"ws_onboard_001","trace_id":"req-1","msg":"onboarding_profile_saved"}
+    # Subtest: POST /onboarding/profile
+        # Subtest: 200 — saves teacher profile
+            ok 1 - Expected 200, got 200: {"success":true,"step":"profile"}
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 1 - 200 — saves teacher profile # time=138.526ms
+        
+        # Subtest: 400 — missing full_name
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - 400 — missing full_name # time=19.858ms
+        
+        # Subtest: 400 — empty full_name
+            ok 1 - should be equal
+            1..1
+        ok 3 - 400 — empty full_name # time=10.408ms
+        
+    {"level":"info","time":"2026-03-11T07:43:18.326Z","service":"api-ts","event":"onboarding_profile_saved","workspace_id":"ws_onboard_001","trace_id":"req-1","msg":"onboarding_profile_saved"}
+        # Subtest: 200 — optional fields omitted
+            ok 1 - should be equal
+            1..1
+        ok 4 - 200 — optional fields omitted # time=12.941ms
+        
+        # Subtest: 401 — unauthenticated
+            ok 1 - should be equal
+            1..1
+        ok 5 - 401 — unauthenticated # time=9.18ms
+        
+        1..5
+    ok 1 - POST /onboarding/profile # time=218.18ms
+    
+    {"level":"info","time":"2026-03-11T07:43:18.364Z","service":"api-ts","event":"onboarding_completed","teacher":"teacher-001","subject":"Matematika","grade":4,"workspace_id":"ws_onboard_001","trace_id":"req-1","msg":"onboarding_completed"}
+    # Subtest: POST /onboarding/assignment
+        # Subtest: 200 — saves teaching assignment
+            ok 1 - Expected 200, got 200: {"success":true,"step":"assignment","completed":true}
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - 200 — saves teaching assignment # time=13.924ms
+        
+        # Subtest: 400 — missing subject
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - 400 — missing subject # time=25.413ms
+        
+        # Subtest: 400 — invalid grade 0
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 3 - 400 — invalid grade 0 # time=10.677ms
+        
+        # Subtest: 400 — invalid grade 13
+            ok 1 - should be equal
+            1..1
+        ok 4 - 400 — invalid grade 13 # time=17.372ms
+        
+        # Subtest: 400 — no teacher profile yet
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 5 - 400 — no teacher profile yet # time=12.598ms
+        
+        # Subtest: 400 — missing grade
+            ok 1 - should be equal
+            1..1
+        ok 6 - 400 — missing grade # time=11.534ms
+        
+        1..6
+    ok 2 - POST /onboarding/assignment # time=113.846ms
+    
+    # Subtest: GET /onboarding/status
+        # Subtest: 200 — completed
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 1 - 200 — completed # time=13.075ms
+        
+        # Subtest: 200 — not completed
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 2 - 200 — not completed # time=22.887ms
+        
+        # Subtest: 200 — no profile
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 3 - 200 — no profile # time=36.817ms
+        
+        # Subtest: 401 — unauthenticated
+            ok 1 - should be equal
+            1..1
+        ok 4 - 401 — unauthenticated # time=7.975ms
+        
+        1..4
+    ok 3 - GET /onboarding/status # time=87.694ms
+    
+    1..3
+ok 20 - tests/onboarding.test.ts # time=3557.812ms
+
+# Subtest: tests/profile.test.ts
+    # Subtest: GET /w/:workspaceId/profile
+        # Subtest: returns 404 when profile does not exist
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 1 - returns 404 when profile does not exist # time=178.794ms
+        
+        # Subtest: returns profile when it exists
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 2 - returns profile when it exists # time=49.715ms
+        
+        # Subtest: returns 403 for cross-workspace access
+            ok 1 - should be equal
+            1..1
+        ok 3 - returns 403 for cross-workspace access # time=120.937ms
+        
+        1..3
+    ok 1 - GET /w/:workspaceId/profile # time=371.22ms
+    
+    # Subtest: POST /w/:workspaceId/profile
+        # Subtest: creates/upserts profile and returns it (success)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - Defaults grade to 4
+            ok 5 - should be equal
+            1..5
+        ok 1 - creates/upserts profile and returns it (success) # time=92.703ms
+        
+        # Subtest: creates profile with custom grade and nip
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 2 - creates profile with custom grade and nip # time=89.211ms
+        
+        # Subtest: validation error: missing full_name
+            ok 1 - should be equal
+            1..1
+        ok 3 - validation error: missing full_name # time=83.677ms
+        
+        # Subtest: validation error: missing primary_subject
+            not ok 1 - should be equal
+              ---
+              compare: ===
+              at:
+                fileName: tests/profile.test.ts
+                lineNumber: 159
+                columnNumber: 11
+                typeName: Test
+              stack: |
+                Test.<anonymous> (tests/profile.test.ts:159:11)
+              source: |2
+                        t.equal(body.nip, '198012122005011002');
+              
+                        await fastify.close();
+                ----------^
+                    });
+              diff: |
+                --- expected
+                +++ actual
+                @@ -1,1 +1,1 @@
+                -400
+                +200
+              ...
+            
+            1..1
+        not ok 4 - validation error: missing primary_subject # time=100.046ms
+          ---
+          at:
+            fileName: tests/profile.test.ts
+            lineNumber: 148
+            columnNumber: 13
+            typeName: Test
+          source: |2
+                        payload: {
+                            full_name: 'Budi Santoso',
+                            primary_subject: 'Matematika',
+            ------------^
+                            primary_grade: 6,
+                            nip: '198012122005011002'
+          ...
+        
+        # Subtest: validation error: grade too low
+            ok 1 - should be equal
+            1..1
+        ok 5 - validation error: grade too low # time=46.466ms
+        
+        # Subtest: validation error: grade too high
+            ok 1 - should be equal
+            1..1
+        ok 6 - validation error: grade too high # time=47.093ms
+        
+        # Subtest: cross-workspace attempt is blocked (403)
+            ok 1 - should be equal
+            1..1
+        ok 7 - cross-workspace attempt is blocked (403) # time=39.421ms
+        
+        1..7
+    not ok 2 - POST /w/:workspaceId/profile # time=519.788ms
+      ---
+      at:
+        fileName: tests/profile.test.ts
+        lineNumber: 93
+        columnNumber: 1
+        typeName: Object
+      source: |2
+      
+            await t.test('returns 403 for cross-workspace access', async (t) => {
+                const fastify = buildApp();
+        ^
+                await fastify.ready();
+      ...
+    
+    1..2
+not ok 21 - tests/profile.test.ts # time=3472.286ms
+  ---
+  stdio: inherit
+  cwd: /home/kangza/workspace/modulajar/apps/api-ts
+  externalID: tests/profile.test.ts
+  command: /home/kangza/.nvm/versions/node/v24.11.1/bin/node
+  args:
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs
+    - --enable-source-maps
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs
+    - -r
+    - ts-node/register
+    - /home/kangza/workspace/modulajar/apps/api-ts/tests/profile.test.ts
+  jobId: 1
+  exitCode: 1
+  signal: null
+  ...
+
+# Subtest: tests/referral.test.ts
+    # Subtest: Referral Growth Engine - API Routes
+        # Subtest: GET /w/:wid/referral returns info correctly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - GET /w/:wid/referral returns info correctly # time=222.036ms
+        
+        # Subtest: GET /w/:wid/referral handles 404 for missing workspaces
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 2 - GET /w/:wid/referral handles 404 for missing workspaces # time=36.996ms
+        
+        # Subtest: POST /w/:wid/referral/attach success on valid foreign code
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - POST /w/:wid/referral/attach success on valid foreign code # time=50.476ms
+        
+        # Subtest: POST /w/:wid/referral/attach rejects invalid code with 400
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - POST /w/:wid/referral/attach rejects invalid code with 400 # time=117.148ms
+        
+        # Subtest: POST /w/:wid/referral/attach rejects self-referral with 400
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 5 - POST /w/:wid/referral/attach rejects self-referral with 400 # time=101.983ms
+        
+        # Subtest: POST /w/:wid/referral/attach fails validation correctly without payload
+            ok 1 - should be equal
+            1..1
+        ok 6 - POST /w/:wid/referral/attach fails validation correctly without payload # time=94.542ms
+        
+        1..6
+    ok 1 - Referral Growth Engine - API Routes # time=661.701ms
+    
+    1..1
+ok 22 - tests/referral.test.ts # time=3219.119ms
+
+# Subtest: tests/remediation_comprehensive.test.ts
+    # Subtest: Remediation — Global Coverage Boost
+        # Subtest: Onboarding Routes
+            ok 1 - should be equal
+    {"level":"info","time":"2026-03-11T07:43:19.795Z","service":"api-ts","event":"onboarding_profile_saved","workspace_id":"ws_rem_001","trace_id":"req-2","msg":"onboarding_profile_saved"}
+            ok 2 - should be equal
+    {"level":"info","time":"2026-03-11T07:43:19.801Z","service":"api-ts","event":"onboarding_completed","teacher":"t1","subject":"IPA","grade":4,"workspace_id":"ws_rem_001","trace_id":"req-3","msg":"onboarding_completed"}
+            ok 3 - should be equal
+            1..3
+        ok 1 - Onboarding Routes # time=258.898ms
+        
+        # Subtest: Profile Routes
+            ok 1 - should be equal
+            1..1
+        ok 2 - Profile Routes # time=118.369ms
+        
+    {"level":"warn","time":"2026-03-11T07:43:20.090Z","service":"api-ts","msg":"Missing callback signature"}
+        # Subtest: Billing Webhook Error Cases
+            ok 1 - should be equal
+            1..1
+        ok 3 - Billing Webhook Error Cases # time=147.651ms
+        
+        # Subtest: RenderService Branch Coverage
+            ok 1 - should contain tujuan
+            ok 2 - should contain inti
+            ok 3 - should contain sikap
+            1..3
+        ok 4 - RenderService Branch Coverage # time=1.838ms
+        
+        1..4
+    ok 1 - Remediation — Global Coverage Boost # time=553.677ms
+    
+    1..1
+ok 23 - tests/remediation_comprehensive.test.ts # time=4487.333ms
+
+# Subtest: tests/remediation_final_coverage.test.ts
+    # Subtest: Final Coverage Remediation — Branch Focus
+        # Subtest: Letterhead Edge Cases
+            ok 1 - GET 404
+            ok 2 - Clear 404
+            ok 3 - Invalid type
+            ok 4 - Size limit
+            ok 5 - Length limit
+            1..5
+        ok 1 - Letterhead Edge Cases # time=305.66ms
+        
+        # Subtest: Wallet & Billing Edge Cases
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - Invalid tier
+            1..5
+        ok 2 - Wallet & Billing Edge Cases # time=108.116ms
+        
+        1..2
+    ok 1 - Final Coverage Remediation — Branch Focus # time=441.05ms
+    
+    1..1
+ok 24 - tests/remediation_final_coverage.test.ts # time=3964.196ms
+
+# Subtest: tests/school.test.ts
+    # Subtest: GET /w/:workspaceId/school
+        # Subtest: returns 404 when school settings do not exist
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 1 - returns 404 when school settings do not exist # time=235.909ms
+        
+        # Subtest: returns settings when they exist
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 2 - returns settings when they exist # time=46.604ms
+        
+        # Subtest: returns 403 for cross-workspace access
+            ok 1 - should be equal
+            1..1
+        ok 3 - returns 403 for cross-workspace access # time=45.511ms
+        
+        1..3
+    ok 1 - GET /w/:workspaceId/school # time=352.06ms
+    
+    # Subtest: POST /w/:workspaceId/school
+        # Subtest: creates/upserts settings with only required fields (success)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - Defaults to unverified
+            1..4
+        ok 1 - creates/upserts settings with only required fields (success) # time=41.07ms
+        
+        # Subtest: creates settings with all fields including valid NPSN
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            1..5
+        ok 2 - creates settings with all fields including valid NPSN # time=55.889ms
+        
+        # Subtest: validation error: missing school_display_name
+            ok 1 - should be equal
+            1..1
+        ok 3 - validation error: missing school_display_name # time=41.579ms
+        
+        # Subtest: validation error: school_display_name too short
+            ok 1 - should be equal
+            1..1
+        ok 4 - validation error: school_display_name too short # time=41.352ms
+        
+        # Subtest: validation error: bad school_npsn length format
+            ok 1 - should be equal
+            1..1
+        ok 5 - validation error: bad school_npsn length format # time=33.152ms
+        
+        # Subtest: validation error: bad school_npsn string format
+            ok 1 - should be equal
+            1..1
+        ok 6 - validation error: bad school_npsn string format # time=35.498ms
+        
+        # Subtest: cross-workspace attempt is blocked (403)
+            ok 1 - should be equal
+            1..1
+        ok 7 - cross-workspace attempt is blocked (403) # time=38.952ms
+        
+        1..7
+    ok 2 - POST /w/:workspaceId/school # time=297.86ms
+    
+    1..2
+ok 25 - tests/school.test.ts # time=3316.188ms
+
+# Subtest: tests/services/renderService.test.ts
+    # Subtest: Render Service
+        # Subtest: renderModuleHtml
+            # Subtest: should render with all fields present
+                not ok 1 - should be equal
+                  ---
+                  at:
+                    fileName: tests/services/renderService.test.ts
+                    lineNumber: 55
+                    columnNumber: 15
+                    typeName: Test
+                  stack: >
+                    Test.<anonymous> (tests/services/renderService.test.ts:55:15)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:27:11)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:26:7)
+                  
+                    Object.<anonymous> (tests/services/renderService.test.ts:11:15)
+                  
+                    Module.m._compile (node_modules/ts-node/dist/index.js:857:29)
+                    (node_modules/ts-node/src/index.ts:1618:23)
+                  
+                    require.extensions.<computed> (node_modules/ts-node/dist/index.js:859:16)
+                    (node_modules/ts-node/src/index.ts:1621:12)
+                  source: |2
+                                };
+                                const html = renderModuleHtml(input as any);
+                                t.ok(html.includes('Tujuan 1'));
+                    --------------^
+                                t.ok(html.includes('Pendahuluan'));
+                                t.ok(html.includes('Sikap'));
+                  ...
+                
+                not ok 2 - should be equal
+                  ---
+                  at:
+                    fileName: tests/services/renderService.test.ts
+                    lineNumber: 56
+                    columnNumber: 15
+                    typeName: Test
+                  stack: >
+                    Test.<anonymous> (tests/services/renderService.test.ts:56:15)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:27:11)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:26:7)
+                  
+                    Object.<anonymous> (tests/services/renderService.test.ts:11:15)
+                  
+                    Module.m._compile (node_modules/ts-node/dist/index.js:857:29)
+                    (node_modules/ts-node/src/index.ts:1618:23)
+                  
+                    require.extensions.<computed> (node_modules/ts-node/dist/index.js:859:16)
+                    (node_modules/ts-node/src/index.ts:1621:12)
+                  source: |2
+                                const html = renderModuleHtml(input as any);
+                                t.ok(html.includes('Tujuan 1'));
+                                t.ok(html.includes('Pendahuluan'));
+                    --------------^
+                                t.ok(html.includes('Sikap'));
+                            });
+                  ...
+                
+                not ok 3 - should be equal
+                  ---
+                  at:
+                    fileName: tests/services/renderService.test.ts
+                    lineNumber: 57
+                    columnNumber: 15
+                    typeName: Test
+                  stack: >
+                    Test.<anonymous> (tests/services/renderService.test.ts:57:15)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:27:11)
+                  
+                    Test.<anonymous> (tests/services/renderService.test.ts:26:7)
+                  
+                    Object.<anonymous> (tests/services/renderService.test.ts:11:15)
+                  
+                    Module.m._compile (node_modules/ts-node/dist/index.js:857:29)
+                    (node_modules/ts-node/src/index.ts:1618:23)
+                  
+                    require.extensions.<computed> (node_modules/ts-node/dist/index.js:859:16)
+                    (node_modules/ts-node/src/index.ts:1621:12)
+                  source: |2
+                                t.ok(html.includes('Tujuan 1'));
+                                t.ok(html.includes('Pendahuluan'));
+                                t.ok(html.includes('Sikap'));
+                    --------------^
+                            });
+                  ...
+                
+                1..3
+            not ok 1 - should render with all fields present # time=86.139ms
+              ---
+              at:
+                fileName: tests/services/renderService.test.ts
+                lineNumber: 27
+                columnNumber: 11
+                typeName: Test
+              source: |2
+              
+                    t.test('renderModuleHtml', async (t) => {
+                        t.test('should render with all fields present', async (t) => {
+                ----------^
+                            const input = {
+                                subjectName: 'IPA',
+              ...
+            
+            # Subtest: should render correctly when optional fields are missing
+                ok 1 - should be equal
+                ok 2 - should be equal
+                ok 3 - should be equal
+                1..3
+            ok 2 - should render correctly when optional fields are missing # time=4.979ms
+            
+            # Subtest: should render correctly with partial optional fields
+                ok 1 - should be equal
+                1..1
+            ok 3 - should render correctly with partial optional fields # time=1.728ms
+            
+            1..3
+        not ok 1 - renderModuleHtml # time=110.274ms
+          ---
+          at:
+            fileName: tests/services/renderService.test.ts
+            lineNumber: 26
+            columnNumber: 7
+            typeName: Test
+          source: |2
+                });
+          
+                t.test('renderModuleHtml', async (t) => {
+            ------^
+                    t.test('should render with all fields present', async (t) => {
+                        const input = {
+          ...
+        
+        # Subtest: computeHtmlSha256
+            ok 1 - should be equal
+            ok 2 - type is string
+            1..2
+        ok 2 - computeHtmlSha256 # time=4.059ms
+        
+        1..2
+    not ok 1 - Render Service # time=141.845ms
+      ---
+      at:
+        fileName: tests/services/renderService.test.ts
+        lineNumber: 11
+        columnNumber: 15
+        typeName: Object
+      source: >
+        tap.test('Render Service', async (t) => {
+            t.beforeEach(() => {
+                (fs as any).readFileSync = (pathStr: string, enc: string) => {
+        --------------^
+                    if (pathStr.includes('modul-ajar.html')) {
+                        return '<html>/* STYLES_PLACEHOLDER */<body>{{TITLE}} {{TEACHER_NAME}} {{SCHOOL_NAME}} {{ACTIVITY_SECTIONS}} {{ASSESSMENT_SECTION}}</body></html>';
+      ...
+    
+    1..1
+not ok 26 - tests/services/renderService.test.ts # time=2300.563ms
+  ---
+  stdio: inherit
+  cwd: /home/kangza/workspace/modulajar/apps/api-ts
+  externalID: tests/services/renderService.test.ts
+  command: /home/kangza/.nvm/versions/node/v24.11.1/bin/node
+  args:
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/typescript/dist/esm/import.mjs
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/mock/dist/esm/import.mjs
+    - --enable-source-maps
+    - --import=file:///home/kangza/workspace/modulajar/apps/api-ts/node_modules/@tapjs/processinfo/dist/esm/import.mjs
+    - -r
+    - ts-node/register
+    - /home/kangza/workspace/modulajar/apps/api-ts/tests/services/renderService.test.ts
+  jobId: 3
+  exitCode: 1
+  signal: null
+  ...
+
+# Subtest: tests/services/schemaValidator.test.ts
+    # Subtest: Schema Validator Service
+        # Subtest: validateDocumentModuleJson
+            # Subtest: should validate a correct document module json
+                ok 1 - should be equal
+                ok 2 - should be equal
+                1..2
+            ok 1 - should validate a correct document module json # time=15.548ms
+            
+            # Subtest: should fail validation on missing required fields
+                ok 1 - should be equal
+                ok 2 - should be equal
+                ok 3 - should be equal
+                1..3
+            ok 2 - should fail validation on missing required fields # time=1.344ms
+            
+            1..2
+        ok 1 - validateDocumentModuleJson # time=29.075ms
+        
+        # Subtest: validateArtifactMetadataJson
+            # Subtest: should validate a correct artifact metadata json
+                ok 1 - should be equal
+                1..1
+            ok 1 - should validate a correct artifact metadata json # time=4.15ms
+            
+            # Subtest: should fail on invalid types
+                ok 1 - should be equal
+                ok 2 - should be equal
+                1..2
+            ok 2 - should fail on invalid types # time=4.977ms
+            
+            1..2
+        ok 2 - validateArtifactMetadataJson # time=29.227ms
+        
+        1..2
+    ok 1 - Schema Validator Service # time=77.35ms
+    
+    1..1
+ok 27 - tests/services/schemaValidator.test.ts # time=2392.222ms
+
+# Subtest: tests/templates.test.ts
+    # Subtest: computeSimilarity
+        # Subtest: identical strings return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 1 - identical strings return 1.0 # time=25.847ms
+        
+        # Subtest: completely different strings return 0.0
+            ok 1 - should be equal
+            1..1
+        ok 2 - completely different strings return 0.0 # time=0.682ms
+        
+        # Subtest: partial overlap returns between 0 and 1
+            ok 1 - Score should be between 0 and 1, got 0.3333333333333333
+            1..1
+        ok 3 - partial overlap returns between 0 and 1 # time=1.992ms
+        
+        # Subtest: empty strings both return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 4 - empty strings both return 1.0 # time=3.672ms
+        
+        # Subtest: one empty string returns 0.0
+            ok 1 - should be equal
+            1..1
+        ok 5 - one empty string returns 0.0 # time=0.966ms
+        
+        1..5
+    ok 1 - computeSimilarity # time=62.871ms
+    
+    # Subtest: calculateScore
+        # Subtest: perfect scores return 1.0
+            ok 1 - should be equal
+            1..1
+        ok 1 - perfect scores return 1.0 # time=1.482ms
+        
+        # Subtest: zero scores return 0.0
+            ok 1 - should be equal
+            1..1
+        ok 2 - zero scores return 0.0 # time=14.188ms
+        
+        # Subtest: quality has most weight
+            ok 1 - Quality weight > usage weight
+            1..1
+        ok 3 - quality has most weight # time=0.55ms
+        
+        # Subtest: values are clamped
+            ok 1 - Score capped at 1.0
+            1..1
+        ok 4 - values are clamped # time=0.357ms
+        
+        1..4
+    ok 2 - calculateScore # time=44.924ms
+    
+    # Subtest: buildPreview
+        # Subtest: extracts fields correctly
+            ok 1 - has tujuan
+            ok 2 - has kegiatan
+            ok 3 - has assessment
+            1..3
+        ok 1 - extracts fields correctly # time=1.627ms
+        
+        # Subtest: truncates long fields to 200 chars
+            ok 1 - Tujuan truncated: 200
+            ok 2 - Kegiatan truncated: 200
+            ok 3 - Assessment truncated: 200
+            1..3
+        ok 2 - truncates long fields to 200 chars # time=0.733ms
+        
+        # Subtest: handles array tujuan_pembelajaran
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - handles array tujuan_pembelajaran # time=9.287ms
+        
+        # Subtest: handles empty/null input
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 4 - handles empty/null input # time=2.029ms
+        
+        # Subtest: handles string kegiatan
+            ok 1 - should be equal
+            1..1
+        ok 5 - handles string kegiatan # time=0.433ms
+        
+        # Subtest: handles string penilaian
+            ok 1 - should be equal
+            1..1
+        ok 6 - handles string penilaian # time=0.431ms
+        
+        1..6
+    ok 3 - buildPreview # time=34.945ms
+    
+    {"level":"info","time":"2026-03-11T07:43:22.937Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":"pecahan","workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    # Subtest: GET /templates/recommended
+        # Subtest: 200 — returns ranked templates
+            ok 1 - Expected 200, got 200: {"templates":[{"id":"tmpl-001","subject":"matematika","grade":4,"topic":"pecahan","score":77,"preview":{"tujuan_pembelajaran":"Siswa dapat membandingkan dua pecahan.","ringkasan_kegiatan":"Siswa melakukan eksplorasi dengan benda konkret.","assessment_summary":"Tes tertulis membandingkan pecahan.; Unjuk kerja.; Observasi selama diskusi."}},{"id":"tmpl-002","subject":"matematika","grade":4,"topic":"bilangan bulat","score":54,"preview":{"tujuan_pembelajaran":"Siswa memahami bilangan bulat.","ringkasan_kegiatan":"Latihan soal.","assessment_summary":"Quiz."}}]}
+            ok 2 - templates is array
+            ok 3 - has templates
+            ok 4 - max 3 templates
+            ok 5 - has id
+            ok 6 - has subject
+            ok 7 - grade is number
+            ok 8 - score is number
+            ok 9 - has preview
+            ok 10 - preview has tujuan
+            1..10
+        ok 1 - 200 — returns ranked templates # time=265.912ms
+        
+        # Subtest: 200 — empty dataset returns empty array
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 2 - 200 — empty dataset returns empty array # time=88.051ms
+        
+        # Subtest: 400 — missing subject
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 3 - 400 — missing subject # time=88.445ms
+        
+        # Subtest: 400 — missing grade
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 4 - 400 — missing grade # time=42.993ms
+        
+        # Subtest: 400 — invalid grade (0)
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 5 - 400 — invalid grade (0) # time=60.556ms
+        
+        # Subtest: 400 — invalid grade (13)
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 6 - 400 — invalid grade (13) # time=62.377ms
+        
+        # Subtest: 400 — grade is not a number
+            ok 1 - should be equal
+            1..1
+        ok 7 - 400 — grade is not a number # time=60.145ms
+        
+        # Subtest: module_json is never exposed in response
+            ok 1 - should be equal
+            ok 2 - module_json must not appear in response
+            1..2
+        ok 8 - module_json is never exposed in response # time=66.633ms
+        
+        # Subtest: 401 — no auth header
+            ok 1 - should be equal
+            1..1
+        ok 9 - 401 — no auth header # time=51.566ms
+        
+        # Subtest: 200 — topic is optional
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 10 - 200 — topic is optional # time=46.814ms
+        
+        # Subtest: templates are sorted by score descending
+            ok 1 - should be equal
+            ok 2 - Sorted by score desc
+            1..2
+        ok 11 - templates are sorted by score descending # time=35.75ms
+        
+        1..11
+    ok 4 - GET /templates/recommended # time=888.071ms
+    
+    # Subtest: GET /templates/recommended — invalid JSON in module_json
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 5 - GET /templates/recommended — invalid JSON in module_json # time=56.665ms
+    
+    # Subtest: Rate limiting
+        # Subtest: 429 after exceeding limit
+            ok 1 - Should be rate limited
+            ok 2 - should match pattern
+            1..2
+        ok 1 - 429 after exceeding limit # time=86.187ms
+        
+        1..1
+    ok 6 - Rate limiting # time=94.854ms
+    
+    # Subtest: GET /w/:workspaceId/templates
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 7 - GET /w/:workspaceId/templates # time=55.354ms
+    
+    # Subtest: POST /w/:workspaceId/templates
+        ok 1 - should be equal
+        ok 2 - should be equal
+        1..2
+    ok 8 - POST /w/:workspaceId/templates # time=52.469ms
+    
+    {"level":"info","time":"2026-03-11T07:43:23.037Z","service":"api-ts","event":"template_api_request","subject":"fisika","grade":10,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.422Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.529Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.570Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":"pecahan","workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.628Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.675Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.677Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-2","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.679Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-3","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.680Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-4","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.681Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-5","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.681Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-6","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.681Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-7","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.682Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-8","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.682Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-9","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.683Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-a","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.684Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-b","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.684Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-c","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.685Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-d","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.686Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-e","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.686Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-f","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.686Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-g","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.687Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-h","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.687Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-i","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.689Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-j","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.690Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-k","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.693Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-l","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.695Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-m","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.696Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-n","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.696Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-o","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.696Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-p","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.697Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-q","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.697Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-r","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.698Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-s","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.698Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-t","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.699Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-u","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.699Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-v","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.701Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-w","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.701Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-x","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.702Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-y","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.702Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-z","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.702Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-10","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.703Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-11","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.703Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-12","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.703Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-13","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.704Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-14","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.704Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-15","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.704Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-16","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.705Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-17","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.705Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-18","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.709Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-19","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.713Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1a","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.714Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1b","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.715Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1c","msg":"template_api_request"}
+    {"level":"info","time":"2026-03-11T07:43:23.717Z","service":"api-ts","event":"template_api_request","subject":"matematika","grade":4,"topic":null,"workspace_id":"ws_tmpl_001","trace_id":"req-1d","msg":"template_api_request"}
+    # Subtest: PUT /w/:workspaceId/templates/:id
+        ok 1 - should be equal
+        1..1
+    ok 9 - PUT /w/:workspaceId/templates/:id # time=51.884ms
+    
+    # Subtest: GET /w/:workspaceId/templates/default
+        ok 1 - should be equal
+        ok 2 - should be equal
+        ok 3 - should be equal
+        ok 4 - should be equivalent
+        1..4
+    ok 10 - GET /w/:workspaceId/templates/default # time=121.146ms
+    
+    # Subtest: POST /w/:workspaceId/templates/default
+        ok 1 - should be equal
+        1..1
+    ok 11 - POST /w/:workspaceId/templates/default # time=43.646ms
+    
+    1..11
+ok 28 - tests/templates.test.ts # time=5015.063ms
+
+# Subtest: tests/tenant-isolation.test.ts
+    # Subtest: Cross-tenant access: user_1 cannot access ws_2
+        ok 1 - Should reject cross-tenant access
+        ok 2 - should be equal
+        1..2
+    ok 1 - Cross-tenant access: user_1 cannot access ws_2 # time=276.17ms
+    
+    # Subtest: Cross-tenant access: user_2 cannot access ws_1
+        ok 1 - Should reject cross-tenant access
+        1..1
+    ok 2 - Cross-tenant access: user_2 cannot access ws_1 # time=78.102ms
+    
+    # Subtest: Missing workspace context: request without workspaceId path param
+        ok 1 - Should reject when workspace context missing
+        ok 2 - should be equal
+        1..2
+    ok 3 - Missing workspace context: request without workspaceId path param # time=9.401ms
+    
+    # Subtest: Unauthenticated request: no token
+        ok 1 - Should reject unauthenticated request
+        1..1
+    ok 4 - Unauthenticated request: no token # time=51.477ms
+    
+    # Subtest: Unauthenticated request: invalid token
+        ok 1 - Should reject invalid token
+        1..1
+    ok 5 - Unauthenticated request: invalid token # time=35.522ms
+    
+    # Subtest: Valid access: user_1 can access ws_1
+        ok 1 - Should allow valid workspace member
+        ok 2 - should be equal
+        ok 3 - should be equal
+        1..3
+    ok 6 - Valid access: user_1 can access ws_1 # time=66.622ms
+    
+    # Subtest: Valid access: user_2 can access ws_2
+        ok 1 - Should allow valid workspace member
+        ok 2 - should be equal
+        1..2
+    ok 7 - Valid access: user_2 can access ws_2 # time=48.361ms
+    
+    # Subtest: Document list is workspace-scoped
+        ok 1 - Should return documents
+        ok 2 - Should have documents array
+        ok 3 - Should reject cross-tenant document list
+        1..3
+    ok 8 - Document list is workspace-scoped # time=58.855ms
+    
+    1..8
+ok 29 - tests/tenant-isolation.test.ts # time=3661.536ms
+
+# Subtest: tests/usage-summary.test.ts
+    # Subtest: GET /w/:workspaceId/usage-summary
+        # Subtest: should return all zeros for an empty workspace
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            ok 3 - should be equal
+            ok 4 - should be equivalent
+            1..4
+        ok 1 - should return all zeros for an empty workspace # time=41.703ms
+        
+        # Subtest: should calculate ledger aggregation correctly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - should be equal
+            ok 7 - should be equal
+            1..7
+        ok 2 - should calculate ledger aggregation correctly # time=3.052ms
+        
+        # Subtest: should reject cross-workspace access with 403 Forbidden
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 3 - should reject cross-workspace access with 403 Forbidden # time=5.848ms
+        
+        1..3
+    ok 1 - GET /w/:workspaceId/usage-summary # time=384.208ms
+    
+    1..1
+ok 30 - tests/usage-summary.test.ts # time=3625.798ms
+
+# Subtest: tests/utils.test.ts
+    # Subtest: RateLimiter
+        # Subtest: Basic Limiting
+            ok 1 - First request allowed
+            ok 2 - Second request allowed
+            ok 3 - Third request blocked
+            ok 4 - Other IP allowed
+            1..4
+        ok 1 - Basic Limiting # time=13.086ms
+        
+        # Subtest: Window Reset
+            ok 1 - Req 1 allowed
+            ok 2 - Req 2 blocked
+            ok 3 - Req 3 allowed after window reset
+            1..3
+        ok 2 - Window Reset # time=1.175ms
+        
+        # Subtest: Cleanup
+            ok 1 - Stale record removed
+            ok 2 - Fresh record kept
+            1..2
+        ok 3 - Cleanup # time=2.69ms
+        
+        1..3
+    ok 1 - RateLimiter # time=55.254ms
+    
+    # Subtest: Crypto Utilities
+        # Subtest: constantTimeCompare
+            ok 1 - Equal strings match
+            ok 2 - Different strings do not match
+            ok 3 - Different lengths do not match
+            ok 4 - Different lengths do not match (2)
+            1..4
+        ok 1 - constantTimeCompare # time=1.858ms
+        
+        1..1
+    ok 2 - Crypto Utilities # time=3.821ms
+    
+    1..2
+ok 31 - tests/utils.test.ts # time=2367.833ms
+
+# Subtest: tests/verify_service_security.test.ts
+    {"level":"info","time":"2026-03-11T07:43:23.956Z","service":"api-ts","public_id":"DOC-VALID-12345678","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    # Subtest: SMOKE PHASE 4: Verify Service Validation
+        # Subtest: GET /:publicId — success returns expected fields only
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - should be equal
+            ok 7 - Should NOT expose workspace_id
+            ok 8 - Should NOT expose file_path
+            ok 9 - Should NOT expose full metadata
+            1..9
+        ok 1 - GET /:publicId — success returns expected fields only # time=169.883ms
+        
+        # Subtest: GET /:publicId — FAIL 404 for invalid format (too short)
+            ok 1 - should be equal
+            1..1
+        ok 2 - GET /:publicId — FAIL 404 for invalid format (too short) # time=10.649ms
+        
+        # Subtest: GET /:publicId — FAIL 404 for non-done document
+            ok 1 - should be equal
+            1..1
+        ok 3 - GET /:publicId — FAIL 404 for non-done document # time=7.989ms
+        
+        # Subtest: GET /:publicId — Rate Limit enforcement
+            ok 1 - should be equal
+            1..1
+        ok 4 - GET /:publicId — Rate Limit enforcement # time=6.984ms
+        
+        1..4
+    ok 1 - SMOKE PHASE 4: Verify Service Validation # time=229.546ms
+    
+    {"level":"info","time":"2026-03-11T07:43:23.998Z","service":"api-ts","public_id":"DOC-RUNNING-12345678","status":"not_found","msg":"Verify lookup failed"}
+    {"level":"info","time":"2026-03-11T07:43:24.007Z","service":"api-ts","public_id":"DOC-VALID-LIMIT","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    1..1
+ok 32 - tests/verify_service_security.test.ts # time=2781.859ms
+
+# Subtest: tests/verify-school.test.ts
+    # Subtest: POST /w/:workspaceId/verify-school
+        # Subtest: should return 400 for missing npsn
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 1 - should return 400 for missing npsn # time=416.824ms
+        
+        # Subtest: should return 400 for invalid npsn format
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 2 - should return 400 for invalid npsn format # time=88.335ms
+        
+        # Subtest: should return 404 for non-existent npsn
+            ok 1 - should be equal
+            ok 2 - should match pattern
+            1..2
+        ok 3 - should return 404 for non-existent npsn # time=71.491ms
+        
+        # Subtest: should return 200 and run update queries for valid npsn
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - Should execute upsert query for workspace_settings
+            ok 7 - should be equivalent
+            ok 8 - Should execute update query for workspaces
+            ok 9 - should be equivalent
+            1..9
+        ok 4 - should return 200 and run update queries for valid npsn # time=50.368ms
+        
+        1..4
+    ok 1 - POST /w/:workspaceId/verify-school # time=659.316ms
+    
+    1..1
+ok 33 - tests/verify-school.test.ts # time=3794.427ms
+
+# Subtest: tests/verify.test.ts
+    {"level":"info","time":"2026-03-11T07:43:25.968Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":1,"msg":"Verify lookup success"}
+    # Subtest: Verification Service Hardening (PR-025)
+        # Subtest: Success: Verify Valid Done Document
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equivalent
+            ok 6 - Should not leak workspace_id
+            ok 7 - Should not leak package_id
+            ok 8 - Should not leak file_path
+            ok 9 - should be equal
+            1..9
+        ok 1 - Success: Verify Valid Done Document # time=149.235ms
+        
+        # Subtest: Fail: Invalid Format (Anti-Enumeration)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 2 - Fail: Invalid Format (Anti-Enumeration) # time=17.066ms
+        
+        # Subtest: Fail: Document Not Done or Not Found
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - Fail: Document Not Done or Not Found # time=5.769ms
+        
+        # Subtest: Fail: Rate Limit Exceeded
+            ok 1 - Should hit rate limit 429
+            1..1
+        ok 4 - Fail: Rate Limit Exceeded # time=34.406ms
+        
+        1..4
+    ok 1 - Verification Service Hardening (PR-025) # time=247.13ms
+    
+    {"level":"info","time":"2026-03-11T07:43:26.023Z","service":"api-ts","public_id":"DOC-PENDING-5678","status":"not_found","msg":"Verify lookup failed"}
+    {"level":"info","time":"2026-03-11T07:43:26.033Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.034Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.034Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.035Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.036Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.036Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.037Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.037Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.037Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.038Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":1,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.038Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.038Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.039Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.039Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.039Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.040Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.040Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.040Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.041Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.041Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.041Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.042Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.042Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.042Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.043Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.043Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.044Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.044Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.044Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.045Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.045Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.045Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.046Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.046Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.047Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.047Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.048Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.048Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.048Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.049Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.049Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.050Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.050Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.051Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.053Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.053Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.053Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.054Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.055Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.055Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.055Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.055Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.056Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.056Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.056Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.057Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.057Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.057Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.058Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"info","time":"2026-03-11T07:43:26.058Z","service":"api-ts","public_id":"DOC-VALID-1234","status":"found","duration_ms":0,"msg":"Verify lookup success"}
+    {"level":"warn","time":"2026-03-11T07:43:26.058Z","service":"api-ts","public_id":"DOC-VALID-1234","ip":"127.0.0.1","rate_limit_hit":true,"msg":"Rate limit exceeded"}
+    1..1
+ok 34 - tests/verify.test.ts # time=2762.758ms
+
+# Subtest: tests/wallet_routes.test.ts
+    # Subtest: Wallet Routes
+        # Subtest: GET /w/:workspaceId/wallet/summary - returns proper usage counts
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - GET /w/:workspaceId/wallet/summary - returns proper usage counts # time=239.06ms
+        
+        # Subtest: GET /w/:workspaceId/wallet/transactions - maps ledger rows cleanly
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - should be equal
+            1..6
+        ok 2 - GET /w/:workspaceId/wallet/transactions - maps ledger rows cleanly # time=53.991ms
+        
+        # Subtest: GET /w/:workspaceId/wallet/summary - handles empty/null rows
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 3 - GET /w/:workspaceId/wallet/summary - handles empty/null rows # time=48.627ms
+        
+        # Subtest: GET /w/:workspaceId/wallet/transactions - handles null metadata and fallback types
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            ok 5 - should be equal
+            ok 6 - should be equal
+            1..6
+        ok 4 - GET /w/:workspaceId/wallet/transactions - handles null metadata and fallback types # time=37.142ms
+        
+        1..4
+    ok 1 - Wallet Routes # time=415.469ms
+    
+    1..1
+ok 35 - tests/wallet_routes.test.ts # time=3531.46ms
+
+# Subtest: tests/wallet.test.ts
+    # Subtest: Wallet Service — Append-Only Ledger (PR-019)
+        # Subtest: Test 1: Double debit prevented (idempotent)
+            ok 1 - First debit should insert
+            ok 2 - First debit should return ledgerId
+            ok 3 - Second debit should be ignored
+            ok 4 - Second debit ledgerId should be null
+            ok 5 - Balance should be 100 - 10 = 90 (not 80)
+            1..5
+        ok 1 - Test 1: Double debit prevented (idempotent) # time=15.059ms
+        
+        # Subtest: Test 2: Double credit prevented (idempotent)
+            ok 1 - First credit should insert
+            ok 2 - First credit should return ledgerId
+            ok 3 - Second credit should be ignored
+            ok 4 - Second credit ledgerId should be null
+            ok 5 - Balance should be 50 (not 100)
+            1..5
+        ok 2 - Test 2: Double credit prevented (idempotent) # time=7.841ms
+        
+        # Subtest: Test 3: Balance correct after 10 credits + 3 debits
+            ok 1 - Balance after 10 credits × 10 = 100
+            ok 2 - Balance = 100 - 15 = 85
+            1..2
+        ok 3 - Test 3: Balance correct after 10 credits + 3 debits # time=5.083ms
+        
+        # Subtest: Test 4: Insufficient balance rejected
+            ok 1 - Should throw Insufficient balance
+            ok 2 - Balance should remain 3
+            1..2
+        ok 4 - Test 4: Insufficient balance rejected # time=1.355ms
+        
+        # Subtest: Test 5: Zero balance returns 0
+            ok 1 - Empty workspace should have 0 balance
+            1..1
+        ok 5 - Test 5: Zero balance returns 0 # time=1.055ms
+        
+        # Subtest: Test 6: Multi-tenant isolation
+            ok 1 - ws-1 balance correct
+            ok 2 - ws-2 balance correct
+            ok 3 - ws-1 balance after debit = 50
+            ok 4 - ws-2 balance unchanged
+            1..4
+        ok 6 - Test 6: Multi-tenant isolation # time=2.526ms
+        
+        # Subtest: Test 7: Invalid amounts rejected
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            1..3
+        ok 7 - Test 7: Invalid amounts rejected # time=1.245ms
+        
+        # Subtest: Test 8: Handing metadata correctly
+            ok 1 - should be equal
+            1..1
+        ok 8 - Test 8: Handing metadata correctly # time=1.021ms
+        
+        1..8
+    ok 1 - Wallet Service — Append-Only Ledger (PR-019) # time=76.284ms
+    
+    1..1
+ok 36 - tests/wallet.test.ts # time=2896.435ms
+
+# Subtest: tests/wizard_fix_verification.test.ts
+    {"level":"info","time":"2026-03-11T07:43:27.908Z","service":"api-ts","msg":"Wizard Job enqueued","trace_id":"req-1","job_id":"01KKDXKH53G4GJ1H91CZS9YTXN","workspace_id":"ws_smoke_001"}
+    # Subtest: Wizard Fix Verification
+        # Subtest: POST /generate — wizard mode with empty topic (should succeed with subject fallback)
+            ok 1 - Should return 201 Created
+            ok 2 - Should return a job_id
+            1..2
+        ok 1 - POST /generate — wizard mode with empty topic (should succeed with subject fallback) # time=29.329ms
+        
+        # Subtest: POST /generate — template mode with empty topic (should still fail)
+            ok 1 - Should return 400 Bad Request if topic is missing in non-wizard mode
+            1..1
+        ok 2 - POST /generate — template mode with empty topic (should still fail) # time=2.64ms
+        
+        1..2
+    ok 1 - Wizard Fix Verification # time=146.792ms
+    
+    1..1
+ok 37 - tests/wizard_fix_verification.test.ts # time=3741.829ms
+
+# Subtest: tests/workspace.test.ts
+    # Subtest: GET /w/:workspaceId/ping
+        # Subtest: returns ok for authorised workspace member
+            ok 1 - Expected 200, got 200: {"status":"ok","workspaceId":"ws-test-001","userId":"user_1"}
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - userId is present
+            1..4
+        ok 1 - returns ok for authorised workspace member # time=186.65ms
+        
+        # Subtest: returns 401 for unauthenticated request
+            ok 1 - should be equal
+            1..1
+        ok 2 - returns 401 for unauthenticated request # time=44.289ms
+        
+        # Subtest: returns 403 for wrong workspace
+            ok 1 - should be equal
+            1..1
+        ok 3 - returns 403 for wrong workspace # time=19.179ms
+        
+        1..3
+    ok 1 - GET /w/:workspaceId/ping # time=270.023ms
+    
+    # Subtest: GET /w/:workspaceId/documents
+        # Subtest: returns empty list when workspace has no documents
+            ok 1 - should be equal
+            ok 2 - should be equivalent
+            1..2
+        ok 1 - returns empty list when workspace has no documents # time=23.162ms
+        
+        # Subtest: maps DB rows to document objects with correct jenjang
+            ok 1 - should be equal
+            ok 2 - 4 documents returned
+            ok 3 - kelas 4 → SD
+            ok 4 - kelas 7 → SMP
+            ok 5 - kelas 10 → SMA/SMK
+            ok 6 - kelas 13 → Kampus
+            ok 7 - should be equal
+            ok 8 - should be equal
+            ok 9 - should be equal
+            1..9
+        ok 2 - maps DB rows to document objects with correct jenjang # time=24.869ms
+        
+        1..2
+    ok 2 - GET /w/:workspaceId/documents # time=50.315ms
+    
+    # Subtest: Workspace Identity (PR-033)
+        # Subtest: GET /w/:wid/workspace returns defaults (personal)
+            ok 1 - should be equal
+            ok 2 - should be equal
+            ok 3 - should be equal
+            ok 4 - should be equal
+            1..4
+        ok 1 - GET /w/:wid/workspace returns defaults (personal) # time=29.18ms
+        
+        # Subtest: GET /w/:wid/workspace returns 404 if not found
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 2 - GET /w/:wid/workspace returns 404 if not found # time=19.264ms
+        
+        # Subtest: PATCH /w/:wid/workspace returns 400 with no fields
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 3 - PATCH /w/:wid/workspace returns 400 with no fields # time=27.182ms
+        
+        # Subtest: PATCH school_name only -> 200
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 4 - PATCH school_name only -> 200 # time=22.478ms
+        
+        # Subtest: PATCH valid npsn -> 200
+            ok 1 - should be equal
+            1..1
+        ok 5 - PATCH valid npsn -> 200 # time=24.073ms
+        
+        # Subtest: PATCH duplicate npsn -> 409
+            ok 1 - should be equal
+            ok 2 - should be equal
+            1..2
+        ok 6 - PATCH duplicate npsn -> 409 # time=23.477ms
+        
+        # Subtest: PATCH invalid npsn (too short) -> 400
+            ok 1 - should be equal
+            1..1
+        ok 7 - PATCH invalid npsn (too short) -> 400 # time=20.113ms
+        
+        # Subtest: PATCH invalid logo_url (not https) -> 400
+            ok 1 - should be equal
+            1..1
+        ok 8 - PATCH invalid logo_url (not https) -> 400 # time=33.471ms
+        
+        # Subtest: Cross-workspace update attempt -> 403
+            ok 1 - should be equal
+            1..1
+        ok 9 - Cross-workspace update attempt -> 403 # time=20.4ms
+        
+        1..9
+    ok 3 - Workspace Identity (PR-033) # time=229.75ms
+    
+    1..3
+ok 38 - tests/workspace.test.ts # time=3613.726ms
+
+---------------------|---------|----------|---------|---------|-------------------------------------
+File                 | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                   
+---------------------|---------|----------|---------|---------|-------------------------------------
+All files            |   91.84 |    80.02 |   89.13 |   91.84 |                                     
+ lib                 |   97.57 |    87.09 |   84.61 |   97.57 |                                     
+  wallet.ts          |   95.52 |    82.97 |      75 |   95.52 | 20-21,26,31-33                      
+ plugins             |   98.16 |    86.66 |     100 |   98.16 |                                     
+  mock_auth.ts       |     100 |    91.66 |     100 |     100 | 3                                   
+  schemas.ts         |   92.85 |       50 |     100 |   92.85 | 24-25                               
+  workspace-guard.ts |     100 |    92.85 |     100 |     100 | 30                                  
+ routes              |   90.04 |    77.77 |   85.45 |   90.04 |                                     
+  auth.ts            |    99.3 |    83.33 |     100 |    99.3 | 138                                 
+  billing.ts         |   89.54 |    76.92 |   77.77 |   89.54 | ...,187-189,212-214,227-228,244-250 
+  documents.ts       |   95.91 |     90.9 |     100 |   95.91 | 12-13                               
+  generate.ts        |   91.24 |    73.91 |   77.77 |   91.24 | ...,126-129,227-235,241-242,249-251 
+  jobs.ts            |   88.57 |    85.18 |     100 |   88.57 | 35-38,48-51                         
+  letterhead.ts      |   93.18 |    71.42 |     100 |   93.18 | 31-32,75-81,113-115                 
+  modules.ts         |   92.21 |    77.41 |      75 |   92.21 | ...,392-393,400-405,535-539,545-548 
+  onboarding.ts      |   95.45 |       88 |   71.42 |   95.45 | 10-11,16,21-23                      
+  profile.ts         |     100 |       80 |     100 |     100 | 37,39                               
+  referral.ts        |     100 |    88.88 |     100 |     100 | 16                                  
+  school.ts          |   95.95 |    78.26 |     100 |   95.95 | 46-47,50-51                         
+  templates.ts       |   88.14 |    55.81 |     100 |   88.14 | ...,275-276,283-284,294-296,322-324 
+  wallet.ts          |     100 |     87.5 |     100 |     100 | 36-43                               
+  workspace.ts       |   68.45 |       75 |     100 |   68.45 | 214-313                             
+ services            |   97.61 |    83.33 |     100 |   97.61 |                                     
+  renderService.ts   |     100 |    93.75 |     100 |     100 | 3                                   
+  schemaValidator.ts |   86.84 |    88.88 |     100 |   86.84 | 21-25                               
+  templateService.ts |     100 |    78.72 |     100 |     100 | 26,43-45,54,84-90                   
+ utils               |     100 |    90.47 |     100 |     100 |                                     
+  logger.ts          |     100 |    66.66 |     100 |     100 | 3                                   
+  metrics.ts         |     100 |       50 |     100 |     100 | 3                                   
+---------------------|---------|----------|---------|---------|-------------------------------------
+# { total: 583, pass: 579, fail: 4 }
+# time=25277.82ms

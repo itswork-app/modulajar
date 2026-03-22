@@ -1,18 +1,41 @@
 package worker
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/santhosh-tekuri/jsonschema/v5"
+
+	"modulajar/apps/core-go/adapters/ai"
+	"modulajar/apps/core-go/adapters/ai/prompts"
+	"modulajar/apps/core-go/curriculum"
+	"modulajar/apps/core-go/curriculum/dataset"
+	"modulajar/apps/core-go/curriculum/qeval"
+	"modulajar/apps/core-go/curriculum/ranking"
+	"modulajar/apps/core-go/db"
 	"modulajar/apps/core-go/docgraph"
+	"modulajar/apps/core-go/gcs"
+	"modulajar/apps/core-go/metrics"
 	"modulajar/apps/core-go/packloader"
 	"modulajar/apps/core-go/planner"
+	"modulajar/apps/core-go/render"
 	"modulajar/apps/core-go/validator"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
-// TaskPayload is the Cloud Task payload for a generate job.
+// TaskPayload is the internal payload used by ExecuteJob.
 type TaskPayload struct {
 	JobID       string `json:"job_id"`
 	PackageID   string `json:"package_id"`
@@ -21,40 +44,67 @@ type TaskPayload struct {
 	Semester    string `json:"semester"`
 	Kelas       string `json:"kelas"`
 	TahunAjaran string `json:"tahun_ajaran"`
+	TeacherName string `json:"teacher_name"`
+	SchoolName  string `json:"school_name"`
+	Jenjang     string `json:"jenjang"` // Explicit Jenjang!
+	PID         string `json:"pid"`
+	TraceID     string `json:"trace_id"`
+
+	// Letterhead Parameters (optional)
+	LetterheadLine1   string `json:"letterhead_line1,omitempty"`
+	LetterheadLine2   string `json:"letterhead_line2,omitempty"`
+	LetterheadLine3   string `json:"letterhead_line3,omitempty"`
+	LetterheadLine4   string `json:"letterhead_line4,omitempty"`
+	LetterheadContact string `json:"letterhead_contact,omitempty"`
+	LogoFilePath      string `json:"logo_file_path,omitempty"`
+
+	// Smart Templates Layout Definition
+	LayoutDefinition map[string]interface{} `json:"layout_definition,omitempty"`
 }
 
-// StatusUpdate represents a status change to be applied by the caller.
-type StatusUpdate struct {
-	Table  string `json:"table"` // "packages" or "generation_jobs"
-	ID     string `json:"id"`
-	Status string `json:"status"`
+// RenderedDocument holds the composed HTML for one document (subject).
+type RenderedDocument struct {
+	DocumentID   string `json:"document_id"`
+	DID          string `json:"did"`
+	SubjectCode  string `json:"subject_code"`
+	HTML         string `json:"html"`
+	FilePath     string `json:"file_path"`          // "html://{did}/v1" or "gcs://bucket/path.pdf"
+	PDFPath      string `json:"pdf_path,omitempty"` // temp local PDF path (cleared after upload)
+	PDFSizeBytes int64  `json:"pdf_size_bytes,omitempty"`
+	PDFHash      string `json:"pdf_hash,omitempty"` // SHA256 of generated PDF
 }
 
 // WorkerResult is the outcome of a worker execution.
 type WorkerResult struct {
-	JobID         string                      `json:"job_id"`
-	PackageID     string                      `json:"package_id"`
-	Status        string                      `json:"status"` // "completed" or "failed"
-	PlannerResult *planner.PlannerResult      `json:"planner_result,omitempty"`
-	ValidationOK  bool                        `json:"validation_ok"`
-	Errors        []validator.ValidationError `json:"errors,omitempty"`
-	FailureReason string                      `json:"failure_reason,omitempty"`
-	StatusUpdates []StatusUpdate              `json:"status_updates"`
-	DocGraph      *docgraph.DocGraphResult    `json:"doc_graph,omitempty"`
+	JobID             string                      `json:"job_id"`
+	PackageID         string                      `json:"package_id"`
+	Status            string                      `json:"status"` // "done" or "failed"
+	PlannerResult     *planner.PlannerResult      `json:"planner_result,omitempty"`
+	ValidationOK      bool                        `json:"validation_ok"`
+	Errors            []validator.ValidationError `json:"errors,omitempty"`
+	FailureReason     string                      `json:"failure_reason,omitempty"`
+	DocGraph          *docgraph.DocGraphResult    `json:"doc_graph,omitempty"`
+	RenderedDocuments []RenderedDocument          `json:"rendered_documents,omitempty"`
 }
 
-// ExecuteJob runs the planner + validator + doc graph pipeline.
-// Pure function, no DB side-effects. Safe to retry.
-func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
+// Worker holds dependencies for job execution.
+type Worker struct {
+	Deps WorkerDeps
+}
+
+// NewWorker creates a new Worker instance with injected dependencies.
+func NewWorker(deps WorkerDeps) *Worker {
+	return &Worker{
+		Deps: deps,
+	}
+}
+
+// ExecuteJob runs the planner + validator + doc graph + HTML composer pipeline.
+// Invariant: Job is marked done ONLY if PDF generation and Upload are successful.
+func (w *Worker) ExecuteJob(ctx context.Context, payload TaskPayload, logger *slog.Logger) (result *WorkerResult, err error) {
 	didSecret := os.Getenv("DID_SECRET")
 	if didSecret == "" {
 		didSecret = "modulajar-did-dev-secret"
-	}
-
-	// Start: package -> generating, job -> running
-	startUpdates := []StatusUpdate{
-		{Table: "packages", ID: payload.PackageID, Status: "generating"},
-		{Table: "generation_jobs", ID: payload.JobID, Status: "running"},
 	}
 
 	failResult := func(reason string) *WorkerResult {
@@ -63,16 +113,24 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 			PackageID:     payload.PackageID,
 			Status:        "failed",
 			FailureReason: reason,
-			StatusUpdates: append(startUpdates,
-				StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "failed"},
-				StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "failed"},
-			),
 		}
 	}
+
+	// PR-A5: Start generation duration timer
+	startGen := time.Now()
+	defer func() {
+		duration := time.Since(startGen).Seconds()
+		resultStatus := db.StatusDone
+		if result != nil && result.Status == "failed" {
+			resultStatus = db.StatusFailed
+		}
+		metrics.GenerationDurationSeconds.WithLabelValues(resultStatus).Observe(duration)
+	}()
 
 	// 1. Load pack
 	pack, err := packloader.LoadPack(payload.PackPath)
 	if err != nil {
+		logger.Error("failed to load pack", "path", payload.PackPath, "error", err)
 		return failResult(fmt.Sprintf("failed to load pack: %v", err)), nil
 	}
 
@@ -80,13 +138,13 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 	config := planner.DefaultConfig()
 	config.Semester = payload.Semester
 
-	planResult, err := planner.Plan(planner.PlannerInput{Pack: pack, Config: config})
+	planResult, err := w.Deps.Planner.Plan(planner.PlannerInput{Pack: pack, Config: config})
 	if err != nil {
 		return failResult(fmt.Sprintf("planner failed: %v", err)), nil
 	}
 
 	// 3. Run validator
-	report, err := validator.Validate(validator.ValidatorInput{Pack: pack, Result: planResult})
+	report, err := w.Deps.Validator.Validate(validator.ValidatorInput{Pack: pack, Result: planResult})
 	if err != nil {
 		return failResult(fmt.Sprintf("validator error: %v", err)), nil
 	}
@@ -98,7 +156,8 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		return r, nil
 	}
 
-	// 4. Build document graph
+	// 4. Build Document Graph
+	// Note: DocGraph logic is currently direct.
 	graphResult, err := docgraph.BuildDocGraph(docgraph.DocGraphInput{
 		WorkspaceID: payload.WorkspaceID,
 		PackageID:   payload.PackageID,
@@ -112,53 +171,745 @@ func ExecuteJob(payload TaskPayload) (*WorkerResult, error) {
 		return failResult(fmt.Sprintf("doc graph failed: %v", err)), nil
 	}
 
-	// 5. Success
+	// 5. Check Idempotency (Skip if all artifacts exist)
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	skipIdempotency := os.Getenv("SKIP_IDEMPOTENCY") == "true"
+	if w.Deps.Storage != nil && gcsBucket != "" && !skipIdempotency {
+		allExist := true
+		for _, doc := range graphResult.Documents {
+			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, doc.PublicID, 1)
+			exists, _ := w.Deps.Storage.Exists(ctx, objectPath)
+			if !exists {
+				allExist = false
+				break
+			}
+		}
+
+		if allExist {
+			logger.Info("Idempotency check passed (all artifacts exist). Skipping generation.", "job_id", payload.JobID)
+
+			// Persist documents as ready
+			for _, doc := range graphResult.Documents {
+				dbDoc := db.Document{
+					ID:          doc.ID,
+					WorkspaceID: doc.WorkspaceID,
+					PackageID:   doc.PackageID,
+					PublicID:    doc.PublicID,
+					SubjectCode: doc.SubjectCode,
+					Version:     doc.Version,
+					Status:      "ready",
+					Metadata:    map[string]interface{}{},
+				}
+				_ = w.Deps.JobStore.SaveDocument(ctx, dbDoc)
+				_ = w.Deps.JobStore.UpdateDocumentStatus(ctx, doc.WorkspaceID, doc.PublicID, "ready")
+			}
+
+			// Return success, handler will mark job done.
+			return &WorkerResult{
+				JobID:         payload.JobID,
+				PackageID:     payload.PackageID,
+				Status:        "done",
+				PlannerResult: planResult,
+				ValidationOK:  true,
+				DocGraph:      graphResult,
+			}, nil
+		}
+	}
+
+	// 6. AI INTEGRATION
+	var aiReceipt map[string]interface{}
+	var resultMerdeka *curriculum.ModulAjarMerdeka
+	var resultLegacy *curriculum.Curriculum
+
+	if w.Deps.AI != nil {
+		// PR-060: Determine subject and if we have a SD4 template
+		subjectCode := "unknown"
+		if len(planResult.SemesterPlan.SubjectPlans) > 0 {
+			subjectCode = planResult.SemesterPlan.SubjectPlans[0].SubjectCode
+		}
+		subjectForTemplate := subjectName(pack, subjectCode)
+
+		// Choose Schema Template
+		var templateJSON []byte
+		var useMerdekaTemplate bool
+
+		if curriculum.HasTemplateMerdeka(subjectCode) {
+			tmplData, err := curriculum.LoadTemplateMerdeka(subjectCode)
+			if err == nil {
+				templateJSON = tmplData
+				useMerdekaTemplate = true
+			}
+		}
+
+		var rankedTemplates []ranking.RankedTemplate
+		var templateExamples []string
+		{
+			timer := prometheus.NewTimer(metrics.TemplateRankLatencyMs)
+			metrics.TemplateRankRequestsTotal.Inc()
+
+			candidates, err := ranking.GetTemplateCandidates(ctx, subjectForTemplate, 4) // SD4 is grade 4
+			if err != nil {
+				logger.Warn("failed to fetch ranking candidates", "error", err)
+			} else {
+				rankedTemplates = ranking.SelectTopTemplates(candidates, subjectForTemplate)
+				for _, rt := range rankedTemplates {
+					templateExamples = append(templateExamples, string(rt.Candidate.ModuleJSON))
+				}
+			}
+			timer.ObserveDuration()
+			metrics.TemplateSelectedTotal.WithLabelValues(fmt.Sprintf("%d", len(templateExamples))).Inc()
+
+			if len(rankedTemplates) > 0 {
+				ids := make([]string, len(rankedTemplates))
+				for i, rt := range rankedTemplates {
+					ids[i] = rt.Candidate.ID.String()
+				}
+				logger.Info("template_rank_selected",
+					"subject", subjectForTemplate,
+					"grade", 4,
+					"topic", subjectForTemplate,
+					"templates", ids)
+			}
+		}
+
+		var resp *ai.GenerateResponse
+		var aiErr error
+		var qualityResult qeval.QualityResult
+
+		// PR-061: Consolidated AI generation with quality gate and retry
+		const maxAttempts = 2
+		var lastErr error
+
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			if attempt > 0 && lastErr != nil {
+				logger.Warn("Retrying AI generation due to quality/parsing failure", "attempt", attempt, "last_error", lastErr)
+				metrics.QualityRetryTotal.Inc()
+			}
+
+			var schemaPrompt string
+			if useMerdekaTemplate {
+				schemaPrompt = prompts.BuildFullPrompt(
+					payload.SchoolName,
+					subjectForTemplate,
+					payload.Jenjang,
+					payload.Kelas,
+					payload.Semester,
+					subjectForTemplate, // topic = subject for now
+					string(templateJSON),
+					templateExamples,
+				)
+			} else { // Fallback prompt
+				schemaPrompt = fmt.Sprintf(`You are a curriculum expert. Create a "Modul Ajar" for:
+Subject: %s
+Jenjang: %s
+Class: %s
+Semester: %s
+Teacher: %s
+School: %s
+
+STRICT RULE: Output must be valid JSON matching this schema:
+{
+  "meta": {
+    "jenjang": "%s",
+    "kelas": "string",
+    "mapel": "string",
+    "semester": "1|2",
+    "tahun_ajaran": "2025/2026"
+  },
+  "identitas": {
+    "sekolah": "string",
+    "guru": "string",
+    "alokasi_waktu": "2x35 menit"
+  },
+  "tujuan_pembelajaran": ["string"],
+  "materi_inti": ["string"],
+  "langkah_pembelajaran": {
+    "pendahuluan": ["string"],
+    "inti": ["string"],
+    "penutup": ["string"]
+  },
+  "asesmen": {
+    "diagnostik": ["string"],
+    "formatif": ["string"],
+    "sumatif": ["string"]
+  },
+  "diferensiasi": {
+    "konten": ["string"],
+    "proses": ["string"],
+    "produk": ["string"]
+  },
+  "profil_pancasila": ["string"],
+  "lampiran": {
+    "media": ["string"],
+    "sumber_belajar": ["string"]
+  }
+}
+No markdown formatting. Pure JSON.`,
+					subjectForTemplate, payload.Jenjang, payload.Kelas, payload.Semester, payload.TeacherName, payload.SchoolName, payload.Jenjang)
+			}
+
+			req := ai.GenerateRequest{Prompt: schemaPrompt}
+
+			// PR-A5: Observe AI Request Duration
+			aiStart := time.Now()
+			resp, aiErr = w.Deps.AI.Generate(ctx, req)
+			metrics.AiRequestDurationSeconds.Observe(time.Since(aiStart).Seconds())
+
+			if aiErr != nil {
+				logger.Warn("AI protocol error", "attempt", attempt, "error", aiErr)
+				lastErr = fmt.Errorf("AI protocol error: %v", aiErr)
+				continue
+			}
+
+			// 2. Parse & Validate Schema
+			if useMerdekaTemplate {
+				var modulAjar curriculum.ModulAjarMerdeka
+				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &modulAjar); err != nil {
+					lastErr = fmt.Errorf("invalid JSON (Merdeka): %v", err)
+					continue
+				}
+				if err := curriculum.ValidateModulAjar(&modulAjar); err != nil {
+					lastErr = fmt.Errorf("schema validation failed (Merdeka): %v", err)
+					continue
+				}
+
+				// PR-061: Quality Evaluation
+				qualityResult, _ = qeval.Evaluate(&modulAjar)
+				metrics.QualityScoreHistogram.Observe(float64(qualityResult.Score))
+
+				if qualityResult.Verdict == qeval.VerdictRetry && attempt < maxAttempts {
+					lastErr = fmt.Errorf("quality verdict: retry (score %d)", qualityResult.Score)
+					continue
+				}
+				if qualityResult.Verdict == qeval.VerdictFail {
+					metrics.QualityFailTotal.Inc()
+					return failResult(fmt.Sprintf("quality_evaluation_failed: score %d, flags %v", qualityResult.Score, qualityResult.Flags)), nil
+				}
+
+				curriculum.SanitizeModulAjar(&modulAjar)
+				resultMerdeka = &modulAjar
+
+				// PR-062: Dataset			// 4. Collect for dataset (async)
+				go func(m *curriculum.ModulAjarMerdeka, s int) {
+					if err := dataset.CollectDataset(ctx, m, s); err != nil {
+						slog.Error("failed to collect dataset", "error", err)
+					}
+				}(&modulAjar, qualityResult.Score)
+			} else {
+				var c curriculum.Curriculum
+				if err := json.Unmarshal([]byte(ai.SanitizeJSON(resp.Content)), &c); err != nil {
+					lastErr = fmt.Errorf("invalid JSON (legacy): %v", err)
+					continue
+				}
+				if err := c.Validate(); err != nil {
+					lastErr = fmt.Errorf("schema validation failed (legacy): %v", err)
+					continue
+				}
+
+				// PR-061: Quality Evaluation
+				qualityResult, _ = qeval.Evaluate(&c)
+				metrics.QualityScoreHistogram.Observe(float64(qualityResult.Score))
+
+				if qualityResult.Verdict == qeval.VerdictRetry && attempt < maxAttempts {
+					lastErr = fmt.Errorf("quality verdict: retry (score %d)", qualityResult.Score)
+					continue
+				}
+				if qualityResult.Verdict == qeval.VerdictFail {
+					metrics.QualityFailTotal.Inc()
+					return failResult(fmt.Sprintf("quality_evaluation_failed: score %d, flags %v", qualityResult.Score, qualityResult.Flags)), nil
+				}
+
+				c.Sanitize()
+				resultLegacy = &c
+			}
+
+			// Success Path
+			lastErr = nil
+			metrics.QualityPassTotal.Inc()
+			logger.Info("AI generation success with quality gate",
+				"model", resp.ModelName,
+				"score", qualityResult.Score,
+				"verdict", qualityResult.Verdict,
+				"flags", qualityResult.Flags)
+
+			// PR-063: Update Usage Counts for selected templates (Async)
+			for _, rt := range rankedTemplates {
+				go func(id string) {
+					if err := db.IncrementDatasetUsage(context.Background(), id); err != nil {
+						logger.Warn("failed to increment template usage", "id", id, "error", err)
+					}
+				}(rt.Candidate.ID.String())
+			}
+
+			break
+		}
+
+		if lastErr != nil {
+			return failResult(fmt.Sprintf("AI generation failed after %d attempts: %v", maxAttempts, lastErr)), nil
+		}
+
+		if resp != nil {
+			// 4. Render (for legacy flow)
+			templateDir := resolveTemplateDir(payload.PackPath)
+			tmplBytes, err := os.ReadFile(filepath.Join(templateDir, "modul-ajar.html"))
+			if err != nil {
+				logger.Warn("Template not found", "error", err)
+			}
+
+			var html, hash string
+			if len(tmplBytes) > 0 {
+				funcs := template.FuncMap{
+					"SUBJECT_NAME":       func() string { return subjectForTemplate },
+					"KELAS":              func() string { return payload.Kelas },
+					"SEMESTER":           func() string { return payload.Semester },
+					"TAHUN_AJARAN":       func() string { return payload.TahunAjaran },
+					"TITLE":              func() string { return "Modul Ajar " + subjectForTemplate },
+					"TEACHER_NAME":       func() string { return payload.TeacherName },
+					"SCHOOL_NAME":        func() string { return payload.SchoolName },
+					"PID":                func() string { return payload.PID },
+					"DID":                func() string { return "PREVIEW" },
+					"VERIFY_URL":         func() string { return "#" },
+					"STYLES":             func() string { return "" },
+					"ATP_TABLE":          func() string { return "(ATP Table Placeholder)" },
+					"ACTIVITY_SECTIONS":  func() string { return "(Activity Sections Placeholder)" },
+					"ASSESSMENT_SECTION": func() string { return "(Assessment Section Placeholder)" },
+					"ALL_SECTIONS":       func() string { return "(All Sections Placeholder)" },
+					"KOP_SURAT":          func() string { return "" },
+				}
+
+				html, hash, err = curriculum.RenderHTML(nil, string(tmplBytes), funcs)
+				if err != nil {
+					return failResult(fmt.Sprintf("Render failed: %v", err)), nil
+				}
+			}
+
+			// 5. Persist receipt
+			innerAIReceipt := map[string]interface{}{
+				"model":         resp.ModelName,
+				"input_tokens":  resp.TokenInput,
+				"output_tokens": resp.TokenOutput,
+				"prompt_hash":   resp.PromptHash,
+				"output_hash":   resp.OutputHash,
+				"duration_ms":   resp.DurationMs,
+				"generated_at":  time.Now().Format(time.RFC3339),
+				"template_mode": useMerdekaTemplate,
+			}
+
+			aiReceipt = innerAIReceipt
+
+			receipt := map[string]interface{}{
+				"ai_receipt": innerAIReceipt,
+				"curriculum": map[string]interface{}{
+					"html_hash": hash,
+				},
+				"quality": map[string]interface{}{
+					"score":          qualityResult.Score,
+					"verdict":        qualityResult.Verdict,
+					"flags":          qualityResult.Flags,
+					"rubric_version": qualityResult.RubricVersion,
+				},
+			}
+
+			if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.WorkspaceID, payload.JobID, receipt); err != nil {
+				logger.Error("Failed to persist AI receipt", "error", err)
+				return failResult(fmt.Sprintf("failed to persist AI receipt: %v", err)), nil
+			}
+			_ = html
+		}
+	}
+
+	// 7. Persist Documents to DB (Generating)
+	for _, doc := range graphResult.Documents {
+		meta := make(map[string]interface{})
+
+		if aiReceipt != nil {
+			meta["ai_config"] = aiReceipt
+			if m, ok := aiReceipt["model"].(string); ok {
+				meta["model"] = m
+			}
+		}
+
+		dbDoc := db.Document{
+			ID:          doc.ID,
+			WorkspaceID: doc.WorkspaceID,
+			PackageID:   doc.PackageID,
+			PublicID:    doc.PublicID,
+			SubjectCode: doc.SubjectCode,
+			Version:     doc.Version,
+			Status:      "generating",
+			Metadata:    meta,
+		}
+		if err := w.Deps.JobStore.SaveDocument(ctx, dbDoc); err != nil {
+			logger.Warn("Failed to save document to DB", "did", doc.PublicID, "error", err)
+			continue
+		}
+	}
+
+	// 5. Compose HTML
+	templateDir := resolveTemplateDir(payload.PackPath)
+	renderedDocs := make([]RenderedDocument, 0, len(graphResult.Documents))
+
+	for _, doc := range graphResult.Documents {
+		verifyBaseURL := os.Getenv("VERIFY_BASE_URL")
+		if verifyBaseURL == "" {
+			verifyBaseURL = "https://verify.modulajar.app"
+		}
+		verifyURL := fmt.Sprintf("%s/verify/%s", verifyBaseURL, doc.PublicID)
+
+		// If LogoFilePath is provided, fetch and convert it to Base64 URI deterministically
+		logoDataURI := ""
+		if payload.LogoFilePath != "" && w.Deps.Storage != nil {
+			logoData, err := w.Deps.Storage.DownloadFile(ctx, payload.LogoFilePath)
+			if err != nil {
+				logger.Warn("Failed to fetch logo for letterhead, proceeding without logo", "path", payload.LogoFilePath, "error", err)
+			} else if len(logoData) > 0 {
+				mimeType := "image/png" // Default, can be refined based on file extension
+				if strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpg") || strings.HasSuffix(strings.ToLower(payload.LogoFilePath), ".jpeg") {
+					mimeType = "image/jpeg"
+				}
+				logoDataURI = fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(logoData))
+			}
+		}
+
+		html, err := render.ComposeModulAjarHTML(render.ComposerInput{
+			TemplateDir: templateDir,
+			SubjectCode: doc.SubjectCode,
+			SubjectName: subjectName(pack, doc.SubjectCode),
+			TeacherName: payload.TeacherName,
+			SchoolName:  payload.SchoolName,
+			Kelas:       payload.Kelas,
+			Semester:    payload.Semester,
+			TahunAjaran: payload.TahunAjaran,
+			PID:         payload.PID,
+			DID:         doc.PublicID,
+			VerifyURL:   verifyURL,
+			PlanResult:  planResult,
+
+			LetterheadLine1:   payload.LetterheadLine1,
+			LetterheadLine2:   payload.LetterheadLine2,
+			LetterheadLine3:   payload.LetterheadLine3,
+			LetterheadLine4:   payload.LetterheadLine4,
+			LetterheadContact: payload.LetterheadContact,
+			LogoDataURI:       logoDataURI,
+
+			LayoutDefinition: payload.LayoutDefinition,
+
+			ModulAjarMerdeka: resultMerdeka,
+			LegacyCurriculum: resultLegacy,
+		})
+		if err != nil {
+			return failResult(fmt.Sprintf("compose HTML failed for %s: %v", doc.SubjectCode, err)), nil
+		}
+
+		htmlHash := sha256.Sum256([]byte(html))
+		htmlHashStr := hex.EncodeToString(htmlHash[:])
+
+		w.Deps.JobStore.UpdateDocumentMetadata(ctx, doc.WorkspaceID, doc.PublicID, map[string]interface{}{
+			"html_sha256": htmlHashStr,
+		})
+
+		filePath := fmt.Sprintf("html://%s/v1", doc.PublicID)
+		renderedDocs = append(renderedDocs, RenderedDocument{
+			DocumentID:  doc.ID,
+			DID:         doc.PublicID,
+			SubjectCode: doc.SubjectCode,
+			HTML:        html,
+			FilePath:    filePath,
+		})
+	}
+
+	// 6. PDF render
+	if w.Deps.PDF != nil {
+		for i, rd := range renderedDocs {
+			maskedTeacher := maskTeacher(payload.TeacherName)
+			watermark := render.WatermarkData{
+				PublicID:    rd.DID,
+				TeacherName: maskedTeacher,
+				Date:        time.Now().Format("02-01-2006"),
+				VerifyURL:   fmt.Sprintf("verify.modulajar.app/verify/%s", rd.DID),
+			}
+
+			w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, map[string]interface{}{
+				"watermark_summary": map[string]string{
+					"teacher_masked": maskedTeacher,
+					"school_name":    payload.SchoolName,
+				},
+			})
+
+			opts := render.GeneratePDFOptions{
+				Watermark:    watermark,
+				MarginBottom: 0.8, // inch
+			}
+
+			// PR-A5: Observe PDF Render Duration
+			renderStart := time.Now()
+			pdfBytes, err := w.Deps.PDF.Generate(ctx, rd.HTML, opts)
+			metrics.PdfRenderDurationSeconds.Observe(time.Since(renderStart).Seconds())
+
+			if err != nil {
+				logger.Error("PDF render failed", "subject", rd.SubjectCode, "error", err)
+				return failResult(fmt.Sprintf("PDF render failed for %s: %v", rd.SubjectCode, err)), nil
+			}
+
+			tmpPDF := filepath.Join(os.TempDir(), fmt.Sprintf("modulajar-%s.pdf", rd.DID))
+			if err := os.WriteFile(tmpPDF, pdfBytes, 0644); err != nil {
+				return failResult(fmt.Sprintf("failed to write temp PDF: %v", err)), nil
+			}
+
+			renderedDocs[i].PDFPath = tmpPDF
+			renderedDocs[i].PDFSizeBytes = int64(len(pdfBytes))
+
+			pdfHash := sha256.New()
+			pdfHash.Write(pdfBytes)
+			renderedDocs[i].PDFHash = hex.EncodeToString(pdfHash.Sum(nil))
+		}
+	} else {
+		return failResult("PDF engine unavailable"), nil
+	}
+
+	// 7. GCS upload
+	if w.Deps.Storage != nil {
+		for i, rd := range renderedDocs {
+			if rd.PDFPath == "" {
+				continue
+			}
+			objectPath := gcs.ArtifactPath(payload.WorkspaceID, payload.PID, rd.DID, 1)
+			if err := w.Deps.Storage.UploadFile(ctx, objectPath, rd.PDFPath, "application/pdf"); err != nil {
+				metrics.GCSUploadTotal.WithLabelValues("failed").Inc()
+				return failResult(fmt.Sprintf("GCS upload failed for %s: %v", rd.SubjectCode, err)), nil
+			}
+			metrics.GCSUploadTotal.WithLabelValues("success").Inc()
+
+			renderedDocs[i].FilePath = gcs.FullGCSURI(gcsBucket, objectPath)
+			os.Remove(rd.PDFPath)
+			renderedDocs[i].PDFPath = ""
+		}
+	}
+
+	// 8. Update Document & Job Status
+	pdfMetadata := make(map[string]interface{})
+	for i, ver := range graphResult.Versions {
+		for _, rd := range renderedDocs {
+			if ver.DocumentID == rd.DocumentID {
+				graphResult.Versions[i].FilePath = rd.FilePath
+
+				if rd.PDFHash != "" {
+					pdfMetadata[rd.SubjectCode] = map[string]interface{}{
+						"pdf_path":       rd.FilePath, // GCS URI
+						"pdf_size_bytes": rd.PDFSizeBytes,
+						"pdf_sha256":     rd.PDFHash,
+						"generated_at":   time.Now().Format(time.RFC3339),
+					}
+
+					// PR-A6: Validate Artifact Metadata before persistence
+					artifactMeta := map[string]interface{}{
+						"pdf_sha256":   rd.PDFHash,
+						"pdf_path":     rd.FilePath,
+						"generated_at": time.Now().Format(time.RFC3339),
+					}
+					if aiReceipt != nil {
+						artifactMeta["ai_config"] = aiReceipt
+						if m, ok := aiReceipt["model"].(string); ok {
+							artifactMeta["model"] = m
+						}
+					}
+
+					if err := w.validateMetadata(artifactMeta, "artifact_metadata.schema.json"); err != nil {
+						logger.Error("Artifact metadata validation failed", "error", err)
+						return failResult(fmt.Sprintf("artifact metadata validation failed: %v", err)), nil
+					}
+
+					w.Deps.JobStore.UpdateDocumentMetadata(ctx, payload.WorkspaceID, rd.DID, artifactMeta)
+					w.Deps.JobStore.UpdateDocumentStatus(ctx, payload.WorkspaceID, rd.DID, "done")
+				}
+				break
+			}
+		}
+	}
+
+	// Persist PDF metadata
+	if len(pdfMetadata) > 0 {
+		update := map[string]interface{}{
+			"pdf_receipts": pdfMetadata,
+		}
+		if err := w.Deps.JobStore.UpdateJobMetadata(ctx, payload.WorkspaceID, payload.JobID, update); err != nil {
+			return failResult(fmt.Sprintf("failed to persist PDF receipts: %v", err)), nil
+		}
+	}
+
+	// Success!
 	return &WorkerResult{
-		JobID:         payload.JobID,
-		PackageID:     payload.PackageID,
-		Status:        "completed",
-		PlannerResult: planResult,
-		ValidationOK:  true,
-		DocGraph:      graphResult,
-		StatusUpdates: append(startUpdates,
-			StatusUpdate{Table: "packages", ID: payload.PackageID, Status: "ready"},
-			StatusUpdate{Table: "generation_jobs", ID: payload.JobID, Status: "completed"},
-		),
+		JobID:             payload.JobID,
+		PackageID:         payload.PackageID,
+		Status:            "done",
+		PlannerResult:     planResult,
+		ValidationOK:      true,
+		DocGraph:          graphResult,
+		RenderedDocuments: renderedDocs,
 	}, nil
 }
 
-// Handler returns an HTTP handler for POST /tasks/generate.
-func Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var payload TaskPayload
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			http.Error(w, fmt.Sprintf("invalid payload: %v", err), http.StatusBadRequest)
-			return
-		}
-		defer r.Body.Close()
-
-		if payload.JobID == "" || payload.PackPath == "" {
-			http.Error(w, "missing job_id or pack_path", http.StatusBadRequest)
-			return
-		}
-
-		result, err := ExecuteJob(payload)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("execution error: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if result.Status == "completed" {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-		}
-		json.NewEncoder(w).Encode(result)
+// Helpers
+func (w *Worker) compileSchema(schemaName string) (*jsonschema.Schema, error) {
+	candidates := []string{
+		filepath.Join("..", "..", "packages", "contracts", "domain", schemaName),       // from apps/core-go
+		filepath.Join("..", "..", "..", "packages", "contracts", "domain", schemaName), // from apps/core-go/worker
+		filepath.Join("packages", "contracts", "domain", schemaName),                   // from root
 	}
+
+	var schemaPath string
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			schemaPath = c
+			break
+		}
+	}
+
+	if schemaPath == "" {
+		return nil, fmt.Errorf("mandatory schema %s not found in any expected location", schemaName)
+	}
+
+	sch, err := jsonschema.Compile(schemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("mandatory schema %s invalid at %s: %w", schemaName, schemaPath, err)
+	}
+	return sch, nil
+}
+
+func (w *Worker) validateMetadata(metadata map[string]interface{}, schemaName string) error {
+	b, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("metadata marshal failed: %w", err)
+	}
+
+	sch, err := w.compileSchema(schemaName)
+	if err != nil {
+		return err
+	}
+
+	var v interface{}
+	if err := json.Unmarshal(b, &v); err != nil {
+		return fmt.Errorf("metadata unmarshal for validation failed: %w", err)
+	}
+	if err := sch.Validate(v); err != nil {
+		return fmt.Errorf("validation against %s failed: %v", schemaName, err)
+	}
+	return nil
+}
+
+func (w *Worker) jobToPayload(job *db.GenerationJob) (TaskPayload, error) {
+	// PR-A6: Mandatory Schema Validation
+	if err := w.validateMetadata(job.Metadata, "generation_job.schema.json"); err != nil {
+		return TaskPayload{}, err
+	}
+
+	b, err := json.Marshal(job.Metadata)
+	if err != nil {
+		return TaskPayload{}, err
+	}
+
+	var p TaskPayload
+	if err := json.Unmarshal(b, &p); err != nil {
+		return TaskPayload{}, err
+	}
+	p.JobID = job.ID
+	p.PackageID = job.PackageID
+	p.WorkspaceID = job.WorkspaceID
+
+	// Extract LayoutDefinition if present
+	if layoutMap, ok := job.Metadata["layout_definition"].(map[string]interface{}); ok {
+		p.LayoutDefinition = layoutMap
+	}
+
+	return p, nil
+}
+
+func resolveTemplateDir(packPath string) string {
+	candidates := []string{
+		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath)))), "templates", "v1"),
+		filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(packPath))))), "templates", "v1"),
+		filepath.Join("templates", "v1"),
+		filepath.Join("..", "templates", "v1"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "modul-ajar.html")); err == nil {
+			return c
+		}
+	}
+	return filepath.Join("templates", "v1")
+}
+
+func subjectName(pack *packloader.CurriculumPack, code string) string {
+	for _, s := range pack.Subjects {
+		if s.Code == code {
+			return s.Name
+		}
+	}
+	return code
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maskTeacher(name string) string {
+	if len(name) < 4 {
+		return name
+	}
+	return name[0:3] + "****"
+}
+
+// Handler functions are moved to cmd/worker/main.go or need to be adapted.
+// For now, I'll remove Handler() from here as it depends on DI which we want to inject.
+// I'll also expose CheckFunc and ReadinessHandler as they are utilities.
+// Actually, keep ReadinessHandler here as it is useful helper, but I will remove the old Handler().
+
+type CheckFunc func(context.Context) error
+
+func ReadinessHandler(dbCheck CheckFunc, chromeCheck CheckFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := dbCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: DB unpingable", "error", err)
+			http.Error(w, "Service Unavailable: DB", http.StatusServiceUnavailable)
+			return
+		}
+
+		if err := chromeCheck(ctx); err != nil {
+			slog.Error("Readiness probe failed: Chrome unavailable", "error", err)
+			http.Error(w, "Service Unavailable: Chrome", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
+}
+
+// AssistSection provides AI suggestions for a specific module section.
+func (w *Worker) AssistSection(ctx context.Context, section, action, content string) (string, *ai.GenerateResponse, error) {
+	if w.Deps.AI == nil {
+		return "", nil, fmt.Errorf("AI engine unavailable")
+	}
+
+	prompt := fmt.Sprintf(`You are a curriculum expert. Improve this section of a "Modul Ajar" (Lesson Plan).
+Section: %s
+Action: %s
+Current Content: %s
+
+STRICT RULE: Your response must ONLY contain the improved content for this section. No conversational filler, no markdown formatting (unless it was already in the content).`,
+		section, action, content)
+
+	req := ai.GenerateRequest{Prompt: prompt}
+	resp, err := w.Deps.AI.Generate(ctx, req)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return resp.Content, resp, nil
 }

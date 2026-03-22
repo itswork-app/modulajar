@@ -1,0 +1,5 @@
+ok  	modulajar/apps/core-go	0.004s	coverage: 0.0% of statements
+ok  	modulajar/apps/core-go/adapters/ai	0.149s	coverage: 63.0% of statements
+ok  	modulajar/apps/core-go/adapters/ai/prompts	0.011s	coverage: 53.8% of statements
+ok  	modulajar/apps/core-go/cmd/planner	0.004s	coverage: 73.7% of statements
+ok  	modulajar/apps/core-go/cmd/validate	0.003s	coverage: 69.6% of statements

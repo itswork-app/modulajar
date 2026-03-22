@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+  --radius-3xl: 2rem;
+  --radius-4xl: 2.5rem;
+}
+
+:root {
+  /* Modulajar Brand Onyx Palette */
+  --background: oklch(0.12 0.02 160); /* Deep dark with a hint of emerald green */
+  --foreground: oklch(0.98 0.01 160);
+  
+  --card: oklch(0.14 0.03 160);
+  --card-foreground: oklch(0.98 0.01 160);
+  
+  --popover: oklch(0.14 0.03 160);
+  --popover-foreground: oklch(0.98 0.01 160);
+  
+  --primary: oklch(0.64 0.17 160); /* Signature Modulajar Emerald */
+  --primary-foreground: oklch(0.98 0.01 160);
+  
+  --secondary: oklch(0.55 0.18 250); /* Brand Indigo for Elite accents */
+  --secondary-foreground: oklch(0.98 0.01 240);
+  
+  --muted: oklch(0.18 0.02 160);
+  --muted-foreground: oklch(0.6 0.03 160);
+  
+  --accent: oklch(0.22 0.05 160);
+  --accent-foreground: oklch(0.98 0.01 160);
+  
+  --destructive: oklch(0.6 0.18 20);
+  --destructive-foreground: oklch(0.98 0.01 240);
+  
+  --border: oklch(0.2 0.03 160);
+  --input: oklch(0.2 0.03 160);
+  --ring: oklch(0.64 0.17 160);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  background-image: 
+    radial-gradient(at 0% 0%, oklch(0.15 0.05 250 / 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, oklch(0.15 0.05 160 / 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+.glass-card {
+  background: oklch(0.14 0.03 160 / 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid oklch(0.2 0.03 160 / 0.3);
+  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.3);
+}
+
+.glow-border {
+  position: relative;
+}
+.glow-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0.2;
+  transition: opacity 0.3s;
+}
+.glow-border:hover::after {
+  opacity: 0.4;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

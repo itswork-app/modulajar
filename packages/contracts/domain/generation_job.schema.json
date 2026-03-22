@@ -1,0 +1,144 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://modulajar.app/schemas/domain/generation_job.schema.json",
+    "title": "GenerationJobMetadata",
+    "description": "Schema for the unstructured metadata column in the generation_jobs table",
+    "type": "object",
+    "properties": {
+        "job_id": {
+            "type": "string"
+        },
+        "package_id": {
+            "type": "string"
+        },
+        "workspace_id": {
+            "type": "string"
+        },
+        "pack_path": {
+            "type": "string"
+        },
+        "semester": {
+            "type": "string"
+        },
+        "kelas": {
+            "type": "string"
+        },
+        "tahun_ajaran": {
+            "type": "string"
+        },
+        "teacher_name": {
+            "type": "string"
+        },
+        "school_name": {
+            "type": "string"
+        },
+        "pid": {
+            "type": "string"
+        },
+        "trace_id": {
+            "type": "string"
+        },
+        "letterhead_line1": {
+            "type": "string"
+        },
+        "letterhead_line2": {
+            "type": "string"
+        },
+        "letterhead_line3": {
+            "type": "string"
+        },
+        "letterhead_line4": {
+            "type": "string"
+        },
+        "letterhead_contact": {
+            "type": "string"
+        },
+        "logo_file_path": {
+            "type": "string"
+        },
+        "ai_receipt": {
+            "type": "object",
+            "properties": {
+                "model": {
+                    "type": "string"
+                },
+                "input_tokens": {
+                    "type": "integer"
+                },
+                "output_tokens": {
+                    "type": "integer"
+                },
+                "prompt_hash": {
+                    "type": "string"
+                },
+                "output_hash": {
+                    "type": "string"
+                },
+                "duration_ms": {
+                    "type": "integer"
+                },
+                "generated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "template_mode": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": true
+        },
+        "curriculum": {
+            "type": "object",
+            "properties": {
+                "html_hash": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": true
+        },
+        "quality": {
+            "type": "object",
+            "properties": {
+                "score": {
+                    "type": "integer"
+                },
+                "verdict": {
+                    "type": "string"
+                },
+                "flags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rubric_version": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": true
+        },
+        "pdf_receipts": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "pdf_path": {
+                        "type": "string"
+                    },
+                    "pdf_size_bytes": {
+                        "type": "integer"
+                    },
+                    "pdf_sha256": {
+                        "type": "string"
+                    },
+                    "generated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": true
+            }
+        }
+    },
+    "additionalProperties": true
+}

@@ -1,0 +1,958 @@
+openapi: 3.0.3
+info:
+  title: ModulAjar API
+  description: Formal API contract for ModulAjar SaaS platform.
+  version: 1.0.0
+servers:
+  - url: https://api.modulajar.app
+    description: Production API
+  - url: http://localhost:8080
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Clerk JWT token or Mock Auth token (in dev)
+    WebhookAuth:
+      type: apiKey
+      in: header
+      name: X-Midtrans-Signature
+      description: Midtrans HMAC signature for webhooks
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    Workspace:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        clerk_org_id: { type: string }
+        role: { type: string, enum: [owner, admin, member] }
+
+    Document:
+      type: object
+      properties:
+        id: { type: string }
+        public_id: { type: string }
+        status: { type: string, enum: [queued, running, done, failed] }
+        created_at: { type: string, format: date-time }
+        jenjang: { type: string }
+        kelas: { type: string }
+        semester: { type: string }
+        school_name: { type: string, nullable: true }
+        teacher_name: { type: string, nullable: true }
+
+    JobStatus:
+      type: object
+      properties:
+        job_id: { type: string }
+        module_id: { type: string, nullable: true }
+        pid: { type: string }
+        status: { type: string, enum: [queued, running, done, failed] }
+        progress:
+          type: object
+          properties:
+            phase: { type: string }
+            pct: { type: integer }
+        error: { type: string, nullable: true }
+
+    TeacherProfile:
+      type: object
+      properties:
+        full_name: { type: string }
+        primary_grade: { type: integer }
+        primary_subject: { type: string }
+        primary_jenjang: { type: string, enum: [SD, SMP, SMA, SMK] }
+        nip: { type: string, nullable: true }
+
+    SchoolIdentity:
+      type: object
+      properties:
+        school_display_name: { type: string }
+        kab_kota: { type: string, nullable: true }
+        provinsi: { type: string, nullable: true }
+        alamat: { type: string, nullable: true }
+        school_npsn: { type: string, nullable: true }
+        school_verified: { type: boolean }
+
+    WalletSummary:
+      type: object
+      properties:
+        workspace_id: { type: string }
+        balance: { type: integer }
+        currency: { type: string, default: IDR }
+
+    ModuleEditor:
+      type: object
+      properties:
+        id: { type: string }
+        public_id: { type: string }
+        module_json: { type: object }
+        metadata: { type: object }
+        status: { type: string }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [credit, debit] }
+        amount: { type: integer }
+        reference: { type: string }
+        created_at: { type: string, format: date-time }
+        metadata: { type: object, nullable: true }
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Forbidden (Not a member of workspace)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  # ---------------------------------------------------------
+  # System & Health
+  # ---------------------------------------------------------
+  /healthz:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /readyz:
+    get:
+      tags: [System]
+      summary: Readiness check
+      responses:
+        200:
+          description: OK
+
+  /metrics:
+    get:
+      tags: [System]
+      summary: Prometheus metrics
+      responses:
+        200:
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+
+  # ---------------------------------------------------------
+  # Auth
+  # ---------------------------------------------------------
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get current user and workspaces
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clerk_user_id: { type: string }
+                  workspaces:
+                    type: array
+                    items: { $ref: '#/components/schemas/Workspace' }
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /bootstrap:
+    post:
+      tags: [Auth]
+      summary: Idempotent user bootstrap
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                clerk_org_id: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      status: { type: string, example: bootstrapped }
+                      workspaceId: { type: string }
+                  - type: object
+                    properties:
+                      message: { type: string, example: User already bootstrapped }
+
+  /workspaces:
+    get:
+      tags: [Workspace]
+      summary: List all workspaces for user
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Workspace]
+      summary: Create new workspace
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        201:
+          description: Created
+
+  # ---------------------------------------------------------
+  # Workspace Management
+  # ---------------------------------------------------------
+  /w/{workspaceId}/ping:
+    get:
+      tags: [Workspace]
+      summary: Permissions check
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+        403:
+          $ref: '#/components/responses/Forbidden'
+
+  /w/{workspaceId}/workspace:
+    get:
+      tags: [Workspace]
+      summary: Get workspace identity
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+    patch:
+      tags: [Workspace]
+      summary: Update workspace identity
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                school_name: { type: string }
+                npsn: { type: string }
+                province: { type: string }
+                regency: { type: string }
+                address: { type: string }
+                workspace_type: { type: string, enum: [personal, institution] }
+      responses:
+        200:
+          description: OK
+
+  /w/{workspaceId}/usage-summary:
+    get:
+      tags: [Workspace]
+      summary: Get workspace usage statistics
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents_count: { type: integer }
+                  credits_used: { type: integer }
+
+  # ---------------------------------------------------------
+  # Module Generation
+  # ---------------------------------------------------------
+  /w/{workspaceId}/modules/generate:
+    post:
+      tags: [Generation]
+      summary: Trigger module generation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode, subject, grade]
+              properties:
+                mode: { type: string, enum: [wizard, quick, template, edit_template, from_scratch] }
+                subject: { type: string }
+                grade: { type: integer }
+                topic: { type: string }
+                template_id: { type: string, nullable: true }
+                semester: { type: string }
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, module_id, status, pid]
+                properties:
+                  job_id: { type: string }
+                  module_id: { type: string }
+                  status: { type: string, example: queued }
+                  pid: { type: string }
+
+  /w/{workspaceId}/jobs/{jobId}:
+    get:
+      tags: [Generation]
+      summary: Get job status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobStatus' }
+
+  # ---------------------------------------------------------
+  # Module Editor
+  # ---------------------------------------------------------
+  /w/{workspaceId}/modules/{moduleId}/editor:
+    get:
+      tags: [Editor]
+      summary: Fetch module for editor
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModuleEditor' }
+
+  /w/{workspaceId}/modules/{moduleId}:
+    patch:
+      tags: [Editor]
+      summary: Update module content
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                module_json: { type: object }
+                metadata: { type: object }
+      responses:
+        200:
+          description: Updated successfully
+
+  /w/{workspaceId}/modules/{moduleId}/preview:
+    get:
+      tags: [Editor]
+      summary: Get HTML preview of module
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: HTML content
+          content:
+            text/html:
+              schema: { type: string }
+
+  # ---------------------------------------------------------
+  # Billing & Wallet
+  # ---------------------------------------------------------
+  /w/{workspaceId}/wallet/summary:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balance
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WalletSummary' }
+
+  /w/{workspaceId}/wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: List transaction history
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Transaction' }
+
+  /w/{workspaceId}/internal/topup-intent:
+    post:
+      tags: [Billing]
+      summary: Create payment intent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount_idr: { type: integer }
+                product: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  snap_token: { type: string }
+                  redirect_url: { type: string }
+
+  /w/webhooks/payment/confirm:
+    post:
+      tags: [Billing]
+      summary: Midtrans payment notification
+      security:
+        - WebhookAuth: []
+      responses:
+        200:
+          description: OK
+
+  # ---------------------------------------------------------
+  # Profile & School
+  # ---------------------------------------------------------
+  /w/{workspaceId}/profile:
+    get:
+      tags: [Profile]
+      summary: Get teacher profile
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeacherProfile' }
+    post:
+      tags: [Profile]
+      summary: Update teacher profile
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeacherProfile' }
+      responses:
+        200:
+          description: Success
+
+  /w/{workspaceId}/school:
+    get:
+      tags: [School]
+      summary: Get school identity
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SchoolIdentity' }
+    post:
+      tags: [School]
+      summary: Update school identity
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [school_display_name]
+              properties:
+                school_display_name: { type: string }
+                kab_kota: { type: string }
+                provinsi: { type: string }
+                alamat: { type: string }
+                school_npsn: { type: string }
+      responses:
+        200:
+          description: Success
+
+  /w/{workspaceId}/modules/{moduleId}/versions:
+    get:
+      tags: [Editor]
+      summary: List module versions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    version: { type: integer }
+                    created_at: { type: string, format: date-time }
+
+  /w/{workspaceId}/modules/{moduleId}:
+    patch:
+      tags: [Editor]
+      summary: Patch module content
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patch]
+              properties:
+                patch: { type: object }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, saved]
+                properties:
+                  version: { type: integer }
+                  saved: { type: boolean }
+
+  /w/{workspaceId}/modules/{moduleId}/ai-assist:
+    post:
+      tags: [Editor]
+      summary: AI assistant for module editing
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required: [section, action, content]
+              properties:
+                section: { type: string }
+                action: { type: string }
+                content: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestion]
+                properties:
+                  suggestion: { type: string }
+                  action: { type: string }
+
+  # ---------------------------------------------------------
+  # Onboarding
+  # ---------------------------------------------------------
+  /w/{workspaceId}/onboarding/profile:
+    post:
+      tags: [Onboarding]
+      summary: Step 1: Teacher profile
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeacherProfile' }
+      responses:
+        200:
+          description: OK
+
+  /w/{workspaceId}/onboarding/assignment:
+    post:
+      tags: [Onboarding]
+      summary: Step 2: Teaching assignment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+
+  /w/{workspaceId}/onboarding/status:
+    get:
+      tags: [Onboarding]
+      summary: Get onboarding progress
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step: { type: string }
+                  complete: { type: boolean }
+
+  # ---------------------------------------------------------
+  # Letterhead & Assets
+  # ---------------------------------------------------------
+  /w/{workspaceId}/letterhead:
+    get:
+      tags: [Letterhead]
+      summary: Get letterhead settings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+    post:
+      tags: [Letterhead]
+      summary: Update letterhead settings (Multipart)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+
+  /w/{workspaceId}/letterhead/clear-logo:
+    post:
+      tags: [Letterhead]
+      summary: Remove logo
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+
+  # ---------------------------------------------------------
+  # Referral & Rewards
+  # ---------------------------------------------------------
+  /w/{workspaceId}/referral:
+    get:
+      tags: [Referral]
+      summary: Get referral info
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+
+  /w/{workspaceId}/referral/attach:
+    post:
+      tags: [Referral]
+      summary: Attach referral code
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        200:
+          description: OK
+
+  # ---------------------------------------------------------
+  # Templates & Discovery
+  # ---------------------------------------------------------
+  /w/{workspaceId}/templates/recommended:
+    get:
+      tags: [Discovery]
+      summary: Get recommended templates
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: OK
+
+  # ---------------------------------------------------------
+  # Documents & Downloads
+  # ---------------------------------------------------------
+  /w/{workspaceId}/documents/{publicId}/download:
+    get:
+      tags: [Documents]
+      summary: Get signed download URL
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: publicId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+
+  # ---------------------------------------------------------
+  # Public Verification
+  # ---------------------------------------------------------
+  /verify/{publicId}:
+    get:
+      tags: [Public]
+      summary: Public document verification
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Valid document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  public_id: { type: string }
+                  generated_at: { type: string, format: date-time }
+                  model: { type: string }
+                  watermark_summary:
+                    type: object
+                    properties:
+                      teacher_masked: { type: string }
+                      school_name: { type: string }
+        404:
+          $ref: '#/components/responses/NotFound'

@@ -1,0 +1,71 @@
+package prompts
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestPromptContainsSchool(t *testing.T) {
+	prompt := BuildInstructionPrompt("SD Negeri 1 Jakarta", "Matematika", "SD", "4", "B", "1", "Pecahan")
+	if !strings.Contains(prompt, "SD Negeri 1 Jakarta") {
+		t.Error("expected prompt to contain school name")
+	}
+}
+
+func TestPromptContainsSubject(t *testing.T) {
+	prompt := BuildInstructionPrompt("SD Negeri 1", "Bahasa Indonesia", "SD", "4", "B", "2", "Puisi")
+	if !strings.Contains(prompt, "Bahasa Indonesia") {
+		t.Error("expected prompt to contain subject name")
+	}
+}
+
+func TestSchemaInjected(t *testing.T) {
+	schema := `{"identitas": {"sekolah": ""}}`
+	prompt := BuildSchemaPrompt(schema)
+	if !strings.Contains(prompt, `"identitas"`) {
+		t.Error("expected schema to be injected into prompt")
+	}
+	if !strings.Contains(prompt, "Jangan menambah field baru") {
+		t.Error("expected fill instruction")
+	}
+}
+
+func TestBuildFullPrompt(t *testing.T) {
+	full := BuildFullPrompt("SD Test", "Math", "SD", "4", "1", "Algebra", `{"identitas":1}`, nil)
+	if !strings.Contains(full, "guru profesional") {
+		t.Error("expected system prompt in full prompt")
+	}
+	if !strings.Contains(full, "SD Test") {
+		t.Error("expected school in full prompt")
+	}
+	if !strings.Contains(full, "Math") {
+		t.Error("expected subject in full prompt")
+	}
+	if !strings.Contains(full, `"identitas"`) {
+		t.Error("expected schema in full prompt")
+	}
+}
+
+func TestSystemPromptNoAI(t *testing.T) {
+	sys := BuildSystemPrompt("SD")
+	if !strings.Contains(sys, "tidak menyebut AI") {
+		t.Error("expected system prompt to instruct no AI mention")
+	}
+}
+
+func TestBuildFewShotPrompt(t *testing.T) {
+	// Empty case
+	empty := BuildFewShotPrompt(nil)
+	if empty != "" {
+		t.Error("expected empty few shot with no examples")
+	}
+
+	// With examples
+	withExamples := BuildFewShotPrompt([]string{"example 1", "example 2"})
+	if !strings.Contains(withExamples, "EXAMPLE 1") {
+		t.Error("expected EXAMPLE 1 in few shot prompt")
+	}
+	if !strings.Contains(withExamples, "example 2") {
+		t.Error("expected example 2 content in few shot prompt")
+	}
+}

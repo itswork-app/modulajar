@@ -11,18 +11,26 @@ import (
 )
 
 func main() {
+	if err := Run(os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Run executes the planner logic and returns an error if any.
+// Exported for testing/coverage.
+func Run(args []string) error {
 	// Default pack path (relative to repo root)
-	packPath := filepath.Join("packs", "merdeka", "sd4", "v1", "pack.json")
+	packPath := filepath.Join("..", "..", "packs", "merdeka", "sd4", "v1", "pack.json")
 
 	// Allow override via CLI arg
-	if len(os.Args) > 1 {
-		packPath = os.Args[1]
+	if len(args) > 1 {
+		packPath = args[1]
 	}
 
 	pack, err := packloader.LoadPack(packPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading pack: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error loading pack: %v", err)
 	}
 
 	config := planner.DefaultConfig()
@@ -33,15 +41,14 @@ func main() {
 
 	result, err := planner.Plan(input)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error planning: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error planning: %v", err)
 	}
 
 	out, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error marshaling: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error marshaling: %v", err)
 	}
 
 	fmt.Println(string(out))
+	return nil
 }

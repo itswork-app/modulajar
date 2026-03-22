@@ -1,19 +1,52 @@
 import { FastifyInstance } from 'fastify';
 import { ulid } from 'ulid';
+import crypto from 'crypto';
+
+function generateReferralCode(): string {
+    // Generate 5 random bytes and conver to base32-like string (uppercase alphanumeric)
+    // 5 bytes = 40 bits = 8 base32 chars
+    return crypto.randomBytes(5)
+        .toString('base64')
+        .replace(/[^A-Za-z0-9]/g, '')
+        .toUpperCase()
+        .substring(0, 8);
+}
 
 export default async function authRoutes(fastify: FastifyInstance) {
     // GET /me
     fastify.get('/me', {
-        preHandler: [fastify.verifyClerk]
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        clerk_user_id: { type: 'string' },
+                        workspaces: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    name: { type: 'string' },
+                                    clerk_org_id: { type: 'string' },
+                                    role: { type: 'string' }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }, async (request, reply) => {
         const { clerk_user_id } = request.auth!;
 
         // Fetch user's workspaces
         const result = await fastify.db.query(
             `SELECT w.id, w.name, w.clerk_org_id, m.role 
-       FROM workspaces w
-       JOIN workspace_members m ON w.id = m.workspace_id
-       WHERE m.clerk_user_id = $1`,
+             FROM workspaces w
+             JOIN workspace_members m ON w.id = m.workspace_id
+             WHERE m.clerk_user_id = $1`,
             [clerk_user_id]
         );
 
@@ -23,13 +56,45 @@ export default async function authRoutes(fastify: FastifyInstance) {
         };
     });
 
+    // Booster/Bootstrap logic remains here as it's part of initial auth flow
     // POST /bootstrap
     // Idempotent: Ensures user has at least one workspace (personal)
     fastify.post('/bootstrap', {
-        preHandler: [fastify.verifyClerk]
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            body: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string' },
+                    clerk_org_id: { type: 'string' }
+                }
+            },
+            response: {
+                200: {
+                    oneOf: [
+                        {
+                            type: 'object',
+                            required: ['status', 'workspaceId'],
+                            properties: {
+                                status: { type: 'string', example: 'bootstrapped' },
+                                workspaceId: { type: 'string' }
+                            }
+                        },
+                        {
+                            type: 'object',
+                            required: ['message', 'status'],
+                            properties: {
+                                message: { type: 'string', example: 'User already bootstrapped' },
+                                status: { type: 'string', example: 'already_bootstrapped' }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
     }, async (request, reply) => {
         const { clerk_user_id } = request.auth!;
-        const body = request.body as { clerk_org_id?: string; name?: string };
+        const body = (request.body || {}) as { clerk_org_id?: string; name?: string };
 
         // 1. Check if user already has any workspace
         const check = await fastify.db.query(
@@ -38,7 +103,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         );
 
         if (check.rowCount && check.rowCount > 0) {
-            return { message: 'User already bootstrapped' };
+            return { status: 'already_bootstrapped', message: 'User already bootstrapped' };
         }
 
         // 2. Create Personal Workspace
@@ -50,11 +115,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
         try {
             await client.query('BEGIN');
 
+            // Generate unique referral code
+            const refCode = generateReferralCode();
+
             // Insert Workspace
             await client.query(
-                `INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3)
+                `INSERT INTO workspaces (id, clerk_org_id, name, referral_code) VALUES ($1, $2, $3, $4)
          ON CONFLICT (clerk_org_id) DO NOTHING`, // Handle race condition or re-run
-                [workspaceId, clerkOrgId, workspaceName]
+                [workspaceId, clerkOrgId, workspaceName, refCode]
             );
 
             // Get actual workspace ID in case of conflict (if we want to join existing org)
@@ -97,5 +165,64 @@ export default async function authRoutes(fastify: FastifyInstance) {
         } finally {
             client.release();
         }
+    });
+
+    // POST /workspaces/join
+    // Join an existing workspace via referral/invite code
+    fastify.post('/workspaces/join', {
+        preHandler: [fastify.verifyClerk],
+        schema: {
+            body: {
+                type: 'object',
+                required: ['code'],
+                properties: {
+                    code: { type: 'string', minLength: 5, maxLength: 10 }
+                }
+            }
+        }
+    }, async (request, reply) => {
+        const { clerk_user_id } = request.auth!;
+        const { code } = request.body as { code: string };
+
+        // 1. Find workspace by referral code
+        const workspaceResult = await fastify.db.query(
+            `SELECT id, name FROM workspaces WHERE referral_code = $1`,
+            [code.toUpperCase()]
+        );
+
+        if (workspaceResult.rowCount === 0) {
+            return reply.code(404).send({ 
+                error: 'Not Found', 
+                message: 'Kode sekolah tidak valid atau tidak ditemukan.' 
+            });
+        }
+
+        const workspaceId = workspaceResult.rows[0].id;
+
+        // 2. Check if already a member
+        const memberCheck = await fastify.db.query(
+            `SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND clerk_user_id = $2`,
+            [workspaceId, clerk_user_id]
+        );
+
+        if (memberCheck.rowCount && memberCheck.rowCount > 0) {
+            return reply.code(400).send({ 
+                error: 'Already Member', 
+                message: 'Anda sudah menjadi anggota di workspace ini.' 
+            });
+        }
+
+        // 3. Add as member
+        await fastify.db.query(
+            `INSERT INTO workspace_members (id, workspace_id, clerk_user_id, role)
+             VALUES ($1, $2, $3, $4)`,
+            [ulid(), workspaceId, clerk_user_id, 'member']
+        );
+
+        return {
+            status: 'joined',
+            workspaceId,
+            name: workspaceResult.rows[0].name
+        };
     });
 }

@@ -1,8 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
+import { SD_FULL_SEMESTER_COST } from '../lib/pricing';
+import { getBalance, debit } from '../lib/wallet';
+import { logger } from '../utils/logger';
+import { generateRequestsTotal } from '../utils/metrics';
 
-const SD_FULL_SEMESTER_COST = 5;
 const PID_SECRET = process.env.PID_SECRET || 'modulajar-pid-dev-secret';
 
 /**
@@ -36,34 +39,71 @@ function computePackageKey(
 
 export default async function generateRoutes(fastify: FastifyInstance) {
 
-    // Reuse workspace guard from workspace.ts pattern
-    const workspaceGuard = async (request: any, reply: any) => {
-        await fastify.verifyClerk(request, reply);
-
-        const { workspaceId } = request.params as { workspaceId: string };
-        const { clerk_user_id } = request.auth || {};
-
-        if (!workspaceId) {
-            return reply.code(400).send({ error: 'Missing workspaceId' });
-        }
-
-        const result = await fastify.db.query(
-            `SELECT 1 FROM workspace_members
-             WHERE workspace_id = $1 AND clerk_user_id = $2`,
-            [workspaceId, clerk_user_id]
-        );
-
-        if (result.rowCount === 0) {
-            return reply.code(403).send({ error: 'Forbidden', message: 'Not a member of this workspace' });
-        }
-    };
-
     fastify.register(async (childServer) => {
 
         childServer.post('/:workspaceId/internal/generate-semester', {
-            preHandler: [workspaceGuard]
+            preHandler: [fastify.workspaceGuard],
+            schema: {
+                params: {
+                    type: 'object',
+                    properties: {
+                        workspaceId: { type: 'string' }
+                    }
+                },
+                body: {
+                    type: 'object',
+                    required: ['pack_id', 'semester', 'tahun_ajaran'],
+                    properties: {
+                        pack_id: { type: 'string' },
+                        semester: { type: 'string' },
+                        tahun_ajaran: { type: 'string' },
+                        kelas: { type: 'string' },
+                        teacher_name: { type: 'string' },
+                        school_name: { type: 'string' },
+                        template_id: { type: 'string' }
+                    }
+                },
+                response: {
+                    201: {
+                        type: 'object',
+                        required: ['job_id', 'package_id', 'pid', 'status'],
+                        properties: {
+                            job_id: { type: 'string' },
+                            package_id: { type: 'string' },
+                            pid: { type: 'string' },
+                            status: { type: 'string' },
+                            cost: { type: 'number' },
+                            balance_after: { type: 'number' },
+                            trace_id: { type: 'string' }
+                        }
+                    },
+                    200: {
+                        type: 'object',
+                        required: ['job_id', 'package_id', 'pid', 'status', 'idempotent'],
+                        properties: {
+                            job_id: { type: 'string' },
+                            package_id: { type: 'string' },
+                            pid: { type: 'string' },
+                            status: { type: 'string' },
+                            idempotent: { type: 'boolean' }
+                        }
+                    },
+                    400: { $ref: 'Error#' },
+                    402: {
+                        type: 'object',
+                        properties: {
+                            error: { type: 'string' },
+                            balance: { type: 'number' },
+                            cost: { type: 'number' },
+                            sisa_generate: { type: 'number' },
+                            message: { type: 'string' }
+                        }
+                    },
+                    409: { $ref: 'Error#' }
+                }
+            }
         }, async (request, reply) => {
-            const { workspaceId } = request.params as { workspaceId: string };
+            const workspaceId = request.workspaceId;
             const body = request.body as {
                 pack_id: string;
                 semester: string;
@@ -71,6 +111,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 kelas?: string;
                 teacher_name?: string;
                 school_name?: string;
+                template_id?: string;
             };
 
             if (!body.pack_id || !body.semester || !body.tahun_ajaran) {
@@ -92,7 +133,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 `SELECT gj.id, gj.status, gj.package_id, p.public_id AS pid
                  FROM generation_jobs gj
                  JOIN packages p ON p.id = gj.package_id
-                 WHERE gj.idempotency_key = $1`,
+                 WHERE gj.generation_id = $1`,
                 [idempotencyKey]
             );
 
@@ -109,7 +150,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             // 2. Concurrency guard: max 1 active job per workspace
             const activeJobs = await fastify.db.query(
                 `SELECT id FROM generation_jobs
-                 WHERE workspace_id = $1 AND status IN ('pending', 'running')`,
+                 WHERE workspace_id = $1 AND status IN ('queued', 'running')`,
                 [workspaceId]
             );
 
@@ -120,14 +161,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            // 3. Check wallet balance
-            const balanceResult = await fastify.db.query(
-                `SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) AS balance
-                 FROM wallet_ledger WHERE workspace_id = $1`,
-                [workspaceId]
-            );
-
-            const balance = parseInt(balanceResult.rows[0]?.balance || '0', 10);
+            // 3. Check wallet balance (via wallet service)
+            const balance = await getBalance(fastify.db, workspaceId);
 
             if (balance < SD_FULL_SEMESTER_COST) {
                 return reply.code(402).send({
@@ -141,6 +176,12 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             const { ulid } = await import('ulid');
 
             // 4. Resolve or create package (identity-keyed)
+            const teacherCtx = await fastify.db.query(
+                `SELECT primary_jenjang FROM teachers WHERE workspace_id = $1 LIMIT 1`,
+                [workspaceId]
+            );
+            const primaryJenjang = teacherCtx.rowCount && teacherCtx.rowCount > 0 ? teacherCtx.rows[0].primary_jenjang : null;
+
             const packageKey = computePackageKey(
                 workspaceId, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName
             );
@@ -173,46 +214,92 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 });
 
                 await fastify.db.query(
-                    `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                    [packageId, workspaceId, pid, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName, 'draft']
+                    `INSERT INTO packages (id, workspace_id, public_id, kelas, semester, tahun_ajaran, teacher_name, school_name, status, jenjang)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                    [packageId, workspaceId, pid, kelas, body.semester, body.tahun_ajaran, teacherName, schoolName, 'draft', primaryJenjang]
                 );
             }
 
-            // 5. Create job (idempotent via UNIQUE idempotency_key)
+            // 5. Create job (idempotent via UNIQUE generation_id)
             const jobId = ulid();
 
-            await fastify.db.query(
-                `INSERT INTO generation_jobs (id, workspace_id, package_id, status, idempotency_key)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [jobId, workspaceId, packageId, 'pending', idempotencyKey]
-            );
+            // Resolve pack path
+            const parts = body.pack_id.split('-');
+            const packPath = parts.length >= 3
+                ? `packs/${parts[0]}/${parts[1]}/${parts[2]}/pack.json`
+                : `packs/${body.pack_id}/pack.json`;
 
-            // 6. Debit wallet (idempotent — check reference doesn't exist)
+            const traceId = request.id; // From Fastify (UUID)
+
+            const metadata = {
+                job_id: jobId,
+                package_id: packageId,
+                workspace_id: workspaceId,
+                pack_path: packPath,
+                semester: body.semester,
+                kelas: kelas,
+                jenjang: primaryJenjang, // Explicit Jenjang!
+                tahun_ajaran: body.tahun_ajaran,
+                teacher_name: teacherName,
+                school_name: schoolName,
+                pid: pid,
+                trace_id: traceId // Persist Trace ID
+            };
+
+            // 6. Debit wallet (idempotent via ON CONFLICT)
             const debitRef = `JOB:${jobId}`;
-            const existingDebit = await fastify.db.query(
-                `SELECT id FROM wallet_ledger WHERE reference = $1`,
-                [debitRef]
-            );
+            try {
+                await debit(fastify.db, workspaceId, SD_FULL_SEMESTER_COST, debitRef, {
+                    event_type: 'GenerationUsageDebit',
+                    transaction_type: 'generate_module',
+                    job_id: jobId,
+                    package_id: packageId
+                });
+            } catch (err: any) {
+                if (err.message === 'Insufficient balance') {
+                    return reply.code(402).send({
+                        error: 'insufficient_credits',
+                        message: 'Saldo kredit tidak cukup. Silakan top up untuk melanjutkan.'
+                    });
+                }
+                logger.warn({ trace_id: traceId, job_id: jobId, error: err }, 'Debit failed');
+                throw err;
+            }
 
-            if (!existingDebit.rowCount || existingDebit.rowCount === 0) {
-                const ledgerId = ulid();
-                await fastify.db.query(
-                    `INSERT INTO wallet_ledger (id, workspace_id, type, amount, reference)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [ledgerId, workspaceId, 'debit', SD_FULL_SEMESTER_COST, debitRef]
+            // Resolve template_id
+            let templateIdToUse = body.template_id || null;
+            if (!templateIdToUse) {
+                const defaultsRes = await fastify.db.query(
+                    `SELECT template_id FROM workspace_default_templates WHERE workspace_id = $1 AND document_type = 'modul_ajar'`,
+                    [workspaceId]
                 );
+                if (defaultsRes.rowCount && defaultsRes.rowCount > 0) {
+                    templateIdToUse = defaultsRes.rows[0].template_id;
+                }
+            }
+
+            try {
+                await fastify.db.query(
+                    `INSERT INTO generation_jobs (id, workspace_id, package_id, status, generation_id, template_id, metadata, next_run_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+                    [jobId, workspaceId, packageId, 'queued', idempotencyKey, templateIdToUse, JSON.stringify(metadata)]
+                );
+            } catch (err) {
+                generateRequestsTotal.inc({ result: 'failed_insert' });
+                throw err;
             }
 
             // 7. Enqueue Cloud Task (placeholder)
-            fastify.log.info({
-                msg: 'Task enqueued (placeholder)',
+            logger.info({
+                msg: 'Job enqueued',
+                trace_id: traceId,
                 job_id: jobId,
                 package_id: packageId,
                 pid,
-                pack_id: body.pack_id,
-                semester: body.semester
+                workspace_id: workspaceId
             });
+
+            generateRequestsTotal.inc({ result: 'success' });
 
             return reply.code(201).send({
                 job_id: jobId,
@@ -220,7 +307,8 @@ export default async function generateRoutes(fastify: FastifyInstance) {
                 pid,
                 status: 'pending',
                 cost: SD_FULL_SEMESTER_COST,
-                balance_after: balance - SD_FULL_SEMESTER_COST
+                balance_after: balance - SD_FULL_SEMESTER_COST,
+                trace_id: traceId
             });
         });
 

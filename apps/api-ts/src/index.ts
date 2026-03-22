@@ -1,38 +1,235 @@
 import Fastify from 'fastify';
 import dbPlugin from './plugins/db';
 import authPlugin from './plugins/auth';
+import mockAuthPlugin from './plugins/mock_auth';
+import storagePlugin from './plugins/storage';
+import workspaceGuardPlugin from './plugins/workspace-guard';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspace';
+import profileRoutes from './routes/profile';
+import schoolRoutes from './routes/school';
 import generateRoutes from './routes/generate';
+import bundleRoutes from './routes/bundle';
 import billingRoutes from './routes/billing';
+import documentsRoutes from './routes/documents';
+import verifyRoutes from './routes/verify';
+import letterheadRoutes from './routes/letterhead';
+import referralRoutes from './routes/referral';
+import templateRoutes from './routes/templates';
+import onboardingRoutes from './routes/onboarding';
+import modulesRoutes from './routes/modules';
+import jobsRoutes from './routes/jobs';
+import walletRoutes from './routes/wallet';
+import curriculumRoutes from './routes/curriculum';
+import voucherRoutes from './routes/voucher';
+import platformRoutes from './routes/platform';
+import platformGuard from './plugins/platform-guard';
+import schemasPlugin from './plugins/schemas';
 import dotenv from 'dotenv';
+import multipart from '@fastify/multipart';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import path from 'path';
+import fs from 'fs';
+import yaml from 'js-yaml';
+
+import { v4 as uuidv4 } from 'uuid';
+import { logger } from './utils/logger';
+import { register, httpRequestsTotal, httpRequestDuration } from './utils/metrics';
 
 dotenv.config();
 
+import cors from '@fastify/cors';
+
 const fastify = Fastify({
-    logger: true
+    logger: false, // Use our structured logger
+    genReqId: (req) => (req.headers['x-trace-id'] as string) || uuidv4(), // Trace ID correlation
 });
 
-// Register Plugins
+// PR-027: Strict CORS Hardening
+fastify.register(cors, {
+    origin: [
+        'https://modulajar.app',
+        'https://app.modulajar.app',
+        'https://ops.modulajar.app',
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002'
+    ],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: false, // Strict: No credentials unless required
+    strictPreflight: true // Enforce strict preflight checks
+});
+
+// S3: Add security headers
+import helmet from '@fastify/helmet';
+fastify.register(helmet, {
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            scriptSrc: ["'self'", "'unsafe-inline'"]
+        }
+    },
+    hsts: true,
+    noSniff: true,
+    frameguard: { action: 'deny' }
+});
+
+// Helper to capture raw body for webhook verification
+fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+    (req as any).rawBody = body; // Attach raw body to request
+    try {
+        const json = JSON.parse(body.toString());
+        done(null, json);
+    } catch (err) {
+        (err as any).statusCode = 400;
+        done(err as Error, undefined);
+    }
+});
+
+// Middleware: Metrics & Logging
+fastify.addHook('onRequest', async (request, _reply) => {
+    (request as any).startTime = process.hrtime();
+});
+
+fastify.addHook('onResponse', async (request, reply) => {
+    const duration = process.hrtime((request as any).startTime);
+    const durationMs = (duration[0] * 1000 + duration[1] / 1e6);
+
+    // Normalize route (avoid high cardinality on 404s or params)
+    const route = request.routeOptions.url || (request as any).routerPath || 'unknown';
+    const method = request.method;
+    const status = reply.statusCode;
+
+    // 1. Metrics
+    httpRequestsTotal.inc({ method, route, status });
+    httpRequestDuration.observe({ method, route }, durationMs);
+
+    // 2. Structured Log
+    logger.info({
+        trace_id: request.id,
+        method,
+        url: request.url,
+        route,
+        status,
+        duration_ms: durationMs,
+        user_agent: request.headers['user-agent'],
+    }, 'http_request');
+});
+
+// Metrics Endpoint
+fastify.get('/metrics', async (_req, reply) => {
+    reply.header('Content-Type', register.contentType);
+    return register.metrics();
+});
+
+const SERVICE_MODE = process.env.SERVICE_MODE || 'api';
+console.log(`[STARTUP] Starting Modulajar API in ${SERVICE_MODE} mode...`);
+
+// Health checks
+fastify.get('/healthz', async () => ({ status: 'ok' }));
+
+// S5: Improve readyz with DB ping
+fastify.get('/readyz', async (request, reply) => {
+    try {
+        await fastify.db.query('SELECT 1');
+        return { status: 'ok', db: 'connected' };
+    } catch (err) {
+        request.log.error(err, 'Readiness check failed: DB disconnected');
+        return reply.code(503).send({ status: 'error', reason: 'db_disconnected' });
+    }
+});
+
+// Core Plugins (Common to both modes)
+fastify.register(schemasPlugin);
 fastify.register(dbPlugin);
-fastify.register(authPlugin);
 
-// Register Routes
-fastify.register(authRoutes);
-fastify.register(workspaceRoutes);
-fastify.register(generateRoutes);
-fastify.register(billingRoutes);
+if (SERVICE_MODE === 'verify') {
+    // ---------------------------------------------------------
+    // VERIFY MODE: Public facing minimal endpoints
+    // ---------------------------------------------------------
+    console.log('[STARTUP] Registering VERIFY mode routes...');
+    fastify.register(verifyRoutes, { prefix: '/verify' });
+} else {
+    // Load OpenAPI spec
+    const openapiPath = path.join(__dirname, '../../contracts/api/openapi.yaml');
+    let openapiSpec = {};
+    try {
+        if (fs.existsSync(openapiPath)) {
+            openapiSpec = yaml.load(fs.readFileSync(openapiPath, 'utf8')) as any;
+            console.log(`[STARTUP] Loaded OpenAPI spec from ${openapiPath}`);
+        } else {
+            console.warn(`[STARTUP] WARNING: OpenAPI spec not found at ${openapiPath}`);
+        }
+    } catch (err) {
+        console.error(`[STARTUP] Failed to load OpenAPI spec:`, err);
+    }
 
-fastify.get('/healthz', async (request, reply) => {
-    return { status: 'ok' };
-});
+    fastify.register(swagger, {
+        openapi: openapiSpec,
+        hideUntagged: false, // Ensure all routes show up
+    } as any);
+
+    fastify.register(swaggerUi, {
+        routePrefix: '/docs/api',
+        uiConfig: {
+            docExpansion: 'list',
+            deepLinking: false
+        }
+    });
+
+    // ---------------------------------------------------------
+    // API MODE: Full authenticated backend
+    // ---------------------------------------------------------
+    console.log('[STARTUP] Registering API mode plugins and routes...');
+    if (process.env.USE_MOCK_AUTH === 'true') {
+        fastify.register(mockAuthPlugin);
+    } else {
+        fastify.register(authPlugin);
+    }
+    fastify.register(workspaceGuardPlugin);
+    fastify.register(platformGuard);
+    
+    fastify.register(storagePlugin);
+    fastify.register(multipart, { limits: { fileSize: 512 * 1024 } });
+
+    fastify.register(platformRoutes);
+    
+    fastify.register(authRoutes);
+    fastify.register(workspaceRoutes);
+    fastify.register(profileRoutes);
+    fastify.register(schoolRoutes);
+    fastify.register(generateRoutes);
+    fastify.register(bundleRoutes);
+    fastify.register(billingRoutes);
+    fastify.register(documentsRoutes);
+    fastify.register(letterheadRoutes);
+    fastify.register(referralRoutes, { prefix: '/w' });
+    fastify.register(templateRoutes);
+    fastify.register(onboardingRoutes);
+    fastify.register(modulesRoutes);
+    fastify.register(jobsRoutes);
+    fastify.register(walletRoutes);
+    fastify.register(curriculumRoutes);
+    fastify.register(voucherRoutes);
+}
 
 const start = async () => {
     try {
+        console.log('[STARTUP] Checking critical environment variables...');
+        if (!process.env.DATABASE_URL) console.warn('[STARTUP] WARNING: DATABASE_URL is not set');
+        if (!process.env.GCS_BUCKET) console.warn('[STARTUP] WARNING: GCS_BUCKET is not set');
+
         const port = parseInt(process.env.PORT || '8080');
+        console.log(`[STARTUP] Attempting to listen on port ${port}...`);
+
         await fastify.listen({ port, host: '0.0.0.0' });
-        console.log(`Server listening on ${port}`);
+        console.log(`[STARTUP] SUCCESS: Server listening on ${port}`);
     } catch (err) {
+        console.error('[STARTUP] FATAL ERROR during start():', err);
         fastify.log.error(err);
         process.exit(1);
     }

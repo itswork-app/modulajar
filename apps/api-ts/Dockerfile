@@ -1,22 +1,36 @@
-FROM node:20-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 
-WORKDIR /app
+WORKDIR /
 
-COPY package*.json ./
-RUN npm install
+COPY packages/ ./packages/
+COPY apps/api-ts/package*.json ./apps/api-ts/
 
-COPY . .
+WORKDIR /apps/api-ts
+RUN npm ci --ignore-scripts
+
+COPY apps/api-ts/ .
 RUN npm run build
 
-FROM node:18-alpine
+FROM node:22-bookworm-slim
 
-WORKDIR /app
+WORKDIR /
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
+# Install Chromium and production dependencies
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN npm install --production
+ENV CHROME_BIN=/usr/bin/chromium
 
-EXPOSE 3000
+COPY --from=builder /packages/ ./packages/
+COPY --from=builder /apps/api-ts/dist ./apps/api-ts/dist
+COPY --from=builder /apps/api-ts/package*.json ./apps/api-ts/
+
+WORKDIR /apps/api-ts
+RUN npm ci --omit=dev --ignore-scripts
+
+EXPOSE 8080
 
 CMD ["node", "dist/index.js"]

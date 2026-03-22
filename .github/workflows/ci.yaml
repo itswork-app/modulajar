@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: ./apps/console-web/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm run build
+      - run: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZXhjaXRpbmctc2hyZXctODguY2xlcmsuYWNjb3VudHMuZGV2JA npm run build
 
   api-ts:
     runs-on: ubuntu-latest
@@ -39,11 +39,63 @@ jobs:
           cache-dependency-path: ./apps/api-ts/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm test
+      - name: Run Tests with Coverage Gate (lines≥85%, branches≥80%)
+        run: |
+          echo "=============================================="
+          echo "🧪 API-TS TEST + COVERAGE GATE"
+          echo "=============================================="
+          # Capture tap output (tap prints coverage table at end)
+          npm test 2>&1 | tee /tmp/tap_output.txt
+
+          echo ""
+          echo "=============================================="
+          echo "📊 API-TS COVERAGE SUMMARY"
+          echo "=============================================="
+          # Extract the 'All files' summary row from tap's coverage table
+          # Format: All files | % Stmts | % Branch | % Funcs | % Lines
+          SUMMARY=$(grep "^All files" /tmp/tap_output.txt || true)
+          echo "Summary row: $SUMMARY"
+
+          # Extract Lines (col 4 in the table)
+          LINES=$(echo "$SUMMARY" | awk -F'|' '{gsub(/ /,"",$5); print $5}' | sed 's/%//')
+          BRANCHES=$(echo "$SUMMARY" | awk -F'|' '{gsub(/ /,"",$3); print $3}' | sed 's/%//')
+
+          echo "Lines: ${LINES}%  Branches: ${BRANCHES}%"
+
+          # --- Lines gate: ≥ 90% (industrial standard) ---
+          LINES_INT=$(echo "$LINES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
+          if [ -n "$LINES" ] && [ "$LINES_INT" -lt 90 ]; then
+            echo "❌ GATE FAIL: api-ts total line coverage ${LINES}% is below 90%."
+            exit 1
+          fi
+          echo "✅ Lines gate: ${LINES}% ≥ 90%"
+
+          # --- Branches gate: ≥ 80% (industrial standard) ---
+          BRANCHES_INT=$(echo "$BRANCHES" | awk '{printf "%d", $1}' 2>/dev/null || echo "0")
+          if [ -n "$BRANCHES" ] && [ "$BRANCHES_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: api-ts branch coverage ${BRANCHES}% is below 80%."
+            exit 1
+          fi
+          echo "✅ Branches gate: ${BRANCHES}% ≥ 80%"
+
       - run: npm run build
 
   core-go:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: modulajar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: ./apps/core-go
@@ -52,9 +104,74 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/core-go/go.sum
-      - run: go test ./...
+      
+      - name: Install goose
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+
+      - name: Migrate DB
+        run: goose -dir ../../migrations postgres "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable" up
+
+      - name: Verify Chrome/Chromium (Using pre-installed)
+        run: |
+          google-chrome --version || chromium-browser --version || echo "No pre-installed browser"
+
+
+      - name: Run Tests with Coverage
+        env:
+          DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
+          DID_SECRET: "test-did-secret"
+          PID_SECRET: "test-pid-secret"
+          CHROME_BIN: "/usr/bin/google-chrome"
+        run: |
+          go test -coverprofile=coverage.out ./...
+
+
+          echo ""
+          echo "=============================================="
+          echo "📊 CORE-GO COVERAGE REPORT"
+          echo "=============================================="
+          go tool cover -func=coverage.out
+
+          # --- Extract total coverage ---
+          TOTAL=$(go tool cover -func=coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+          echo ""
+          echo "Total coverage: ${TOTAL}%"
+
+          # --- Gate: Total ≥ 80% (Industrial standard) ---
+          TOTAL_INT=$(echo "$TOTAL" | awk '{printf "%d", $1}')
+          if [ "$TOTAL_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: core-go total coverage ${TOTAL}% is below the 80% threshold."
+            exit 1
+          fi
+          echo "✅ Gate passed: core-go total ${TOTAL}% ≥ 80%"
+
+      - name: Check Worker Package Coverage Gate (≥80%)
+        env:
+          DATABASE_URL: "postgres://user:password@localhost:5432/modulajar_test?sslmode=disable"
+          DID_SECRET: "test-did-secret"
+          PID_SECRET: "test-pid-secret"
+          CHROME_BIN: "/usr/bin/google-chrome"
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "🔍 WORKER PACKAGE COVERAGE GATE (≥80%)"
+          echo "=============================================="
+          go test -coverprofile=worker_coverage.out ./worker/...
+          WORKER=$(go tool cover -func=worker_coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+          echo "Worker coverage: ${WORKER}%"
+
+          WORKER_INT=$(echo "$WORKER" | awk '{printf "%d", $1}')
+          if [ "$WORKER_INT" -lt 80 ]; then
+            echo "❌ GATE FAIL: worker coverage ${WORKER}% is below the 80% threshold."
+            exit 1
+          fi
+          echo "✅ Gate passed: worker ${WORKER}% ≥ 80%"
+
 
   worker-go:
     runs-on: ubuntu-latest
@@ -66,7 +183,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-            go-version: '1.21'
+            go-version: '1.24'
             cache-dependency-path: apps/worker-go/go.sum
       - run: go test ./...
 

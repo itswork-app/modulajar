@@ -17,15 +17,25 @@ export interface PricingTier {
  */
 export const PRICING_TABLE: PricingTier[] = [
     { product: 'sd_semester', label: 'SD Semester', amountIdr: 59000, credits: 20 },
-    // Future:
-    // { product: 'smp_mapel_semester', label: 'SMP Mapel Semester', amountIdr: 49000, credits: 15 },
-    // { product: 'sma_mapel_semester', label: 'SMA Mapel Semester', amountIdr: 59000, credits: 18 },
+    { product: 'pkg_10', label: 'Paket Basic 10', amountIdr: 49000, credits: 10 },
+    { product: 'pkg_50', label: 'Paket Regular 50', amountIdr: 199000, credits: 50 },
+    { product: 'pkg_200', label: 'Paket Premium 200', amountIdr: 699000, credits: 200 },
 ];
 
 /**
  * SD full semester generation cost in credits.
  */
 export const SD_FULL_SEMESTER_COST = 5;
+
+/**
+  * Administration bundle document costs (in credits).
+ */
+export const ATP_COST = 1;
+export const PROTA_COST = 1;
+export const PROMES_COST = 1;
+/** Per-topic modul ajar cost within a bundle — reuses SD_FULL_SEMESTER_COST. */
+export const BUNDLE_MODUL_COST = SD_FULL_SEMESTER_COST;
+
 
 /**
  * Look up credits for an IDR amount.

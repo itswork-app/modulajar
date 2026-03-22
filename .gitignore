@@ -3,10 +3,10 @@ node_modules/
 .pnpm-store
 
 # Build outputs
-/dist/
-/.next/
-/out/
-/build/
+dist/
+.next/
+out/
+build/
 
 # Go
 /bin/
@@ -48,3 +48,13 @@ Thumbs.db
 
 # Docker
 .dockerignore
+env-api.yaml
+env-worker.yaml
+docs/ENV_TEMPLATE.md
+apps/console-web/dev.log
+apps/worker-go/worker-go
+
+# Test deps
+chrome-bin/
+
+tmp/
