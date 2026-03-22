@@ -28,16 +28,7 @@ interface CurriculumTopic {
     notes?: string;
 }
 
-interface UsageSummary {
-    credits_remaining: number;
-    documents_generated: number;
-}
 
-interface Template {
-    id: string;
-    name: string;
-    workspace_id: string | null;
-}
 
 const STEPS: { key: WizardStep; label: string }[] = [
     { key: 'IDENTITAS', label: '1. Identitas' },

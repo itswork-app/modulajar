@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useWorkspaceStore } from '@/store/workspace-store';
-import { Loader2 } from 'lucide-react';
 import OnboardingFlow from '@/components/OnboardingFlow';
 
 export default function GlobalOnboardingGuard({ children }: { children: React.ReactNode }) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useWorkspaceStore } from '@/store/workspace-store';
@@ -69,10 +69,10 @@ const ModulesSkeleton = () => (
 );
 
 export default function JobsListPage() {
-    const router = useRouter();
+
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();
-    const { teacherProfile, schoolIdentity, isProfileLoading } = useWorkspaceStore();
+    const { isProfileLoading } = useWorkspaceStore();
 
     const [jobs, setJobs] = useState<Job[]>([]);
     const [error, setError] = useState<string | null>(null);

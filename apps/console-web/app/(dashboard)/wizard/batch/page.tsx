@@ -14,10 +14,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 type BatchStep = 'KONTEKS' | 'TOPIK' | 'REVIEW' | 'GENERATING';
 
-interface UsageSummary {
-    credits_remaining: number;
-    documents_generated: number;
-}
+
 
 interface CurriculumTopic {
     id: string;
@@ -30,11 +27,7 @@ interface CurriculumTopic {
     notes?: string;
 }
 
-interface Template {
-    id: string;
-    name: string;
-    workspace_id: string | null;
-}
+
 
 const STEPS: { key: BatchStep; label: string }[] = [
     { key: 'KONTEKS', label: '1. Konteks' },

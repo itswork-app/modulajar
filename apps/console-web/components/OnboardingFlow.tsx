@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { Loader2, User, School, PenTool, CheckCircle2, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
@@ -28,7 +28,7 @@ type SchoolResult = {
 type Step = 'PROFILE' | 'SCHOOL' | 'SIGNATURE';
 
 export default function OnboardingFlow({ onSuccess }: { onSuccess: () => void }) {
-    const router = useRouter();
+
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const { user } = useUser();
     const { workspace, isLoading: isLoadingWorkspace } = useWorkspace();

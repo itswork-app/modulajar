@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { TeacherProfile, SchoolIdentity } from 'shared-types';
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 

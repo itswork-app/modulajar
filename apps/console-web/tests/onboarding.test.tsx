@@ -71,7 +71,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockUseWorkspaceStore.mockReturnValue(defaultStore);
-        global.fetch = vi.fn().mockImplementation((url: string) => {
+        global.fetch = vi.fn().mockImplementation(() => {
             return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({}) });
         });
     });
@@ -94,7 +94,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     it('loads wizard successfully with empty states if school identity is missing', async () => {
         mockUseWorkspaceStore.mockReturnValue({
             ...defaultStore,
-            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika' } as any,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 },
             schoolIdentity: null,
         });
 
@@ -110,8 +110,8 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     it('loads wizard successfully and renders identity step', async () => {
         mockUseWorkspaceStore.mockReturnValue({
             ...defaultStore,
-            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 } as any,
-            schoolIdentity: { school_display_name: 'Mock School' } as any,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 },
+            schoolIdentity: { school_display_name: 'Mock School' },
         });
 
         render(<OnboardingWizardPage />);
@@ -126,7 +126,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     it('progresses through WizardV2Page flow correctly', async () => {
         mockUseWorkspaceStore.mockReturnValue({
             ...defaultStore,
-            teacherProfile: { full_name: 'Mock', primary_subject: '' } as any,
+            teacherProfile: { full_name: 'Mock', primary_subject: '', primary_jenjang: 'SD', primary_grade: 4 },
         });
 
         render(<OnboardingWizardPage />);
@@ -166,7 +166,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     it('submits the generation successfully in V2 flow', async () => {
         mockUseWorkspaceStore.mockReturnValue({
             ...defaultStore,
-            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 } as any,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'Matematika', primary_jenjang: 'SD', primary_grade: 4 },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,7 +218,7 @@ describe('Onboarding Wizard Guard Logic (v1)', () => {
     it('handles generate validation errors in V2 flow', async () => {
         mockUseWorkspaceStore.mockReturnValue({
             ...defaultStore,
-            teacherProfile: { full_name: 'Mock', primary_subject: 'IPAS', primary_jenjang: 'SD', primary_grade: 4 } as any,
+            teacherProfile: { full_name: 'Mock', primary_subject: 'IPAS', primary_jenjang: 'SD', primary_grade: 4 },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

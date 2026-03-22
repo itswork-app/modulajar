@@ -23,11 +23,7 @@ const SEMESTER_OPTIONS = ['1', '2'];
 
 type BundleStep = 'KONTEKS' | 'TOPIK' | 'ESTIMASI' | 'GENERATE';
 
-interface Template {
-    id: string;
-    name: string;
-    workspace_id: string | null;
-}
+
 
 const STEPS: { key: BundleStep; label: string }[] = [
     { key: 'KONTEKS', label: 'Konteks' },
