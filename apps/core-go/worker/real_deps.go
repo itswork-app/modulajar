@@ -100,66 +100,55 @@ func (r *RealValidator) Validate(input validator.ValidatorInput) (*validator.Val
 }
 
 // NewRealWorker creates a Worker with real dependencies.
-// It initializes API clients from environment variables.
+// Priority: Claude (primary) → OpenAI (fallback) → Gemini (last resort)
 func NewRealWorker(ctx context.Context) (*Worker, error) {
-	// AI
-	var aiEngine AIEngine
+	claudeKey := os.Getenv("ANTHROPIC_API_KEY")
 	openAIKey := os.Getenv("OPENAI_API_KEY")
 	geminiKey := os.Getenv("GEMINI_API_KEY")
 
-	var primary ai.Client
-	var secondary ai.Client
+	var clients []ai.Client
 
+	// Claude — primary, terbaik untuk konten panjang modul ajar
+	if claudeKey != "" {
+		model := os.Getenv("CLAUDE_MODEL")
+		if model == "" {
+			model = "claude-sonnet-4-5"
+		}
+		clients = append(clients, ai.NewClaudeClient(claudeKey, model, 0, 0))
+	}
+
+	// OpenAI — fallback pertama
 	if openAIKey != "" {
-		openAIModel := os.Getenv("OPENAI_MODEL")
-		if openAIModel == "" {
-			openAIModel = "gpt-4o"
+		model := os.Getenv("OPENAI_MODEL")
+		if model == "" {
+			model = "gpt-4o"
 		}
-		primary = ai.NewOpenAIClient(openAIKey, openAIModel, 0, 0)
+		clients = append(clients, ai.NewOpenAIClient(openAIKey, model, 0, 0))
 	}
 
+	// Gemini — last resort
 	if geminiKey != "" {
-		geminiModel := os.Getenv("GEMINI_MODEL")
-		if geminiModel == "" {
-			geminiModel = "gemini-2.0-flash"
+		model := os.Getenv("GEMINI_MODEL")
+		if model == "" {
+			model = "gemini-2.0-flash"
 		}
-		secondary = ai.NewGeminiClient(geminiKey, geminiModel, 0, 0)
+		clients = append(clients, ai.NewGeminiClient(geminiKey, model, 0, 0))
 	}
 
-	if primary != nil && secondary != nil {
-		// Use Fallback (OpenAI -> Gemini)
-		aiEngine = ai.NewFallbackClient(primary, secondary, nil)
-	} else if primary != nil {
-		aiEngine = primary
-	} else if secondary != nil {
-		aiEngine = secondary
-	} else {
-		// Fallback to a default or error? NewRealWorker returns error.
-		return nil, fmt.Errorf("no AI provider configured (missing OPENAI_API_KEY or GEMINI_API_KEY)")
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("no AI provider configured — set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY")
 	}
 
-	// GCS - Note: Client creation might fail if credentials missing
-	// Should we fail or allow nil (if optional)?
-	// For production/worker, it is required.
-	// But previous code allowed it to be nil/warn.
-	// NewClient returns (*Client, error).
-	gcsClient, err := gcs.NewClient(ctx)
-	// We handle err in calling code or validly return nil if not needed locally?
-	// But worker needs it.
-	// Let's return error if fundamental.
+	// Build fallback chain: A → B → C
+	var aiEngine ai.Client = clients[0]
+	for i := 1; i < len(clients); i++ {
+		aiEngine = ai.NewFallbackClient(aiEngine, clients[i], nil)
+	}
 
-	// Wait, previous handler:
-	// if err != nil { baseLogger.Warn... }
-	// So it didn't crash.
-	// Check ExecuteJob use of Storage: if w.Deps.Storage != nil { ... }
-	// So nil is allowed.
-
+	// GCS Storage
 	var realStorage Storage
-	if gcsClient != nil {
+	if gcsClient, err := gcs.NewClient(ctx); err == nil && gcsClient != nil {
 		realStorage = &RealStorage{Client: gcsClient}
-	} else if err != nil {
-		// Log warning? We don't have logger here easily.
-		// Return nil storage is fine.
 	}
 
 	deps := WorkerDeps{
