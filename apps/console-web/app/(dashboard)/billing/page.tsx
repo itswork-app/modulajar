@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -86,16 +86,15 @@ export default function BillingPage() {
     const [isTopUpOpen, setIsTopUpOpen] = useState(false);
     const [isVoucherOpen, setIsVoucherOpen] = useState(false);
 
-    useEffect(() => {
-        let isMounted = true;
-
-        async function fetchSummary() {
+    const fetchWalletData = useCallback(
+        async (opts?: { showPageSpinner?: boolean }) => {
+            const showSpinner = opts?.showPageSpinner ?? false;
             if (!isAuthLoaded || isLoadingWorkspace) return;
             if (!workspace) {
-                if (isMounted) setIsLoading(false);
+                if (showSpinner) setIsLoading(false);
                 return;
             }
-
+            if (showSpinner) setIsLoading(true);
             try {
                 const token = await getToken();
                 const [summaryRes, trxRes] = await Promise.all([
@@ -114,27 +113,33 @@ export default function BillingPage() {
                 const summaryData = await summaryRes.json();
                 const trxData = await trxRes.json();
 
-                if (isMounted) {
-                    setSummary(summaryData);
-                    setTransactions(trxData);
-                    setError(null);
-                }
+                setSummary(summaryData);
+                setTransactions(trxData);
+                setError(null);
             } catch (err: unknown) {
-                if (isMounted) {
-                    console.error('Failed to fetch billing data:', err);
-                    setError(err instanceof Error ? err.message : 'Terjadi kesalahan tidak terduga.');
-                }
+                console.error('Failed to fetch billing data:', err);
+                setError(err instanceof Error ? err.message : 'Terjadi kesalahan tidak terduga.');
             } finally {
-                if (isMounted) setIsLoading(false);
+                if (showSpinner) setIsLoading(false);
             }
-        }
+        },
+        [isAuthLoaded, isLoadingWorkspace, workspace, getToken]
+    );
 
-        fetchSummary();
+    useEffect(() => {
+        fetchWalletData({ showPageSpinner: true });
+    }, [fetchWalletData]);
 
-        return () => {
-            isMounted = false;
+    // After Xendit redirect, user returns to this tab — refresh saldo without full reload
+    useEffect(() => {
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                fetchWalletData({ showPageSpinner: false });
+            }
         };
-    }, [isAuthLoaded, isLoadingWorkspace, workspace, getToken]);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, [fetchWalletData]);
 
     if (!isAuthLoaded || isLoadingWorkspace || isLoading) {
         return <BillingSkeleton />;

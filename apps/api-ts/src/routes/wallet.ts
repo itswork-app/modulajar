@@ -18,7 +18,8 @@ export default async function walletRoutes(fastify: FastifyInstance) {
                         properties: {
                             credits_remaining: { type: 'number' },
                             documents_generated: { type: 'number' },
-                            month_usage: { type: 'number' }
+                            month_usage: { type: 'number' },
+                            jobs_failed: { type: 'number' }
                         }
                     }
                 }

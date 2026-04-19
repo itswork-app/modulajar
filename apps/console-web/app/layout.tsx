@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 import { ToastProvider } from '@/components/ui/Toaster';
+import { BetaBanner } from '@/components/BetaBanner';
 
 export default function RootLayout({
   children,
@@ -21,6 +22,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className={inter.className}>
+          <BetaBanner />
           <ToastProvider>
             {children}
           </ToastProvider>

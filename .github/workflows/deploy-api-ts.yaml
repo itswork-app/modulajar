@@ -1,0 +1,52 @@
+# Deploy otomatis ke production: pakai Cloud Build trigger (cloudbuild.yaml) di GCP — bukan workflow ini.
+# File ini hanya untuk darurat: deploy hanya API dari GitHub (Actions → Run workflow).
+name: Deploy API (api-ts) to Cloud Run (manual)
+
+on:
+  workflow_dispatch:
+
+# Selaras dengan image di cloudbuild.yaml: asia-southeast1 …/modulajar/api-ts
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  SERVICE_NAME: modulajar-api
+  REPOSITORY: modulajar
+  IMAGE_NAME: api-ts
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and push container
+        run: |
+          TAG=${GITHUB_SHA}
+          IMAGE_PATH="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:$TAG"
+          docker build -f apps/api-ts/Dockerfile -t "$IMAGE_PATH" .
+          docker push "$IMAGE_PATH"
+          echo "IMAGE_PATH=$IMAGE_PATH" >> "$GITHUB_ENV"
+
+      # Hanya update image; env vars & service account tetap seperti di Cloud Run (atau dari trigger GCP Anda)
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE_PATH }}

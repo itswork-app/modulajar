@@ -4,14 +4,17 @@ import fp from 'fastify-plugin';
 export default fp(async (fastify: FastifyInstance) => {
     fastify.decorate('platformGuard', async (request: FastifyRequest, reply: FastifyReply) => {
         const clerkUserId = request.auth?.clerk_user_id;
-        const email = request.auth?.email;
 
         if (!clerkUserId) {
             return reply.code(401).send({ error: 'Unauthorized', message: 'User not authenticated' });
         }
 
-        // Hardcoded Superadmin Override for Initial Setup
-        if (email === 'rejaputraperdana@gmail.com') {
+        // Optional bootstrap: comma-separated Clerk user IDs (set in deployment env only, never commit secrets)
+        const bootstrapIds = (process.env.PLATFORM_ADMIN_CLERK_USER_IDS || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        if (bootstrapIds.includes(clerkUserId)) {
             request.platformRole = 'owner';
             return;
         }

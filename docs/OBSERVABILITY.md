@@ -2,6 +2,9 @@
 
 This document outlines the observability stack for `modulajar`, including metrics, logging, and trace correlation.
 
+**Canonical metric names and full tables:** [docs/canon/05-observability.md](canon/05-observability.md).  
+**GCP alerting (log-based / Cloud Run):** [docs/GCP_LOG_ALERTS.md](GCP_LOG_ALERTS.md).
+
 ## 1. Metrics (Prometheus)
 
 Both `api-ts` and `core-go` (worker) expose Prometheus-compatible metrics at `/metrics`.

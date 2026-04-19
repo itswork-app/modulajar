@@ -36,6 +36,7 @@ import yaml from 'js-yaml';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './utils/logger';
 import { register, httpRequestsTotal, httpRequestDuration } from './utils/metrics';
+import { assertProductionEnv } from './lib/env';
 
 dotenv.config();
 
@@ -120,11 +121,38 @@ fastify.addHook('onResponse', async (request, reply) => {
     }, 'http_request');
 });
 
-// Metrics Endpoint
-fastify.get('/metrics', async (_req, reply) => {
+// Metrics: when METRICS_SECRET is set, require X-Metrics-Token or Authorization: Bearer <secret>
+fastify.get('/metrics', async (req, reply) => {
+    const secret = process.env.METRICS_SECRET?.trim();
+    if (secret) {
+        const headerToken = req.headers['x-metrics-token'] as string | undefined;
+        const auth = req.headers['authorization'];
+        const bearer = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : undefined;
+        const ok =
+            (headerToken !== undefined && headerToken === secret) ||
+            (bearer !== undefined && bearer === secret);
+        if (!ok) {
+            return reply.code(404).send({ error: 'Not found' });
+        }
+    }
     reply.header('Content-Type', register.contentType);
     return register.metrics();
 });
+
+function resolveOpenApiSpecPath(): string | null {
+    if (process.env.OPENAPI_SPEC_PATH?.trim()) {
+        return process.env.OPENAPI_SPEC_PATH.trim();
+    }
+    const fromSourceTree = path.join(__dirname, '../../../contracts/api/openapi.yaml');
+    if (fs.existsSync(fromSourceTree)) {
+        return fromSourceTree;
+    }
+    const dockerBundled = '/contracts/api/openapi.yaml';
+    if (fs.existsSync(dockerBundled)) {
+        return dockerBundled;
+    }
+    return null;
+}
 
 const SERVICE_MODE = process.env.SERVICE_MODE || 'api';
 console.log(`[STARTUP] Starting Modulajar API in ${SERVICE_MODE} mode...`);
@@ -154,15 +182,17 @@ if (SERVICE_MODE === 'verify') {
     console.log('[STARTUP] Registering VERIFY mode routes...');
     fastify.register(verifyRoutes, { prefix: '/verify' });
 } else {
-    // Load OpenAPI spec
-    const openapiPath = path.join(__dirname, '../../contracts/api/openapi.yaml');
+    // Load OpenAPI spec (path works from dist/ and src/; Docker uses /contracts)
+    const openapiPath = resolveOpenApiSpecPath();
     let openapiSpec = {};
     try {
-        if (fs.existsSync(openapiPath)) {
+        if (openapiPath && fs.existsSync(openapiPath)) {
             openapiSpec = yaml.load(fs.readFileSync(openapiPath, 'utf8')) as any;
             console.log(`[STARTUP] Loaded OpenAPI spec from ${openapiPath}`);
         } else {
-            console.warn(`[STARTUP] WARNING: OpenAPI spec not found at ${openapiPath}`);
+            console.warn(
+                `[STARTUP] WARNING: OpenAPI spec not found (set OPENAPI_SPEC_PATH or bundle contracts/)`
+            );
         }
     } catch (err) {
         console.error(`[STARTUP] Failed to load OpenAPI spec:`, err);
@@ -219,9 +249,14 @@ if (SERVICE_MODE === 'verify') {
 
 const start = async () => {
     try {
+        assertProductionEnv();
         console.log('[STARTUP] Checking critical environment variables...');
-        if (!process.env.DATABASE_URL) console.warn('[STARTUP] WARNING: DATABASE_URL is not set');
-        if (!process.env.GCS_BUCKET) console.warn('[STARTUP] WARNING: GCS_BUCKET is not set');
+        if (!process.env.DATABASE_URL) {
+            console.warn('[STARTUP] WARNING: DATABASE_URL is not set');
+        }
+        if (!process.env.GCS_BUCKET) {
+            console.warn('[STARTUP] WARNING: GCS_BUCKET is not set');
+        }
 
         const port = parseInt(process.env.PORT || '8080');
         console.log(`[STARTUP] Attempting to listen on port ${port}...`);

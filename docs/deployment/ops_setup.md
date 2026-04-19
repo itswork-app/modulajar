@@ -17,6 +17,8 @@ Panduan ini akan membantu Anda menghubungkan aplikasi `ops-web` (HQ Command Cent
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: (Ambil dari Clerk Dashboard)
    - `CLERK_SECRET_KEY`: (Ambil dari Clerk Dashboard)
 
+Pada **API (Cloud Run)**, set juga `CONSOLE_APP_BASE_URL` ke URL origin konsol pengguna (mis. `https://app.modulajar.app`, tanpa slash di akhir) agar redirect setelah pembayaran Xendit mengembalikan pengguna ke halaman Billing. Lihat [docs/BILLING_PAYMENT_SMOKE.md](../BILLING_PAYMENT_SMOKE.md).
+
 ## 3. Setting Sub-domain
 1. Di dashboard project `modulajar-ops`, buka menu **"Settings"** > **"Domains"**.
 2. Masukkan `ops.modulajar.app` dan klik **"Add"**.
