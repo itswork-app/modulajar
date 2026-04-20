@@ -14,6 +14,21 @@ function generateExternalRef(): string {
     return `RCPT-${randomBytes(8).toString('hex').toUpperCase()}`;
 }
 
+/** Xendit success/failure redirects back to console-web (`CONSOLE_APP_BASE_URL`, no trailing slash). */
+function xenditRedirectUrls():
+    | { successRedirectUrl: string; failureRedirectUrl: string }
+    | undefined {
+    const raw = process.env.CONSOLE_APP_BASE_URL?.trim();
+    if (!raw) {
+        return undefined;
+    }
+    const base = raw.replace(/\/$/, '');
+    return {
+        successRedirectUrl: `${base}/billing?payment=success`,
+        failureRedirectUrl: `${base}/billing?payment=failed`
+    };
+}
+
 export default async function billingRoutes(fastify: FastifyInstance) {
 
     // ═══════════════════════════════════════════
@@ -132,11 +147,13 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
             let invoice;
             try {
+                const redirects = xenditRedirectUrls();
                 invoice = await xendit.createInvoice({
                     externalId: externalRef,
                     amount: amount_idr,
                     payerEmail: userEmail,
-                    description: `Top-up ${tier.credits} Token - ModulAjar`
+                    description: `Top-up ${tier.credits} Token - ModulAjar`,
+                    ...redirects
                 });
             } catch (err) {
                 logger.error(err, 'Failed to create Xendit invoice');
@@ -248,11 +265,13 @@ export default async function billingRoutes(fastify: FastifyInstance) {
                 const userEmail = request.auth?.email;
                 let invoice;
                 try {
+                    const redirects = xenditRedirectUrls();
                     invoice = await xendit.createInvoice({
                         externalId: externalRef,
                         amount: plan.base_price_idr,
                         payerEmail: userEmail,
-                        description: `Upgrade to ${plan.name} - ModulAjar`
+                        description: `Upgrade to ${plan.name} - ModulAjar`,
+                        ...redirects
                     });
                 } catch (err) {
                     logger.error(err, 'Failed to create upgrade invoice');

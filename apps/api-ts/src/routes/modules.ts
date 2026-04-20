@@ -13,6 +13,7 @@ import {
 } from 'shared-types';
 import { createHash } from 'crypto';
 import { issuePID } from '../lib/pid';
+import { getPidSecret } from '../lib/env';
 import { logger } from '../utils/logger';
 import { generateRequestsTotal, moduleUpdateTotal, aiAssistTotal } from '../utils/metrics';
 import { computeHtmlSha256, renderModuleHtml } from '../services/renderService';
@@ -134,7 +135,7 @@ export default async function modulesRoutes(fastify: FastifyInstance) {
 
             // In V2 Wizard, we issue a new Package for each Generation as they are granular topic-based modules.
             packageId = ulid();
-            pid = issuePID(process.env.PID_SECRET || 'dev-secret', {
+            pid = issuePID(getPidSecret(), {
                 workspaceId,
                 packageUlid: packageId,
                 kelas: grade.toString(),

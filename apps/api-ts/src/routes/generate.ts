@@ -5,8 +5,7 @@ import { SD_FULL_SEMESTER_COST } from '../lib/pricing';
 import { getBalance, debit } from '../lib/wallet';
 import { logger } from '../utils/logger';
 import { generateRequestsTotal } from '../utils/metrics';
-
-const PID_SECRET = process.env.PID_SECRET || 'modulajar-pid-dev-secret';
+import { getPidSecret } from '../lib/env';
 
 /**
  * Compute idempotency key for a generate request.
@@ -205,7 +204,7 @@ export default async function generateRoutes(fastify: FastifyInstance) {
             } else {
                 // Create new package with canonical PID
                 packageId = ulid();
-                pid = issuePID(PID_SECRET, {
+                pid = issuePID(getPidSecret(), {
                     workspaceId,
                     packageUlid: packageId,
                     kelas,

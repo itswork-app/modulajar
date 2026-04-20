@@ -1,19 +1,16 @@
-name: Deploy Worker Go to Cloud Run
+# Deploy otomatis ke production: pakai Cloud Build trigger (cloudbuild.yaml) di GCP — bukan workflow ini.
+# File ini hanya untuk darurat: deploy hanya worker dari GitHub (Actions → Run workflow).
+name: Deploy Worker Go to Cloud Run (manual)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/core-go/**'
-      - 'apps/worker-go/**'
-      - '.github/workflows/deploy-worker-go.yaml'
+  workflow_dispatch:
 
+# Selaras dengan cloudbuild.yaml: asia-southeast1, Artifact Registry modulajar/worker-go
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: asia-southeast2
+  REGION: asia-southeast1
   SERVICE_NAME: modulajar-worker
-  REPOSITORY: modulajar-repo # Adjust if needed
+  REPOSITORY: modulajar
   IMAGE_NAME: worker-go
   IMAGE_PATH: ''
 

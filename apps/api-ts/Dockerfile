@@ -2,6 +2,7 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /
 
+COPY contracts/ ./contracts/
 COPY packages/ ./packages/
 COPY apps/api-ts/package*.json ./apps/api-ts/
 
@@ -24,6 +25,7 @@ RUN apt-get update && apt-get install -y \
 
 ENV CHROME_BIN=/usr/bin/chromium
 
+COPY --from=builder /contracts/ ./contracts/
 COPY --from=builder /packages/ ./packages/
 COPY --from=builder /apps/api-ts/dist ./apps/api-ts/dist
 COPY --from=builder /apps/api-ts/package*.json ./apps/api-ts/

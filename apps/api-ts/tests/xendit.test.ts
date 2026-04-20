@@ -36,6 +36,8 @@ test('Xendit Client utility', async (t) => {
             t.equal(url, 'https://api.xendit.co/v2/invoices');
             const auth = Buffer.from(`${SECRET}:`).toString('base64');
             t.equal(init.headers['Authorization'], `Basic ${auth}`);
+            const body = JSON.parse(init.body);
+            t.notOk(body.success_redirect_url, 'no redirect without CONSOLE_APP_BASE_URL');
 
             return {
                 ok: true,
@@ -51,6 +53,37 @@ test('Xendit Client utility', async (t) => {
         t.equal(result.id, 'inv_123');
         t.equal(result.amount, 1000);
 
+        global.fetch = originalFetch;
+    });
+
+    await t.test('createInvoice - includes redirect URLs when CONSOLE_APP_BASE_URL set', async (t) => {
+        process.env.XENDIT_SECRET_KEY = SECRET;
+        process.env.CONSOLE_APP_BASE_URL = 'https://app.example.com/';
+
+        const mockResponse = {
+            id: 'inv_123',
+            external_id: 'ext_123',
+            invoice_url: 'http://xendit.co/inv',
+            status: 'PENDING',
+            amount: 1000
+        };
+
+        const originalFetch = global.fetch;
+        (global as any).fetch = async (_url: string, init: any) => {
+            const body = JSON.parse(init.body);
+            t.equal(body.success_redirect_url, 'https://app.example.com/billing?payment=success');
+            t.equal(body.failure_redirect_url, 'https://app.example.com/billing?payment=failed');
+            return { ok: true, json: async () => mockResponse } as any;
+        };
+
+        await xendit.createInvoice({
+            externalId: 'ext_123',
+            amount: 1000,
+            successRedirectUrl: 'https://app.example.com/billing?payment=success',
+            failureRedirectUrl: 'https://app.example.com/billing?payment=failed'
+        });
+
+        delete process.env.CONSOLE_APP_BASE_URL;
         global.fetch = originalFetch;
     });
 

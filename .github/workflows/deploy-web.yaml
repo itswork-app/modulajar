@@ -1,0 +1,43 @@
+name: Deploy Landing (web) to Vercel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/deploy-web.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Project Vercel terpisah untuk landing; set VERCEL_WEB_PROJECT_ID di GitHub Secrets.
+      - name: Pull Vercel Project Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}

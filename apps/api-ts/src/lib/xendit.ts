@@ -26,6 +26,10 @@ export const xendit = {
         amount: number;
         payerEmail?: string;
         description?: string;
+        /** After payment (e.g. https://app.example.com/billing?payment=success) */
+        successRedirectUrl?: string;
+        /** After failed / expired (e.g. https://app.example.com/billing?payment=failed) */
+        failureRedirectUrl?: string;
     }): Promise<XenditInvoiceResponse> {
         const secretKey = getSecretKey();
         if (!secretKey) {
@@ -34,19 +38,27 @@ export const xendit = {
 
         const auth = Buffer.from(`${secretKey}:`).toString('base64');
 
+        const payload: Record<string, unknown> = {
+            external_id: params.externalId,
+            amount: params.amount,
+            payer_email: params.payerEmail,
+            description: params.description,
+            should_send_email: !!params.payerEmail
+        };
+        if (params.successRedirectUrl) {
+            payload.success_redirect_url = params.successRedirectUrl;
+        }
+        if (params.failureRedirectUrl) {
+            payload.failure_redirect_url = params.failureRedirectUrl;
+        }
+
         const response = await fetch('https://api.xendit.co/v2/invoices', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Basic ${auth}`
             },
-            body: JSON.stringify({
-                external_id: params.externalId,
-                amount: params.amount,
-                payer_email: params.payerEmail,
-                description: params.description,
-                should_send_email: !!params.payerEmail
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
